@@ -5,3 +5,4 @@ CREATE TYPE appt_status_enum AS ENUM ('รอ', 'ยืนยัน', 'ยกเ
 CREATE TYPE symptom_duration_enum AS ENUM ('1-3 วัน', '4-7 วัน', 'มากกว่า 7 วัน');
 CREATE TYPE ref_type_enum AS ENUM ('รักษา', 'ผ่าตัด', 'วัคซีน');
 
+-- int
