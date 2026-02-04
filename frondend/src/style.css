@@ -1,0 +1,31 @@
+/* src/style.css */
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #333;
+  background-color: #f3f4f6;
+}
+
+/* ลบ display: flex และ place-items: center ของเดิมออก */
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  display: block; /* สำคัญมาก */
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Reset ปุ่ม */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
