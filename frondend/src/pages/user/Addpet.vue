@@ -57,8 +57,8 @@
             <div class="select-wrapper">
               <select v-model="pet.pet_gender" class="input-field cursor-pointer" required>
                 <option value="" disabled selected>เลือกเพศ</option>
-                <option value="ผู้">ชาย (Male)</option>
-                <option value="เมีย">หญิง (Female)</option>
+                <option value="ผู้">ตัวผู้</option>
+                <option value="เมีย">ตัวเมีย</option>
               </select>
               <span class="select-arrow">▼</span>
             </div>

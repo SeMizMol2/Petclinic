@@ -71,12 +71,12 @@
         </div>
 
         <div class="status-row">
-             <div>
+             <!-- <div>
                 <p class="label">อายุ</p>
                 <div class="age-value">
                   {{ calculateAge(pet.pet_birthdate) }} <span class="unit">ปี</span>
                 </div>
-             </div>
+             </div> -->
              <div>
                 <span class="status-badge" :class="pet.sterile_status === 'ทำแล้ว' ? 'status-green' : 'status-orange'">
                   {{ pet.sterile_status === 'ทำแล้ว' ? '✓ ทำหมันแล้ว' : '✕ ยังไม่ทำ' }}
@@ -281,7 +281,7 @@ onMounted(loadPets)
   font-family: 'Inter', sans-serif;
 }
 
-/* ⭐ Back Nav Container ⭐ */
+/*  Back Nav Container  */
 .back-nav {
   max-width: 1200px;
   margin: 0 auto 1.5rem; /* เว้นระยะห่างด้านล่าง */
@@ -320,7 +320,7 @@ onMounted(loadPets)
   padding-left: 0.5rem;
 }
 
-/* ⭐ 3. Shared Button Style (ใช้ทั้งปุ่มเพิ่มและปุ่มย้อนกลับ) ⭐ */
+/*  3. Shared Button Style (ใช้ทั้งปุ่มเพิ่มและปุ่มย้อนกลับ)  */
 .btn-white {
   background-color: white;
   color: #5a72ea; /* สีตัวหนังสือสีเดียวกับพื้นหลังเว็บ */

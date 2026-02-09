@@ -62,7 +62,27 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'กรอกข้อมูลไม่ครบ' });
     }
 
-    // 🔎 หา user
+    // ⭐ ส่วนของ Admin (แก้ไขแล้ว)
+    if (username === 'admin' && password === 'admin1234') {
+      const token = jwt.sign(
+        { user_id : 'admin_001', role : 'admin'},
+        process.env.JWT_SECRET,
+        { expiresIn:'1d'}
+      );
+      
+      // ✅ แก้ไขโครงสร้าง JSON ให้ถูกต้อง (Token กับ User แยกกัน)
+      return res.json({
+        message: 'เข้าสู่ระบบผู้ดูแลระบบสำเร็จ',
+        token, // ส่ง token string กลับไป
+        user: {
+          user_id: 'admin_001',
+          username: 'Administrator',
+          role: 'admin'
+        }
+      });
+    }
+
+    // 🔎 หา user ปกติ
     const result = await pool.query(
       'SELECT * FROM tb_user WHERE username = $1',
       [username]
@@ -85,7 +105,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       {
         user_id: user.user_id,
-        role: user.user_role
+        role: user.user_role // ตรวจสอบว่าใน DB ชื่อ column คือ user_role จริงๆ
       },
       process.env.JWT_SECRET,
       { expiresIn: '1d' }

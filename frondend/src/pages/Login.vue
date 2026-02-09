@@ -76,9 +76,11 @@ const login = async () => {
     localStorage.setItem('user', JSON.stringify(res.data.user))
 
     alert('เข้าสู่ระบบสำเร็จ')
-
-    // 👉 ไปหน้า user
-    router.push('/user')
+    if (res.data.user.role === 'admin'){
+      router.push('/admin')
+    } else{
+      router.push('/user')
+    }
 
   } catch (err) {
     error.value =

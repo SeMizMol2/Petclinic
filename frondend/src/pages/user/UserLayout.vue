@@ -58,7 +58,7 @@
           @click="logout" 
           class="flex items-center gap-2 px-5 py-3 bg-white text-[#5a72ea] rounded-xl font-bold text-base shadow-[0_2px_4px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_10px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all duration-200"
         >
-          <span class="text-lg">🚪</span> ออกระบบ
+          <span class="text-lg">🚪</span> ออกจากระบบ
         </button>
       </header>
 

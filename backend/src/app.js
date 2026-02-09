@@ -5,6 +5,7 @@ const authRoutes = require('./routes/auth.routes');
 const testRoutes = require('./routes/test.routes');
 const petRoutes = require('./routes/pet.routes');
 const userRoutes = require('./routes/user.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
 app.use('/api/pets', petRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/admin', adminRoutes);
 
 const routes = require('./routes');
 app.use('/api', routes);
