@@ -13,6 +13,8 @@ import AddPet from '../pages/user/Addpet.vue'
 import AdminLayout from '../pages/admin/AdminLayout.vue'
 import AdminDashboard from '../pages/admin/Dashboard.vue'
 import AdminUsers from '../pages/admin/Users.vue'
+import AdminAppointments from '../pages/admin/Appointments.vue'
+import { comma } from 'postcss/lib/list'
 
 const routes = [
   { path: '/', component: Home },
@@ -40,7 +42,8 @@ const routes = [
     children: [
       { path: '', redirect: '/admin/dashboard' },
       { path: 'dashboard', component: AdminDashboard },
-      { path: 'users', component: AdminUsers}
+      { path: 'users', component: AdminUsers},
+      { path: 'Appointments', component: AdminAppointments}
     ]
   }
 ]

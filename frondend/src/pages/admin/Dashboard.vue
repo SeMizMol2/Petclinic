@@ -1,298 +1,328 @@
 <template>
-  <div class="dashboard-container">
+  <div class="dashboard-wrapper">
     
-    <header class="dashboard-header">
-      <div class="header-text">
-        <h1>Dashboard ภาพรวม</h1>
-        <p>👋 ยินดีต้อนรับกลับ, <span class="highlight-text">Administrator</span></p>
-      </div>
-      <div class="date-badge">📅 {{ currentDate }}</div>
-    </header>
-
-    <section class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-content">
-          <p class="stat-label">ผู้ใช้งานทั้งหมด</p>
-          <h3 class="stat-value">{{ stats.totalUsers }}</h3>
-          <p class="stat-trend positive">คน</p>
-        </div>
-        <div class="stat-icon icon-blue">👥</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-content">
-          <p class="stat-label">จำนวนสัตว์เลี้ยง</p>
-          <h3 class="stat-value">{{ stats.totalPets }}</h3>
-          <p class="stat-trend positive">ตัว</p>
-        </div>
-        <div class="stat-icon icon-orange">🐾</div>
-      </div>
-    </section>
-
-    <section class="content-grid">
-      <div class="main-card table-wrapper">
-        <div class="card-header">
-          <h2><span class="accent-bar"></span> สมาชิกใหม่ล่าสุด</h2>
-          
-          <router-link to="/admin/users" class="text-btn">
-            ดูทั้งหมด →
-          </router-link>
-        </div>
-        
-        <table class="custom-table">
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>ชื่อเจ้าของ</th>
-              <th>เบอร์โทร</th>
-              <th class="text-center">สัตว์เลี้ยง</th>
-              <th class="text-center">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in stats.recentUsers" :key="user.user_id">
-              <td>
-                <div class="user-info">
-                  <div class="avatar" :class="{'guest': isGuest(user.username)}">
-                    {{ user.username.startsWith('guest_') ? 'G' : user.username.charAt(0).toUpperCase() }}
-                  </div>
-                  <div class="flex flex-col">
-                    <span class="username" :class="{'text-gray-400': isGuest(user.username)}">
-                      {{ isGuest(user.username) ? '(ไม่ได้สมัคร)' : user.username }}
-                    </span>
-                    <span v-if="isGuest(user.username)" class="text-[10px] text-gray-400">Walk-in User</span>
-                  </div>
-                </div>
-              </td>
-              <td>{{ user.owner_name || '-' }}</td>
-              <td class="text-gray">{{ user.owner_tel || '-' }}</td>
-              
-              <td class="text-center">
-                <span class="pet-badge" :class="{'has-pet': user.pet_count > 0}">
-                  🐾 {{ user.pet_count || 0 }} ตัว
-                </span>
-              </td>
-
-              <td class="text-center">
-                <button @click="openEditModal(user)" class="action-btn edit" title="แก้ไข">
-                  ✏️
-                </button>
-                <button @click="deleteUser(user.user_id)" class="action-btn delete" title="ลบ">
-                  🗑️
-                </button>
-              </td>
-            </tr>
-            <tr v-if="stats.recentUsers.length === 0">
-              <td colspan="5" class="text-center py-6 text-gray-400">ไม่พบข้อมูล</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <Teleport to="body">
-      <div v-if="isEditOpen" class="modal-overlay" @click.self="isEditOpen = false">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>📝 แก้ไขข้อมูลผู้ใช้</h3>
-            <button @click="isEditOpen = false" class="close-btn">×</button>
-          </div>
-          
-          <form @submit.prevent="updateUser">
-            <div class="form-group" v-if="!isGuest(editForm.username)">
-              <label>Username</label>
-              <input v-model="editForm.username" type="text" class="input-field bg-gray-100" required>
-            </div>
-            
-            <div class="form-group">
-              <label>ชื่อ-นามสกุล</label>
-              <input v-model="editForm.owner_name" type="text" class="input-field">
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-               <div class="form-group">
-                <label>เบอร์โทรศัพท์</label>
-                <input v-model="editForm.tel" type="text" class="input-field">
-              </div>
-              <div class="form-group">
-                <label>อีเมล</label>
-                <input v-model="editForm.email" type="email" class="input-field">
-              </div>
-            </div>
-
-            <div class="modal-footer">
-              <button type="button" @click="isEditOpen = false" class="btn-cancel">ยกเลิก</button>
-              <button type="submit" class="btn-save">บันทึก</button>
-            </div>
-          </form>
+    <div class="clinic-card header-card">
+      <div class="header-content">
+        <div class="icon-box">📊</div>
+        <div class="title-box">
+          <h1>ภาพรวมระบบ (Dashboard)</h1>
+          <p>รายงานสถิติการนัดหมาย และสรุปรายรับ-รายจ่ายของคลินิก</p>
         </div>
       </div>
-    </Teleport>
+      
+      <div class="filter-box">
+        <select v-model="selectedMonth" @change="fetchDashboardData" class="custom-select">
+          <option v-for="(m, index) in months" :key="index" :value="index + 1">{{ m }}</option>
+        </select>
+        <select v-model="selectedYear" @change="fetchDashboardData" class="custom-select">
+          <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="card-icon bg-blue-100 text-blue-600">📅</div>
+        <div class="card-info">
+          <p>จำนวนนัดหมาย (ประจำเดือน)</p>
+          <h3>{{ summary.totalAppointments }} <span class="unit">รายการ</span></h3>
+        </div>
+      </div>
+
+      <div class="summary-card">
+        <div class="card-icon bg-emerald-100 text-emerald-600">💰</div>
+        <div class="card-info">
+          <p>รายรับรวม (เดือนนี้)</p>
+          <h3 class="text-emerald-600">{{ formatPrice(summary.totalRevenue) }} <span class="unit">บาท</span></h3>
+        </div>
+      </div>
+
+      <div class="summary-card">
+        <div class="card-icon bg-rose-100 text-rose-600">💸</div>
+        <div class="card-info">
+          <p>รายจ่ายรวม (เดือนนี้)</p>
+          <h3 class="text-rose-600">{{ formatPrice(summary.totalExpense) }} <span class="unit">บาท</span></h3>
+        </div>
+      </div>
+
+      <div class="summary-card highlight-card">
+        <div class="card-icon bg-white/20 text-white">🏆</div>
+        <div class="card-info text-white">
+          <p class="text-emerald-50">กำไรสุทธิ (เดือนนี้)</p>
+          <h3 class="text-white">{{ formatPrice(summary.netProfit) }} <span class="unit text-emerald-100">บาท</span></h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="clinic-card chart-container">
+        <h3>📈 สถิติการนัดหมาย (30 วันย้อนหลัง)</h3>
+        <div class="chart-box">
+          <Line v-if="!loading" :data="apptChartData" :options="lineChartOptions" />
+        </div>
+      </div>
+
+      <div class="clinic-card chart-container">
+        <h3>📊 รายรับ - รายจ่าย รายวัน (ประจำเดือน)</h3>
+        <div class="chart-box">
+          <Bar v-if="!loading" :data="financialChartData" :options="barChartOptions" />
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
-import { useRouter } from 'vue-router'
 
-const router = useRouter()
-const currentDate = new Date().toLocaleDateString('th-TH', { dateStyle: 'long' })
+// นำเข้าเครื่องมือสร้างกราฟจาก Chart.js
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from 'chart.js'
+import { Line, Bar } from 'vue-chartjs'
 
-const stats = ref({ totalUsers: 0, totalPets: 0, recentUsers: [] })
-const isEditOpen = ref(false)
-const editForm = ref({})
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler)
 
-// Helper function เช็ค Guest
-const isGuest = (username) => username && username.startsWith('guest_')
+// State สำหรับตัวกรอง
+const currentDate = new Date()
+const selectedMonth = ref(currentDate.getMonth() + 1)
+const selectedYear = ref(currentDate.getFullYear())
+const loading = ref(true)
 
-const fetchData = async () => {
+const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม']
+const years = computed(() => {
+  const current = new Date().getFullYear()
+  return [current - 2, current - 1, current, current + 1]
+})
+
+// State สำหรับข้อมูลสรุป
+const summary = ref({
+  totalRevenue: 0,
+  totalExpense: 0,
+  netProfit: 0,
+  totalAppointments: 0
+})
+
+// State ข้อมูลกราฟดิบ
+const rawApptData = ref([])
+const rawRevData = ref([])
+const rawExpData = ref([])
+
+// รูปแบบตัวเลขเงิน
+const formatPrice = (val) => {
+  return Number(val).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ----------------------------------------------------
+// ดึงข้อมูลจาก API
+// ----------------------------------------------------
+const fetchDashboardData = async () => {
+  loading.value = true
   try {
     const token = localStorage.getItem('token')
-    if (!token) return router.push('/login')
-
-    const res = await axios.get('http://localhost:3000/api/admin/dashboard', {
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await axios.get('http://localhost:3000/api/dashboard', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { month: selectedMonth.value, year: selectedYear.value }
     })
-    stats.value = res.data
+    
+    summary.value = res.data.summary
+    rawApptData.value = res.data.charts.appointments
+    rawRevData.value = res.data.charts.revenue
+    rawExpData.value = res.data.charts.expense
+
   } catch (err) {
-    console.error(err)
+    console.error("Dashboard Fetch Error:", err)
+  } finally {
+    loading.value = false
   }
 }
 
-const deleteUser = async (userId) => {
-  if(!confirm('⚠️ คำเตือน: ข้อมูลสัตว์เลี้ยงจะหายไปถาวร!\nต้องการลบจริงหรือไม่?')) return;
+// ----------------------------------------------------
+// กราฟที่ 1: นัดหมาย 30 วัน (Line Chart)
+// ----------------------------------------------------
+const apptChartData = computed(() => {
+  const labels = rawApptData.value.map(item => {
+    const d = new Date(item.date)
+    return `${d.getDate()}/${d.getMonth()+1}`
+  })
+  const data = rawApptData.value.map(item => parseInt(item.count))
 
-  try {
-    const token = localStorage.getItem('token')
-    await axios.delete(`http://localhost:3000/api/admin/users/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    alert('ลบข้อมูลสำเร็จ')
-    fetchData()
-  } catch (err) {
-    alert('เกิดข้อผิดพลาดในการลบ')
+  return {
+    labels,
+    datasets: [{
+      label: 'จำนวนนัดหมาย (คิว)',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      borderColor: '#3b82f6',
+      borderWidth: 2,
+      pointBackgroundColor: '#ffffff',
+      pointBorderColor: '#3b82f6',
+      pointRadius: 4,
+      fill: true,
+      tension: 0.4,
+      data
+    }]
+  }
+})
+
+const lineChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    y: { beginAtZero: true, ticks: { stepSize: 1 } },
+    x: { grid: { display: false } }
   }
 }
 
-const openEditModal = (user) => {
-  editForm.value = {
-    id: user.user_id,
-    username: user.username,
-    owner_name: user.owner_name,
-    email: user.owner_email || '',
-    tel: user.owner_tel || ''
+// ----------------------------------------------------
+// กราฟที่ 2: รายรับ VS รายจ่าย (Bar Chart)
+// ----------------------------------------------------
+const financialChartData = computed(() => {
+  // สร้าง Array วันที่ 1-31 ของเดือนนั้น
+  const daysInMonth = new Date(selectedYear.value, selectedMonth.value, 0).getDate()
+  const labels = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+  
+  const revDataArray = new Array(daysInMonth).fill(0)
+  const expDataArray = new Array(daysInMonth).fill(0)
+
+  rawRevData.value.forEach(item => {
+    revDataArray[item.day - 1] = parseFloat(item.total)
+  })
+  rawExpData.value.forEach(item => {
+    expDataArray[item.day - 1] = parseFloat(item.total)
+  })
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'รายรับ',
+        backgroundColor: '#10b981',
+        borderRadius: 4,
+        data: revDataArray
+      },
+      {
+        label: 'รายจ่าย',
+        backgroundColor: '#f43f5e',
+        borderRadius: 4,
+        data: expDataArray
+      }
+    ]
   }
-  isEditOpen.value = true
+})
+
+const barChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { 
+    legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8 } } 
+  },
+  scales: {
+    y: { beginAtZero: true },
+    x: { grid: { display: false } }
+  }
 }
 
-const updateUser = async () => {
-  try {
-    const token = localStorage.getItem('token')
-    await axios.put(`http://localhost:3000/api/admin/users/${editForm.value.id}`, editForm.value, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    alert('แก้ไขข้อมูลเรียบร้อย')
-    isEditOpen.value = false
-    fetchData()
-  } catch (err) {
-    alert('บันทึกไม่สำเร็จ')
-  }
-}
-
-onMounted(fetchData)
+onMounted(() => {
+  fetchDashboardData()
+})
 </script>
 
 <style scoped>
-/* GLOBAL & VARIABLES */
-:root {
-  --primary: #10b981;
-  --bg-color: #f8fafc;
-  --text-main: #1e293b;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
-}
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
 
-.dashboard-container {
-  min-height: 100%;
-  padding-bottom: 2.5rem;
+.dashboard-wrapper {
   font-family: 'Sarabun', sans-serif;
-  color: #334155;
-  background-color: #f1f5f9;
-  background-image: radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%);
-  background-attachment: fixed;
+  background-color: #f8fafc;
+  min-height: 100vh;
+  padding: 24px;
+  color: #1e293b;
+  box-sizing: border-box;
 }
 
-.dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-.header-text h1 { font-size: 1.8rem; font-weight: 800; color: #0f172a; margin: 0; }
-.highlight-text { color: #10b981; font-weight: 700; }
-.date-badge { background: white; padding: 0.5rem 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; font-size: 0.9rem; color: #64748b; }
-
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-.stat-card { background: white; border-radius: 1rem; padding: 1.5rem; display: flex; justify-content: space-between; box-shadow: var(--shadow-sm); }
-.stat-label { font-size: 0.85rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-.stat-value { font-size: 2rem; font-weight: 800; color: #1e293b; margin: 0.5rem 0 0 0; }
-.stat-icon { width: 56px; height: 56px; border-radius: 1rem; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; }
-.icon-blue { background: #eff6ff; color: #3b82f6; }
-.icon-orange { background: #fff7ed; color: #f97316; }
-
-.content-grid { display: block; }
-.main-card { background: white; border-radius: 1rem; padding: 2rem; box-shadow: var(--shadow-sm); }
-
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-.card-header h2 { font-size: 1.25rem; font-weight: 700; display: flex; gap: 0.75rem; align-items: center; }
-.accent-bar { width: 5px; height: 24px; background: #10b981; border-radius: 4px; display: block; }
-
-.text-btn { text-decoration: none; color: #10b981; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; cursor: pointer; }
-.text-btn:hover { text-decoration: underline; color: #059669; }
-
-/* Table Styles */
-.table-wrapper { overflow-x: auto; }
-.custom-table { width: 100%; border-collapse: separate; border-spacing: 0; }
-.custom-table th { text-align: left; padding: 1rem; border-bottom: 2px solid #f1f5f9; color: #64748b; font-size: 0.85rem; font-weight: 700; }
-.custom-table td { padding: 1rem; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
-
-.user-info { display: flex; align-items: center; gap: 1rem; }
-.avatar { width: 36px; height: 36px; background: #eff6ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #3b82f6; }
-.avatar.guest { background: #f1f5f9; color: #94a3b8; }
-.username { font-weight: 600; color: #0f172a; font-size: 0.95rem; }
-
-/* Pet Badge */
-.pet-badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  background-color: #f1f5f9;
-  color: #64748b;
-}
-.pet-badge.has-pet {
-  background-color: #ffedd5;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
+/* --- Cards Shared --- */
+.clinic-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  border: 1px solid #f1f5f9;
+  padding: 24px;
 }
 
-/* Action Buttons */
-.action-btn { background: none; border: none; cursor: pointer; padding: 0.5rem; font-size: 1.1rem; border-radius: 0.5rem; transition: all 0.2s; margin: 0 0.2rem; }
-.action-btn.edit:hover { background: #eff6ff; transform: translateY(-2px); }
-.action-btn.delete:hover { background: #fef2f2; transform: translateY(-2px); }
+/* --- Header Section --- */
+.header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.header-content { display: flex; align-items: center; gap: 16px; }
+.icon-box {
+  width: 56px; height: 56px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: white; box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+}
+.title-box h1 { margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; }
+.title-box p { margin: 4px 0 0 0; font-size: 14px; color: #64748b; font-weight: 500; }
 
-/* Modal Styles */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 50; backdrop-filter: blur(4px); }
-.modal-content { background: white; width: 90%; max-width: 500px; padding: 2rem; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); animation: slideUp 0.3s ease-out; }
-@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+/* Filter Dropdown */
+.filter-box { display: flex; gap: 12px; }
+.custom-select {
+  padding: 10px 16px; font-size: 15px; font-family: inherit; font-weight: 600;
+  color: #334155; background-color: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 12px; outline: none; cursor: pointer; transition: 0.2s;
+}
+.custom-select:hover { border-color: #cbd5e1; }
+.custom-select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); background-color: #ffffff; }
 
-.modal-header { display: flex; justify-content: space-between; margin-bottom: 1.5rem; align-items: center; }
-.modal-header h3 { margin: 0; font-size: 1.25rem; font-weight: 700; color: #1e293b; }
-.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #94a3b8; }
+/* --- Summary Cards Grid --- */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
 
-.form-group { margin-bottom: 1rem; }
-.form-group label { display: block; font-size: 0.9rem; margin-bottom: 0.5rem; color: #475569; font-weight: 600; }
-.input-field { width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; outline: none; transition: all 0.2s; box-sizing: border-box; }
-.input-field:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); }
+.summary-card {
+  background: #ffffff; border-radius: 20px; padding: 24px;
+  display: flex; align-items: center; gap: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #f1f5f9;
+  transition: transform 0.2s ease;
+}
+.summary-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
 
-.modal-footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
-.btn-cancel { padding: 0.75rem 1.5rem; background: #f1f5f9; border: none; border-radius: 0.75rem; font-weight: 600; color: #64748b; cursor: pointer; }
-.btn-save { padding: 0.75rem 1.5rem; background: #10b981; border: none; border-radius: 0.75rem; font-weight: 600; color: white; cursor: pointer; }
-.btn-save:hover { background: #059669; }
+.card-icon {
+  width: 56px; height: 56px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;
+}
+.card-info { flex-grow: 1; }
+.card-info p { margin: 0 0 4px 0; font-size: 13px; color: #64748b; font-weight: 600; }
+.card-info h3 { margin: 0; font-size: 26px; font-weight: 800; color: #0f172a; line-height: 1; }
+.unit { font-size: 13px; font-weight: 500; color: #94a3b8; }
+
+.highlight-card {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+}
+
+/* --- Charts Grid --- */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+}
+.chart-container h3 {
+  margin: 0 0 20px 0; font-size: 16px; font-weight: 800; color: #1e293b;
+}
+.chart-box {
+  position: relative; height: 300px; width: 100%;
+}
+
+@media (max-width: 768px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .header-card { flex-direction: column; align-items: flex-start; }
+}
 </style>

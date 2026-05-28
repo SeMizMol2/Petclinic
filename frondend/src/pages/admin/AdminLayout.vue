@@ -1,67 +1,60 @@
 <template>
-  <div class="min-h-screen bg-gray-100 flex font-sans">
+  <div class="h-screen w-full flex bg-slate-50 font-sans overflow-hidden">
     
-    <aside class="hidden md:flex flex-col w-64 bg-slate-900 text-white shadow-xl z-20 relative">
-      <div class="p-6 border-b border-gray-700 flex items-center gap-3">
-        <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-emerald-900/50">
-          
+    <aside class="w-72 bg-slate-900 text-white flex flex-col shadow-2xl z-20">
+      
+      <div class="p-6 border-b border-slate-800 flex items-center gap-4">
+        <div class="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-emerald-900/50">
+          🏥
         </div>
         <div>
-          <h2 class="text-lg font-extrabold tracking-wide">Admin Panel</h2>
-          <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">System Control</p>
+          <h2 class="text-xl font-bold tracking-tight">Clinic Admin</h2>
+          <p class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Management</p>
         </div>
       </div>
 
-      <nav class="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
-        <router-link
-          to="/admin/dashboard"
-          class="nav-item"
-          active-class="active"
-        >
-          <span class="text-xl">📊</span> 
-          <span class="font-bold">Dashboard</span>
+      <nav class="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
+        <p class="px-4 text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Main Menu</p>
+        
+        <router-link to="/admin/dashboard" class="nav-item" active-class="active">
+          <span class="icon">📊</span>
+          <span class="label">Dashboard</span>
         </router-link>
 
-        </nav>
+        <router-link to="/admin/users" class="nav-item" active-class="active">
+          <span class="icon">👥</span>
+          <span class="label">จัดการสมาชิก</span>
+        </router-link>
 
-      <div class="p-6 border-t border-gray-700 bg-slate-800/50">
-        <button
-          @click="logout"
-          class="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-red-600 text-white font-bold shadow-lg hover:bg-red-500 hover:shadow-red-500/30 hover:-translate-y-1 transition-all duration-200"
-        >
-          <span class="text-xl">🚪</span> 
-          <span class="text-lg">ออกจากระบบ</span>
+        <router-link to="/admin/appointments" class="nav-item" active-class="active">
+          <span class="icon">📅</span>
+          <span class="label">การนัดหมาย</span>
+        </router-link>
+      </nav>
+
+      <div class="p-6 border-t border-slate-800">
+        <button @click="logout" class="logout-btn">
+          <span>🚪</span>
+          <span>ออกจากระบบ</span>
         </button>
       </div>
     </aside>
 
-    <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
+    <div class="flex-1 flex flex-col min-w-0">
       
-      <header class="bg-white shadow-sm p-4 flex items-center justify-between md:hidden z-30 sticky top-0">
-        <div class="flex items-center gap-3">
-           <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold shadow-md">
-             
-           </div>
-           <h1 class="font-extrabold text-gray-800 text-lg">Admin Panel</h1>
+      
+
+      <main class="flex-1 overflow-y-auto bg-slate-50 p-8">
+        <div class="max-w-6xl mx-auto">
+          <router-view v-slot="{ Component }">
+            <transition name="fade" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
         </div>
-
-        <button 
-          @click="logout" 
-          class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition font-bold text-sm"
-        >
-          🚪 ออกระบบ
-        </button>
-      </header>
-
-      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6 relative w-full">
-        <router-view v-slot="{ Component }">
-          <transition name="fade-page" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
       </main>
-
     </div>
+
   </div>
 </template>
 
@@ -71,49 +64,87 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const logout = () => {
-  if(confirm("ต้องการออกจากระบบผู้ดูแลหรือไม่?")) {
-    localStorage.clear() // ล้างข้อมูลทั้งหมด (Token, User)
-    router.push('/login') // กลับไปหน้า Login
+  if(confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) {
+    localStorage.clear()
+    router.push('/login')
   }
 }
 </script>
 
 <style scoped>
-/* Sidebar Link Style */
+/* ลบ Padding ส่วนเกินที่อาจค้างมาจากโค้ดเก่า */
+.h-screen {
+  height: 100vh;
+}
+
+/* สไตล์พื้นฐานของเมนู Sidebar */
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.2rem;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
   border-radius: 0.75rem;
-  color: #94a3b8; /* slate-400 */
-  transition: all 0.2s;
+  color: #94a3b8;
   text-decoration: none;
-  margin-bottom: 0.5rem;
+  transition: all 0.3s ease;
+  font-weight: 600;
 }
 
 .nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
   transform: translateX(4px);
 }
 
+/* สไตล์เมื่อเมนูถูกเลือก (Active) */
 .nav-item.active {
-  background: linear-gradient(to right, #10b981, #059669); /* Emerald Gradient */
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
   box-shadow: 0 4px 15px -3px rgba(16, 185, 129, 0.4);
 }
 
-/* Page Transition */
-.fade-page-enter-active,
-.fade-page-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+/* ปุ่ม Logout */
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: #1e293b;
+  color: #ef4444;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
 }
-.fade-page-enter-from {
+
+.logout-btn:hover {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+  transform: translateY(-2px);
+}
+
+/* ตกแต่ง Scrollbar ของเมนูให้ดูเนียนตา */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+
+/* แอนิเมชันตอนเปลี่ยนหน้า */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+.fade-enter-from {
   opacity: 0;
   transform: translateY(10px);
 }
-.fade-page-leave-to {
+.fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
 }

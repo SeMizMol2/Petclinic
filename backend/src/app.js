@@ -6,6 +6,8 @@ const testRoutes = require('./routes/test.routes');
 const petRoutes = require('./routes/pet.routes');
 const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
+const appointmentRoutes = require('./routes/appointment.routes');
+const dashboardRoutes = require('./routes/dashboard.routes');
 
 const app = express();
 
@@ -17,6 +19,8 @@ app.use('/api/test', testRoutes);
 app.use('/api/pets', petRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 const routes = require('./routes');
 app.use('/api', routes);
