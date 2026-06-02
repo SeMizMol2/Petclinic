@@ -71,12 +71,6 @@
         </div>
 
         <div class="status-row">
-             <!-- <div>
-                <p class="label">อายุ</p>
-                <div class="age-value">
-                  {{ calculateAge(pet.pet_birthdate) }} <span class="unit">ปี</span>
-                </div>
-             </div> -->
              <div>
                 <span class="status-badge" :class="pet.sterile_status === 'ทำแล้ว' ? 'status-green' : 'status-orange'">
                   {{ pet.sterile_status === 'ทำแล้ว' ? '✓ ทำหมันแล้ว' : '✕ ยังไม่ทำ' }}
@@ -109,7 +103,21 @@
            <span class="birthdate-text">{{ formatDateDisplay(pet.pet_birthdate) }}</span>
         </div>
 
-      </div>
+        <div class="history-section">
+          <h3 class="history-title">🏥 ประวัติการรักษาล่าสุด</h3>
+          
+          <div class="history-list">
+            <div v-for="history in mockHistory" :key="history.id" class="history-item">
+              <div class="history-item-header">
+                 <span class="history-date">📅 {{ history.date }}</span>
+                 <span class="history-vet">👨‍⚕️ {{ history.vet }}</span>
+              </div>
+              <p class="history-name">{{ history.title }}</p>
+              <p class="history-note">📝 หมายเหตุ: {{ history.note }}</p>
+            </div>
+          </div>
+        </div>
+        </div>
     </div>
 
     <div v-else class="empty-state">
@@ -182,6 +190,13 @@ const pets = ref([])
 const loading = ref(false)
 const showEdit = ref(false)
 const editPet = ref({})
+
+// 📍 ส่วนที่เพิ่มเข้ามาใหม่: ข้อมูลจำลอง (Mock Data) 📍
+// วันหลังถ้า API ประวัติเสร็จ ค่อยลบตัวนี้ทิ้ง แล้วดึงข้อมูลจาก axios แทนครับ
+const mockHistory = ref([
+  { id: 1, date: "20 พ.ค. 2026", title: "ฉีดวัคซีนรวม 5 โรค", note: "น้องปกติดี ร่าเริง", vet: "น.สพ. สมชาย" },
+  { id: 2, date: "10 เม.ย. 2026", title: "อาบน้ำตัดขน", note: "ตัดทรงสิงโต", vet: "ช่างสมศรี" }
+]);
 
 const getHeaders = () => ({
   headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
@@ -276,15 +291,15 @@ onMounted(loadPets)
 /* 1. Page Container */
 .custom-page-container {
   min-height: 100vh;
-  background-color: #5a72ea; /* พื้นหลังสีน้ำเงิน */
+  background-color: #5a72ea;
   padding: 2rem;
   font-family: 'Inter', sans-serif;
 }
 
-/*  Back Nav Container  */
+/* Back Nav Container  */
 .back-nav {
   max-width: 1200px;
-  margin: 0 auto 1.5rem; /* เว้นระยะห่างด้านล่าง */
+  margin: 0 auto 1.5rem;
 }
 
 /* 2. Header */
@@ -314,20 +329,20 @@ onMounted(loadPets)
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
 }
 .subtitle {
-  color: #bfdbfe; /* blue-100 */
+  color: #bfdbfe;
   margin-top: 0.25rem;
   font-size: 0.95rem;
   padding-left: 0.5rem;
 }
 
-/*  3. Shared Button Style (ใช้ทั้งปุ่มเพิ่มและปุ่มย้อนกลับ)  */
+/* 3. Shared Button Style  */
 .btn-white {
   background-color: white;
-  color: #5a72ea; /* สีตัวหนังสือสีเดียวกับพื้นหลังเว็บ */
+  color: #5a72ea;
   padding: 0.75rem 1.5rem;
   border-radius: 12px;
   font-weight: 700;
-  display: inline-flex; /* ใช้ inline-flex ให้ขนาดพอดีคำ */
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -345,7 +360,7 @@ onMounted(loadPets)
   font-weight: 400; 
 }
 
-/* 4. Grid Layout (บังคับ Grid) */
+/* 4. Grid Layout */
 .custom-grid {
   max-width: 1200px;
   margin: 0 auto;
@@ -360,9 +375,9 @@ onMounted(loadPets)
   .custom-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
-/* 5. Pet Card (บังคับสีขาว!) */
+/* 5. Pet Card */
 .pet-card {
-  background-color: #ffffff !important; /* บังคับขาว */
+  background-color: #ffffff !important;
   border-radius: 1.5rem;
   padding: 1.5rem;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
@@ -374,7 +389,7 @@ onMounted(loadPets)
 }
 .pet-card:hover {
   transform: translateY(-5px);
-  border-color: #bfdbfe; /* blue-200 */
+  border-color: #bfdbfe;
 }
 
 /* Action Buttons */
@@ -409,7 +424,7 @@ onMounted(loadPets)
 .pet-avatar {
   width: 64px;
   height: 64px;
-  background-color: #fff7ed; /* orange-50 */
+  background-color: #fff7ed;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -462,6 +477,66 @@ onMounted(loadPets)
 }
 .birthdate-text { color: #6b7280; font-weight: 500; }
 
+/* 📍 ส่วนที่เพิ่มเข้ามาใหม่: CSS ของประวัติการรักษา 📍 */
+.history-section {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 2px dashed #e5e7eb; /* เส้นประคั่นเนื้อหา */
+}
+.history-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #374151;
+  margin: 0 0 1rem 0;
+}
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.history-item {
+  background-color: #f8fafc;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #f1f5f9;
+  transition: background 0.2s;
+}
+.history-item:hover {
+  background-color: #f1f5f9;
+}
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.history-date { 
+  font-size: 0.75rem; 
+  color: #64748b; 
+  font-weight: 700; 
+}
+.history-vet { 
+  font-size: 0.7rem; 
+  color: #4f46e5; 
+  font-weight: 700; 
+  background: #e0e7ff; 
+  padding: 0.2rem 0.5rem; 
+  border-radius: 99px; 
+}
+.history-name { 
+  font-size: 0.9rem; 
+  font-weight: 700; 
+  color: #1e293b; 
+  margin: 0 0 0.25rem 0; 
+}
+.history-note { 
+  font-size: 0.8rem; 
+  color: #64748b; 
+  margin: 0; 
+  line-height: 1.4;
+}
+/* 📍 สิ้นสุด CSS ประวัติการรักษา 📍 */
+
 /* 7. Modal Styles */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999;
@@ -478,7 +553,7 @@ onMounted(loadPets)
 .form-group label { font-size: 0.875rem; font-weight: 700; color: #4b5563; margin-bottom: 0.25rem; display: block; }
 .input-field {
   width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 0.5rem;
-  font-size: 0.95rem; outline: none; box-sizing: border-box; /* สำคัญ */
+  font-size: 0.95rem; outline: none; box-sizing: border-box;
 }
 .input-field:focus { border-color: #6200ea; box-shadow: 0 0 0 3px rgba(98,0,234,0.1); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
