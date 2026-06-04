@@ -105,3 +105,50 @@ CREATE TABLE tb_expense (
         REFERENCES tb_user(user_id) 
         ON DELETE SET NULL
 );
+
+CREATE TABLE tb_service (
+    service_id VARCHAR(10) PRIMARY KEY,
+    service_name VARCHAR(100) NOT NULL,
+    service_desc TEXT,
+    service_price DECIMAL(10,2) NOT NULL,
+    create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_datetime TIMESTAMP
+);
+
+CREATE TABLE tb_treatment (
+    treatment_id VARCHAR(15) PRIMARY KEY, 
+    pet_id VARCHAR(20) NOT NULL,          
+    user_id VARCHAR(20),                  
+    symptom TEXT,                         
+    diagnosis TEXT,                       
+    treatment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    total_amount DECIMAL(10,2) DEFAULT 0, 
+    
+    CONSTRAINT fk_treatment_pet 
+        FOREIGN KEY (pet_id) 
+        REFERENCES tb_pet(pet_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_treatment_user 
+        FOREIGN KEY (user_id) 
+        REFERENCES tb_user(user_id) 
+        ON DELETE SET NULL
+);
+
+CREATE TABLE tb_treatment_detail (
+    detail_id SERIAL PRIMARY KEY,
+    treatment_id VARCHAR(15) NOT NULL,    
+    service_id VARCHAR(10) NOT NULL,      
+    quantity INT DEFAULT 1,               
+    price DECIMAL(10,2) NOT NULL,         
+    
+    CONSTRAINT fk_detail_treatment 
+        FOREIGN KEY (treatment_id) 
+        REFERENCES tb_treatment(treatment_id) 
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_detail_service 
+        FOREIGN KEY (service_id) 
+        REFERENCES tb_service(service_id) 
+        ON DELETE RESTRICT 
+);

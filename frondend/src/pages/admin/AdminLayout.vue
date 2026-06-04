@@ -5,16 +5,15 @@
       
       <div class="p-6 border-b border-slate-800 flex items-center gap-4">
         <div class="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-2xl shadow-lg shadow-emerald-900/50">
-          🏥
+          
         </div>
         <div>
           <h2 class="text-xl font-bold tracking-tight">Clinic Admin</h2>
-          <p class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Management</p>
         </div>
       </div>
 
       <nav class="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
-        <p class="px-4 text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Main Menu</p>
+        <p class="px-4 text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Menu</p>
         
         <router-link to="/admin/dashboard" class="nav-item" active-class="active">
           <span class="icon">📊</span>
@@ -30,7 +29,18 @@
           <span class="icon">📅</span>
           <span class="label">การนัดหมาย</span>
         </router-link>
+
+        <router-link to="/admin/services" class="nav-item" active-class="active">
+          <span class="icon">📋</span>
+          <span class="label">บริการและค่ารักษา</span>
+        </router-link>
+        <router-link to="/admin/treatments" class="nav-item" active-class="active">
+          <span class="icon">🩺</span>
+          <span class="label">การรักษา</span>
+        </router-link>
+
       </nav>
+        
 
       <div class="p-6 border-t border-slate-800">
         <button @click="logout" class="logout-btn">
@@ -77,30 +87,44 @@ const logout = () => {
   height: 100vh;
 }
 
-/* สไตล์พื้นฐานของเมนู Sidebar */
+/* พื้นฐานของเมนู Sidebar */
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.85rem 1.25rem;
+  gap: 0.875rem;
+  padding: 0.75rem 1rem;
   border-radius: 0.75rem;
   color: #94a3b8;
   text-decoration: none;
-  transition: all 0.3s ease;
-  font-weight: 600;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.nav-item .icon {
+  color: #64748b;
+  transition: color 0.2s ease;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   color: #f8fafc;
-  transform: translateX(4px);
+}
+
+.nav-item:hover .icon {
+  color: #cbd5e1;
 }
 
 /* สไตล์เมื่อเมนูถูกเลือก (Active) */
 .nav-item.active {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
-  box-shadow: 0 4px 15px -3px rgba(16, 185, 129, 0.4);
+  font-weight: 600;
+  box-shadow: 0 4px 12px -3px rgba(16, 185, 129, 0.3);
+}
+
+.nav-item.active .icon {
+  color: white;
 }
 
 /* ปุ่ม Logout */
@@ -109,13 +133,14 @@ const logout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding: 0.75rem;
-  background: #1e293b;
+  background: transparent;
   color: #ef4444;
   border: 1px solid #334155;
   border-radius: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -124,28 +149,34 @@ const logout = () => {
   background: #ef4444;
   color: white;
   border-color: #ef4444;
-  transform: translateY(-2px);
+  box-shadow: 0 4px 12px -3px rgba(239, 68, 68, 0.4);
 }
 
-/* ตกแต่ง Scrollbar ของเมนูให้ดูเนียนตา */
+/* Scrollbar แบบบางๆ เนียนตา */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #334155;
   border-radius: 10px;
 }
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: #475569;
+}
 
 /* แอนิเมชันตอนเปลี่ยนหน้า */
 .fade-enter-active, .fade-leave-active {
-  transition: opacity 0.2s, transform 0.2s;
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 .fade-enter-from {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(15px);
 }
 .fade-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-15px);
 }
 </style>

@@ -8,8 +8,9 @@ const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
 const appointmentRoutes = require('./routes/appointment.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
-// ดึงไฟล์ history.routes.js มาใช้งาน
 const historyRoutes = require('./routes/history.routes');
+const serviceRoutes = require('./routes/services.routes');
+const treatmentRoutes = require('./routes/treatments.routes');
 const app = express();
 
 app.use(cors());
@@ -23,6 +24,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/treatments', treatmentRoutes);
 
 
 const routes = require('./routes');
