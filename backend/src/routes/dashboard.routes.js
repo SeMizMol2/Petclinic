@@ -9,60 +9,66 @@ router.get('/', auth, async (req, res) => {
             return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึง' });
         }
 
-        // ⭐ 1. บังคับแปลงค่าเดือนและปีให้เป็นตัวเลข (Integer) เสมอ ป้องกัน Error จาก String
         const month = parseInt(req.query.month) || (new Date().getMonth() + 1);
         const year = parseInt(req.query.year) || new Date().getFullYear();
 
-        // 2. ดึงสถิติการนัดหมาย
-        // ⭐ เพิ่ม TRIM() เพื่อตัดช่องว่างที่อาจจะติดมากับคำว่า 'ยืนยัน'
+        // --- 1. ส่วนสรุปกราฟและตัวเลข (ของเดิม) ---
         const apptMonthly = await pool.query(`
             SELECT TO_CHAR(appt_date, 'YYYY-MM-DD') as date, COUNT(*) as count 
             FROM tb_appointment 
             WHERE EXTRACT(MONTH FROM appt_date) = $1 AND EXTRACT(YEAR FROM appt_date) = $2
-            AND TRIM(appt_status) = 'ยืนยัน'
-            GROUP BY appt_date 
-            ORDER BY appt_date ASC
+            AND TRIM(appt_status) = 'ยืนยัน' GROUP BY appt_date ORDER BY appt_date ASC
         `, [month, year]);
 
-        // 3. ดึงสถิติรายรับรายวัน
         const revenueDaily = await pool.query(`
             SELECT EXTRACT(DAY FROM pay_date) as day, SUM(total_amount) as total
             FROM tb_receipt
             WHERE EXTRACT(MONTH FROM pay_date) = $1 AND EXTRACT(YEAR FROM pay_date) = $2
-            AND payment_status = 'ชำระเสร็จสิ้น'
-            GROUP BY day 
-            ORDER BY day ASC
+            AND payment_status = 'ชำระเสร็จสิ้น' GROUP BY day ORDER BY day ASC
         `, [month, year]);
 
-        // 4. ดึงสถิติรายจ่ายรายวัน
         const expenseDaily = await pool.query(`
             SELECT EXTRACT(DAY FROM exp_date) as day, SUM(exp_amount) as total
             FROM tb_expense
             WHERE EXTRACT(MONTH FROM exp_date) = $1 AND EXTRACT(YEAR FROM exp_date) = $2
-            GROUP BY day 
-            ORDER BY day ASC
+            GROUP BY day ORDER BY day ASC
         `, [month, year]);
 
-        // 5. สรุปรวมยอดทั้งเดือน
+        // --- 2. ส่วนดึงข้อมูลรายละเอียด (เพื่อแสดงใน Popup) ---
+        const detailAppt = await pool.query(`
+            SELECT a.appt_date, a.appt_time, a.appt_reason, p.pet_name, o.owner_name
+            FROM tb_appointment a
+            LEFT JOIN tb_pet p ON a.pet_id = p.pet_id
+            LEFT JOIN tb_owner o ON p.owner_id = o.owner_id
+            WHERE EXTRACT(MONTH FROM a.appt_date) = $1 AND EXTRACT(YEAR FROM a.appt_date) = $2
+            AND TRIM(a.appt_status) = 'ยืนยัน' ORDER BY a.appt_date DESC, a.appt_time DESC
+        `, [month, year]);
+
+        const detailRev = await pool.query(`
+            SELECT r.receipt_id, r.pay_date, r.total_amount, o.owner_name
+            FROM tb_receipt r
+            LEFT JOIN tb_owner o ON r.owner_id = o.owner_id
+            WHERE EXTRACT(MONTH FROM r.pay_date) = $1 AND EXTRACT(YEAR FROM r.pay_date) = $2
+            AND r.payment_status = 'ชำระเสร็จสิ้น' ORDER BY r.pay_date DESC
+        `, [month, year]);
+
+        const detailExp = await pool.query(`
+            SELECT e.exp_date, e.exp_title, e.exp_amount, c.category_name
+            FROM tb_expense e
+            LEFT JOIN tb_category c ON e.category_id = c.category_id
+            WHERE EXTRACT(MONTH FROM e.exp_date) = $1 AND EXTRACT(YEAR FROM e.exp_date) = $2
+            ORDER BY e.exp_date DESC
+        `, [month, year]);
+
+        // --- คำนวณยอดรวม ---
         const totalRevenue = revenueDaily.rows.reduce((sum, item) => sum + parseFloat(item.total), 0);
         const totalExpense = expenseDaily.rows.reduce((sum, item) => sum + parseFloat(item.total), 0);
         const totalAppointments = apptMonthly.rows.reduce((sum, item) => sum + parseInt(item.count), 0);
 
-        // ⭐ พิมพ์เช็คในหน้าจอดำ (Terminal) ว่านับได้เท่าไหร่
-        console.log(`เดือน: ${month}/${year} | นับนัดหมายได้: ${totalAppointments} รายการ`);
-
         res.json({
-            summary: {
-                totalRevenue,
-                totalExpense,
-                netProfit: totalRevenue - totalExpense,
-                totalAppointments
-            },
-            charts: {
-                appointments: apptMonthly.rows,
-                revenue: revenueDaily.rows,
-                expense: expenseDaily.rows
-            }
+            summary: { totalRevenue, totalExpense, netProfit: totalRevenue - totalExpense, totalAppointments },
+            charts: { appointments: apptMonthly.rows, revenue: revenueDaily.rows, expense: expenseDaily.rows },
+            details: { appointments: detailAppt.rows, revenue: detailRev.rows, expense: detailExp.rows }
         });
     } catch (err) {
         console.error("❌ Dashboard API Error:", err.message);
