@@ -1,55 +1,61 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex font-sans">
+  <div class="min-h-screen bg-slate-50 flex font-sans overflow-hidden">
     
-    <aside class="flex flex-col w-64 bg-white shadow-xl z-20 relative h-screen">
-      <div class="p-6 border-b border-gray-100 flex items-center gap-3">
-        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-blue-200 transform hover:scale-105 transition-transform duration-300">
-          P
+    <aside class="flex flex-col w-72 bg-white shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 relative h-screen border-r border-slate-100">
+      
+      <div class="h-24 px-8 border-b border-slate-100 flex items-center gap-4">
+        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30 transform hover:scale-105 transition-all duration-300 text-2xl">
+          🏥
         </div>
         <div>
-          <h2 class="text-lg font-extrabold text-gray-800 tracking-tight leading-tight">Pet Clinic</h2>
-          <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Management System</p>
+          <h2 class="text-xl font-extrabold text-slate-800 tracking-tight leading-none">Pet Clinic<span class="text-blue-600">.</span></h2>
+          <p class="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-1">Client Portal</p>
         </div>
       </div>
 
-      <nav class="flex-1 p-6 space-y-3 overflow-y-auto custom-scrollbar">
+      <nav class="flex-1 px-5 py-8 space-y-2 overflow-y-auto custom-scrollbar">
+        <p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">เมนูหลัก</p>
+
         <router-link to="/user/profile" class="nav-item" active-class="active">
-          <span class="text-xl icon">👤</span> 
+          <span class="text-xl icon">👤</span>
           <span class="font-bold">ข้อมูลส่วนตัว</span>
         </router-link>
 
         <router-link to="/user/pets" class="nav-item" active-class="active" :class="{ 'active': $route.path.startsWith('/user/pets') }">
-          <span class="text-xl icon">🐾</span> 
+          <span class="text-xl icon">🐾</span>
           <span class="font-bold">สัตว์เลี้ยงของฉัน</span>
         </router-link>
 
-        <router-link to="/user/receipts" class="nav-item" active-class="active" :class="{ 'active': $route.path.startsWith('/user/receipts') }">
-          <span class="text-xl icon">🧾</span> 
-          <span class="font-bold">ประวัติการชำระเงิน</span>
-        </router-link>
-      </nav>
         <router-link to="/user/appointments" class="nav-item" active-class="active" :class="{ 'active': $route.path.startsWith('/user/appointments') }">
-          <span class="text-xl icon">📅</span> 
+          <span class="text-xl icon">📅</span>
           <span class="font-bold">การนัดหมาย</span>
         </router-link>
 
-      
+        <router-link to="/user/receipts" class="nav-item" active-class="active" :class="{ 'active': $route.path.startsWith('/user/receipts') }">
+          <span class="text-xl icon">🧾</span>
+          <span class="font-bold">ประวัติการรักษา / ชำระเงิน</span>
+        </router-link>
+      </nav>
 
-      <div class="p-8 border-t border-gray-100 bg-gray-50/50">
-        <button @click="logout" class="w-full flex items-center justify-center gap-3 py-5 rounded-2xl bg-white text-[#5a72ea] font-bold shadow-[0_4px_6px_rgba(0,0,0,0.08)] hover:shadow-[0_10px_15px_rgba(0,0,0,0.12)] hover:-translate-y-1 transition-all duration-200">
-          <span class="text-2xl">🚪</span> 
-          <span class="text-xl">ออกจากระบบ</span>
+      <div class="p-6 border-t border-slate-100 bg-slate-50/50">
+        <button @click="logout" class="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white text-rose-500 border border-slate-200 font-bold shadow-sm hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all duration-200 group">
+          <span class="text-xl group-hover:-translate-x-1 transition-transform">🚪</span>
+          <span>ออกจากระบบ</span>
         </button>
       </div>
     </aside>
 
     <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
-      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 relative w-full">
-        <router-view v-slot="{ Component }">
-          <transition name="fade-page" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
+      
+      
+      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 p-6 md:p-8 relative w-full">
+        <div class="max-w-6xl mx-auto pb-10">
+          <router-view v-slot="{ Component }">
+            <transition name="fade-page" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </div>
       </main>
     </div>
 
@@ -75,29 +81,33 @@ const logout = () => {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.2rem;
-  border-radius: 1rem;
+  gap: 0.875rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: 0.875rem;
   color: #64748b;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   margin-bottom: 0.5rem;
+  font-size: 0.95rem;
 }
 .nav-item:hover {
   background-color: #f8fafc;
   color: #1e293b;
-  transform: translateX(4px);
 }
 .nav-item.active {
-  background: linear-gradient(to right, #eff6ff, #fff);
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
   color: #2563eb;
-  box-shadow: 0 4px 15px -3px rgba(37, 99, 235, 0.15);
-  border-right: 4px solid #2563eb;
+  box-shadow: 0 4px 15px -3px rgba(37, 99, 235, 0.1);
 }
 .nav-item .icon {
   transition: transform 0.2s;
+  opacity: 0.8;
+}
+.nav-item:hover .icon {
+  opacity: 1;
 }
 .nav-item.active .icon {
   transform: scale(1.1);
+  opacity: 1;
 }
 
 /* Page Transition */
@@ -107,11 +117,11 @@ const logout = () => {
 }
 .fade-page-enter-from {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(15px);
 }
 .fade-page-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-15px);
 }
 
 /* Scrollbar Sidebar */
@@ -124,5 +134,8 @@ const logout = () => {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 10px;
+}
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: #94a3b8;
 }
 </style>
