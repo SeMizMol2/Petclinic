@@ -148,7 +148,6 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
-
 // ================= GET MY APPOINTMENTS (User) =================
 router.get('/my-appointments/:user_id', auth, async (req, res) => {
     try {
@@ -171,4 +170,5 @@ router.get('/my-appointments/:user_id', auth, async (req, res) => {
         res.status(500).json({ success: false, message: 'ดึงข้อมูลนัดหมายไม่สำเร็จ' });
     }
 });
+
 module.exports = router;

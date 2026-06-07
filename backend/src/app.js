@@ -24,7 +24,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/history', historyRoutes);
-app.use('/api/receipts', receiptRoutes);ั
+app.use('/api/receipts', receiptRoutes);
 
 
 const routes = require('./routes');
