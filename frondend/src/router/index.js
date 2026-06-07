@@ -59,47 +59,30 @@ const router = createRouter({
 
 // Navigation Guard (แก้ไขแล้ว: ป้องกันจอขาว 100%)
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
-  let user = null
+  const token = localStorage.getItem('token');
+  const userStr = localStorage.getItem('user');
   
+  let user = null;
   try {
-    const userStr = localStorage.getItem('user')
-    user = userStr ? JSON.parse(userStr) : null
+    user = userStr ? JSON.parse(userStr) : null;
+    
+    // 👈 บรรทัดนี้สำคัญ: ถ้ามีข้อมูล user แต่ไม่มี role ให้เติมให้ทันที!
+    if (user && !user.role) {
+      user.role = 'user'; 
+      localStorage.setItem('user', JSON.stringify(user)); // อัปเดตข้อมูลที่เติม role ลงไปเลย
+    }
   } catch (e) {
-    // ถ้าข้อมูล User พัง ให้เคลียร์ทิ้งเลย
-    localStorage.clear()
-    return next('/login')
+    localStorage.clear();
+    return next('/login');
   }
 
-  // 1. เช็คว่าหน้านี้ต้องการ Login หรือไม่
+  // --- ที่เหลือเหมือนเดิม ---
   if (to.meta.requiresAuth) {
-    // ถ้าไม่มี Token หรือ ไม่มีข้อมูล User หรือ User ไม่มี Role -> ไป Login ใหม่
-    if (!token || !user || !user.role) {
-      localStorage.clear()
-      return next('/login')
-    }
-    
-    // 2. เช็คสิทธิ์ (Role)
-    if (to.meta.role && user.role !== to.meta.role) {
-      // ถ้าเป็น Admin แต่จะเข้าหน้า User -> พาไปหน้า Admin
-      if (user.role === 'admin') {
-         if (to.path.startsWith('/admin')) return next() // ถ้ากำลังไปถูกทางแล้ว ให้ผ่าน
-         return next('/admin')
-      }
-      
-      // ถ้าเป็น User แต่จะเข้าหน้า Admin -> พาไปหน้า User
-      if (user.role === 'user') {
-         if (to.path.startsWith('/user')) return next() // ถ้ากำลังไปถูกทางแล้ว ให้ผ่าน
-         return next('/user')
-      }
-
-      // ถ้า Role แปลกๆ (ไม่ใช่ admin/user) -> เคลียร์ทิ้งแล้วไป Login
-      localStorage.clear()
-      return next('/login')
-    }
+    if (!token || !user) return next('/login');
+    if (to.meta.role && user.role !== to.meta.role) return next(user.role === 'admin' ? '/admin' : '/user');
   }
   
-  next()
+  next();
 })
 
 export default router

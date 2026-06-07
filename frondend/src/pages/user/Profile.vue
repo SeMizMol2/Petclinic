@@ -53,22 +53,26 @@ const previewImage = ref(null)
 const isEditing = ref(false)
 
 onMounted(async () => {
-  // 1. โหลดจาก localStorage มาโชว์ก่อน (เพื่อให้หน้าจอแสดงผลไว)
-  const userData = JSON.parse(localStorage.getItem('user'))
-  if (userData) user.value = userData
-
-  // 2. ดึงข้อมูลล่าสุดจาก Server เสมอ เพื่อแก้ปัญหาข้อมูลหายหลัง Login
-  try {
-    const token = localStorage.getItem('token')
-    if (token) {
+  const token = localStorage.getItem('token')
+  if (token) {
+    try {
       const res = await axios.get('http://localhost:3000/api/user/me', {
         headers: { Authorization: `Bearer ${token}` }
       })
-      console.log("ข้อมูลที่ได้จาก Server:", res.data); // เพิ่มบรรทัดนี้
-user.value = res.data;
+
+      // ⭐ แก้ตรงนี้ครับ: จับคู่ชื่อให้ตรงกับที่ใน input ต้องการ
+      user.value = {
+        ...res.data,           // เอาข้อมูลทั้งหมดมา
+        email: res.data.owner_email // บังคับให้ email มีค่าเท่ากับ owner_email ที่ได้จาก Server
+      }
+      
+      localStorage.setItem('user', JSON.stringify(user.value))
+    } catch (err) {
+      console.error("ดึงข้อมูลใหม่ไม่สำเร็จ:", err)
+      // ถ้าดึงไม่สำเร็จค่อยใช้ของเก่าจาก localStorage
+      const userData = JSON.parse(localStorage.getItem('user'))
+      if (userData) user.value = userData
     }
-  } catch (err) {
-    console.error("ดึงข้อมูลล่าสุดจาก Server ไม่สำเร็จ:", err)
   }
 })
 
