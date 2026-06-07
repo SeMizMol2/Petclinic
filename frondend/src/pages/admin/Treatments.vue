@@ -83,9 +83,16 @@
               <div v-for="(item, index) in form.services" :key="index" class="item-row">
                 <div class="flex-1">
                   <div class="font-bold text-sm">{{ item.service_name }}</div>
-                  <div class="text-xs text-gray-500">{{ formatPrice(item.price) }} บาท</div>
+                  
+                  <div class="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                    <span></span>
+                    <input type="number" v-model.number="item.price" min="0" step="0.5" class="price-edit-input">
+                    <span>บาท</span>
+                  </div>
+                  
                 </div>
                 <input type="number" v-model.number="item.quantity" min="1" class="qty-input">
+                
                 <div class="font-bold text-emerald-600 w-20 text-right">{{ formatPrice(item.price * item.quantity) }}</div>
                 <button @click="removeServiceItem(index)" class="btn-remove">✕</button>
               </div>
@@ -238,4 +245,20 @@ onMounted(() => fetchAllData())
 .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
 @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+
+.price-edit-input {
+  width: 70px;
+  padding: 2px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  text-align: right;
+  font-size: 12px;
+  background-color: #f8fafc;
+  transition: all 0.2s;
+}
+.price-edit-input:focus {
+  background-color: #ffffff;
+  border-color: #10b981;
+  outline: none;
+}
 </style>

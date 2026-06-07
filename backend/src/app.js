@@ -11,6 +11,7 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 const historyRoutes = require('./routes/history.routes');
 const serviceRoutes = require('./routes/services.routes');
 const treatmentRoutes = require('./routes/treatments.routes');
+const ownerRoutes = require('./routes/owner.routes');
 const app = express();
 
 app.use(cors());
@@ -26,6 +27,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/treatments', treatmentRoutes);
+app.use('/api/owner', ownerRoutes);
 
 
 const routes = require('./routes');

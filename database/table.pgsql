@@ -71,6 +71,7 @@ CREATE TABLE tb_receipt (
     proof_image VARCHAR(255),
     owner_id VARCHAR(20),
     user_id VARCHAR(20),
+    treatment_id VARCHAR(15),
     create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_datetime TIMESTAMP,
     
@@ -83,6 +84,11 @@ CREATE TABLE tb_receipt (
         FOREIGN KEY (user_id) 
         REFERENCES tb_user(user_id) 
         ON DELETE SET NULL
+
+    CONSTRAINT fk_receipt_treatment
+        FOREIGN KEY (treatment_id)
+        REFERENCES tb_treatment(treatment_id)
+        ON DELETE RESTRICT;
 );
 
 CREATE TABLE tb_expense (
