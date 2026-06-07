@@ -148,4 +148,27 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
+
+// ================= GET MY APPOINTMENTS (User) =================
+router.get('/my-appointments/:user_id', auth, async (req, res) => {
+    try {
+        const { user_id } = req.params;
+
+        // ดึงข้อมูลนัดหมาย โดยเชื่อมจาก User -> Owner -> Pet -> Appointment
+        const sql = `
+            SELECT a.appt_id, a.appt_date, a.appt_time, a.appt_reason, a.appt_status, p.pet_name
+            FROM tb_appointment a
+            JOIN tb_pet p ON a.pet_id = p.pet_id
+            JOIN tb_owner o ON p.owner_id = o.owner_id
+            WHERE o.user_id = $1
+            ORDER BY a.appt_date ASC, a.appt_time ASC
+        `;
+        const appointments = await pool.query(sql, [user_id]);
+        
+        res.json({ success: true, data: appointments.rows });
+    } catch (err) {
+        console.error("Error Get My Appointments:", err);
+        res.status(500).json({ success: false, message: 'ดึงข้อมูลนัดหมายไม่สำเร็จ' });
+    }
+});
 module.exports = router;
