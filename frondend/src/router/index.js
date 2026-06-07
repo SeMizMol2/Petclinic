@@ -8,6 +8,8 @@ import UserLayout from '../pages/user/UserLayout.vue'
 import Profile from '../pages/user/Profile.vue'
 import Pets from '../pages/user/Pets.vue'
 import AddPet from '../pages/user/Addpet.vue'
+import Receipts from '../pages/user/Receipts.vue'
+import Appointments from '../pages/user/Appointments.vue'
 
 // Admin Components
 import AdminLayout from '../pages/admin/AdminLayout.vue'
@@ -29,11 +31,13 @@ const routes = [
     component: UserLayout,
     meta: { requiresAuth: true, role: 'user' },
     children: [
-      { path: '', redirect: '/user/profile' },
-      { path: 'profile', component: Profile },
-      { path: 'pets', component: Pets },
-      { path: 'pets/add', component: AddPet }
-    ]
+        { path: '', redirect: '/user/profile' },
+        { path: 'profile', component: Profile },
+        { path: 'pets', component: Pets },
+        { path: 'pets/add', component: AddPet },
+        { path: 'receipts', component: Receipts }, // 📍 <--- เติมลูกน้ำ (,) ตรงนี้ครับ!
+        { path: 'appointments', component: Appointments }
+      ]
   },
 
   // Admin Routes

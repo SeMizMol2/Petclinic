@@ -83,6 +83,7 @@ router.post('/login', async (req, res) => {
     }
 
     // 🔎 หา user ปกติ
+    // 🔎 หา user ปกติ
     const result = await pool.query(
       'SELECT * FROM tb_user WHERE username = $1',
       [username]
@@ -94,8 +95,18 @@ router.post('/login', async (req, res) => {
 
     const user = result.rows[0];
 
+    // 📍 ---------------- แทรกตรงนี้เลยครับ ---------------- 📍
+    console.log("==============================");
+    console.log("👉 รหัสที่พี่พิมพ์ในเว็บ :", password);
+    console.log("👉 รหัสที่ดึงมาจาก DB   :", user.password);
+    console.log("👉 ความยาวรหัสใน DB  :", user.password.length, "ตัวอักษร (ต้องเป็น 60 เท่านั้น)");
+    console.log("==============================");
+    // 📍 -------------------------------------------------- 📍
+
     // 🔐 เช็ครหัสผ่าน
     const isMatch = await bcrypt.compare(password, user.password);
+
+    
 
     if (!isMatch) {
       return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });

@@ -8,6 +8,7 @@ const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
 const appointmentRoutes = require('./routes/appointment.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const receiptRoutes = require('./routes/receipt.routes');
 const historyRoutes = require('./routes/history.routes');
 const serviceRoutes = require('./routes/services.routes');
 const treatmentRoutes = require('./routes/treatments.routes');
@@ -25,6 +26,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/receipts', receiptRoutes);ั
 app.use('/api/services', serviceRoutes);
 app.use('/api/treatments', treatmentRoutes);
 app.use('/api/owner', ownerRoutes);
