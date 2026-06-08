@@ -71,20 +71,31 @@ const login = async () => {
       }
     )
 
-    // 🔐 เก็บ token + user
+    // 1. ดึงข้อมูล user ออกมาพักไว้ก่อน
+    const userData = res.data.user
+
+    // 2. 👈 แก้ตรงนี้: ถ้าไม่มี role ให้ใส่เข้าไปให้มัน (บังคับให้มี)
+    if (!userData.role) {
+      // เช็คว่าถ้าเป็น admin ให้ใส่ 'admin' ถ้าไม่ใช่ให้ใส่ 'user' 
+      // (ถ้าพี่รู้อยู่แล้วว่าใครเป็น admin ให้เปลี่ยน logic ตรงนี้ครับ)
+      userData.role = 'user' 
+    }
+
+    // 3. เก็บ token + user (ที่เติม role แล้ว)
     localStorage.setItem('token', res.data.token)
-    localStorage.setItem('user', JSON.stringify(res.data.user))
+    localStorage.setItem('user', JSON.stringify(userData)) // ใช้ userData ที่เติม role แล้ว
 
     alert('เข้าสู่ระบบสำเร็จ')
-    if (res.data.user.role === 'admin'){
+    
+    // Redirect ตาม role ที่เพิ่งเซตเข้าไป
+    if (userData.role === 'admin') {
       router.push('/admin')
-    } else{
+    } else {
       router.push('/user')
     }
 
   } catch (err) {
-    error.value =
-      err.response?.data?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+    error.value = err.response?.data?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
   }
 }
 </script>

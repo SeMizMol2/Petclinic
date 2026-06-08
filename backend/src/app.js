@@ -1,6 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const app = express();
+
+// รวม Route ทั้งหมด
 const authRoutes = require('./routes/auth.routes');
 const testRoutes = require('./routes/test.routes');
 const petRoutes = require('./routes/pet.routes');
@@ -13,10 +17,12 @@ const historyRoutes = require('./routes/history.routes');
 const serviceRoutes = require('./routes/services.routes');
 const treatmentRoutes = require('./routes/treatments.routes');
 const ownerRoutes = require('./routes/owner.routes');
-const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// เปิดทางเข้าให้คนภายนอกดูรูปได้ (บรรทัดนี้บรรทัดเดียวพอสำหรับเรื่องรูปใน app.js)
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
