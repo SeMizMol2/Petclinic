@@ -32,7 +32,7 @@ router.post('/', auth, async (req, res) => {
     const client = await pool.connect(); // ใช้ client สำหรับ Transaction
     try {
         const { pet_id, symptom, diagnosis, services, total_amount } = req.body;
-        const user_id = req.user.id; // ดึงรหัสหมอจาก Token ที่ Login
+        const user_id = req.user.user_id; // ดึงรหัสหมอจาก Token ที่ Login
 
         await client.query('BEGIN'); // เริ่มต้น Transaction
 

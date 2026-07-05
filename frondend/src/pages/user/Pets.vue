@@ -104,16 +104,22 @@
         </div>
 
         <div class="history-section">
-          <h3 class="history-title">🏥 ประวัติการรักษาล่าสุด</h3>
-          
+          <div class="history-title-row">
+            <h3 class="history-title">🏥 ประวัติการรักษาล่าสุด</h3>
+            <router-link :to="`/user/history/${pet.pet_id}`" class="history-link">ดูทั้งหมด →</router-link>
+          </div>
+
           <div class="history-list">
-            <div v-for="history in mockHistory" :key="history.id" class="history-item">
+            <div v-if="getRecentHistory(pet.pet_id).length === 0" class="history-empty">
+              ยังไม่มีประวัติการรักษา
+            </div>
+            <div v-for="history in getRecentHistory(pet.pet_id)" :key="history.treatment_id" class="history-item">
               <div class="history-item-header">
-                 <span class="history-date">📅 {{ history.date }}</span>
-                 <span class="history-vet">👨‍⚕️ {{ history.vet }}</span>
+                 <span class="history-date">📅 {{ formatDateDisplay(history.treatment_date) }}</span>
+                 <span class="history-vet">👨‍⚕️ {{ history.doctor_name || 'ไม่ระบุ' }}</span>
               </div>
-              <p class="history-name">{{ history.title }}</p>
-              <p class="history-note">📝 หมายเหตุ: {{ history.note }}</p>
+              <p class="history-name">{{ history.diagnosis || history.symptom || 'ไม่มีข้อมูลการวินิจฉัย' }}</p>
+              <p class="history-note">📝 อาการ: {{ history.symptom || '-' }}</p>
             </div>
           </div>
         </div>
@@ -191,20 +197,35 @@ const loading = ref(false)
 const showEdit = ref(false)
 const editPet = ref({})
 
-// 📍 ส่วนที่เพิ่มเข้ามาใหม่: ข้อมูลจำลอง (Mock Data) 📍
-// วันหลังถ้า API ประวัติเสร็จ ค่อยลบตัวนี้ทิ้ง แล้วดึงข้อมูลจาก axios แทนครับ
-const mockHistory = ref([
-]);
+// ⭐ ประวัติการรักษาจริงของแต่ละสัตว์เลี้ยง ดึงจาก /api/history/pet-history/:pet_id
+// เก็บเป็น object แยกตาม pet_id เพื่อโชว์ในการ์ดของสัตว์เลี้ยงแต่ละตัว
+const historyByPet = ref({})
 
 const getHeaders = () => ({
   headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
 })
+
+// แสดงแค่ 2 รายการล่าสุดต่อการ์ด ไม่ให้การ์ดยาวเกินไป
+const getRecentHistory = (petId) => (historyByPet.value[petId] || []).slice(0, 2)
+
+const loadHistoryForPet = async (petId) => {
+  try {
+    const res = await axios.get(`http://localhost:3000/api/history/pet-history/${petId}`, getHeaders())
+    if (res.data.success) {
+      historyByPet.value[petId] = res.data.data
+    }
+  } catch (error) {
+    console.error('Error loading history for pet', petId, error)
+  }
+}
 
 const loadPets = async () => {
   loading.value = true
   try {
     const res = await axios.get('http://localhost:3000/api/pets', getHeaders())
     pets.value = res.data
+    // โหลดประวัติของสัตว์เลี้ยงทุกตัวพร้อมกัน
+    await Promise.all(pets.value.map(pet => loadHistoryForPet(pet.pet_id)))
   } catch (error) {
     console.error('Error loading pets:', error)
   } finally {
@@ -481,11 +502,32 @@ onMounted(loadPets)
   padding-top: 1.25rem;
   border-top: 2px dashed #e5e7eb; /* เส้นประคั่นเนื้อหา */
 }
+.history-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
 .history-title {
   font-size: 0.95rem;
   font-weight: 800;
   color: #374151;
-  margin: 0 0 1rem 0;
+  margin: 0;
+}
+.history-link {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #10b981;
+  text-decoration: none;
+}
+.history-link:hover {
+  text-decoration: underline;
+}
+.history-empty {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 0.75rem 0;
 }
 .history-list {
   display: flex;

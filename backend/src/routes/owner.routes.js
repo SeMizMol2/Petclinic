@@ -7,7 +7,7 @@ const auth = require('./auth.middleware');
 router.get('/dashboard', auth, async (req, res) => {
     try {
         // 1. หา owner_id จาก user_id ที่ล็อกอินเข้ามา
-        const user_id = req.user.id;
+        const user_id = req.user.user_id;
         const ownerQuery = await pool.query('SELECT owner_id, owner_name FROM tb_owner WHERE user_id = $1', [user_id]);
         
         if (ownerQuery.rows.length === 0) {

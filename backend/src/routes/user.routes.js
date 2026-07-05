@@ -10,7 +10,8 @@ const fs = require('fs');
 router.get('/me', auth, async (req, res) => {
   try {
     const userId = req.user.user_id;
-    // ผมแก้ comma ที่เกินมาออกให้แล้วครับ
+    
+    // ⭐ เอาคอมม่า (,) หลัง o.profile_pic ออกให้แล้วครับ ไม่งั้นเดี๋ยว 500 Error อีก
     const result = await pool.query(
       `SELECT 
           u.user_id, 
@@ -18,8 +19,7 @@ router.get('/me', auth, async (req, res) => {
           o.owner_name, 
           o.owner_email,
           o.owner_tel AS tel,
-          o.profile_pic,
-          o.owner_address
+          o.profile_pic
        FROM tb_user u
        LEFT JOIN tb_owner o ON u.user_id = o.user_id
        WHERE u.user_id = $1`,
@@ -41,18 +41,21 @@ router.get('/me', auth, async (req, res) => {
 router.put('/me', auth, async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const { owner_name, owner_email, tel, owner_address } = req.body;
-
-    // --- ตรงนี้คือจุดที่พัง ---
-    // พี่ลองเช็คดูว่าชื่อใน SET กับ WHERE ตรงกับชื่อคอลัมน์จริงๆ ในตารางไหม
-   // แก้บรรทัด const sql เป็นบรรทัดนี้ครับ (ใส่ double quotes ครอบชื่อทั้งหมด)
-    const sql = `UPDATE "tb_owner" SET "owner_name" = $1, "owner_email" = $2, "owner_tel" = $3, "owner_address" = $4 WHERE "user_id" = $5`;
     
+    // ⭐ 1. เอา owner_address ออกจากการรับค่า
+    const { owner_name, owner_email, tel } = req.body;
+
+    // ⭐ 2. แก้ SQL ใหม่: เอา address ออก และเปลี่ยนเป็น WHERE "user_id" = $4
+    const sql = `UPDATE "tb_owner" SET "owner_name" = $1, "owner_email" = $2, "owner_tel" = $3 WHERE "user_id" = $4`;
+    
+    // ⭐ 3. จัดเรียง Values ใหม่ให้ตรงกับ $1, $2, $3, $4
+    const values = [owner_name, owner_email, tel, userId];
+
     // พิมพ์ SQL ออกมาดูใน Terminal
     console.log("SQL ที่จะรัน:", sql);
-    console.log("Values:", [owner_name, owner_email, tel, owner_address, userId]);
+    console.log("Values:", values);
 
-    const result = await pool.query(sql, [owner_name, owner_email, tel, owner_address, userId]);
+    const result = await pool.query(sql, values);
     
     res.json({ message: 'บันทึกสำเร็จ' });
   } catch (err) {

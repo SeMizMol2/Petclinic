@@ -33,11 +33,6 @@
           <div v-else class="info-value">📞 {{ user.tel || 'ไม่ได้ระบุเบอร์โทร' }}</div>
         </div>
 
-        <div class="info-box">
-          <label>ที่อยู่</label>
-          <input v-if="isEditing" v-model="user.owner_address" class="edit-input" placeholder="ระบุที่อยู่..." />
-          <div v-else class="info-value">🏠 {{ user.owner_address || 'ไม่ได้ระบุที่อยู่' }}</div>
-        </div>
       </div>
     </div>
   </div>

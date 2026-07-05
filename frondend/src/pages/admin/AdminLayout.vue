@@ -39,6 +39,11 @@
           <span class="label">การรักษา</span>
         </router-link>
 
+        <router-link to="/admin/expenses" class="nav-item" active-class="active">
+          <span class="icon">💸</span>
+          <span class="label">รายจ่ายคลินิก</span>
+        </router-link>
+
       </nav>
         
 

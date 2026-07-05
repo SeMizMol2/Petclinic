@@ -16,9 +16,10 @@ import AdminLayout from '../pages/admin/AdminLayout.vue'
 import AdminDashboard from '../pages/admin/Dashboard.vue'
 import AdminUsers from '../pages/admin/Users.vue'
 import AdminAppointments from '../pages/admin/Appointments.vue'
-import { comma } from 'postcss/lib/list'
 import Services from '../pages/admin/Services.vue'
 import Treatments from '../pages/admin/Treatments.vue'
+import Expenses from '../pages/admin/Expenses.vue'
+import History from '../pages/user/History.vue'
 
 const routes = [
   { path: '/', component: Home },
@@ -35,8 +36,9 @@ const routes = [
         { path: 'profile', component: Profile },
         { path: 'pets', component: Pets },
         { path: 'pets/add', component: AddPet },
-        { path: 'receipts', component: Receipts }, // 📍 <--- เติมลูกน้ำ (,) ตรงนี้ครับ!
-        { path: 'appointments', component: Appointments }
+        { path: 'receipts', component: Receipts },
+        { path: 'appointments', component: Appointments },
+        { path: 'history/:petId', component: History }
       ]
   },
 
@@ -51,7 +53,8 @@ const routes = [
       { path: 'users', component: AdminUsers},
       { path: 'Appointments', component: AdminAppointments},
       { path: 'Services', component: Services},
-      { path: 'Treatments', component: Treatments }
+      { path: 'Treatments', component: Treatments },
+      { path: 'Expenses', component: Expenses }
     ]
   }
 ]

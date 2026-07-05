@@ -11,6 +11,8 @@ CREATE TABLE tb_owner (
   owner_name VARCHAR(100),
   owner_email VARCHAR(100),
   owner_tel VARCHAR(15),
+  owner_address TEXT,
+  profile_pic VARCHAR(255),
 
   CONSTRAINT fk_owner_user
     FOREIGN KEY (user_id)
@@ -59,36 +61,6 @@ CREATE TABLE tb_category (
     type VARCHAR(20) CHECK (type IN ('รายรับ', 'รายจ่าย')) NOT NULL,
     create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_datetime TIMESTAMP
-);
-
-CREATE TABLE tb_receipt (
-    receipt_id VARCHAR(15) PRIMARY KEY,
-    issue_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    total_amount DECIMAL(10,2) NOT NULL,
-    payment_status VARCHAR(20) CHECK (payment_status IN ('ยังไม่ได้ชำระ', 'ชำระเสร็จสิ้น')) DEFAULT 'ยังไม่ได้ชำระ',
-    pay_method VARCHAR(50),
-    pay_date TIMESTAMP,
-    proof_image VARCHAR(255),
-    owner_id VARCHAR(20),
-    user_id VARCHAR(20),
-    treatment_id VARCHAR(15),
-    create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    update_datetime TIMESTAMP,
-    
-    CONSTRAINT fk_receipt_owner 
-        FOREIGN KEY (owner_id) 
-        REFERENCES tb_owner(owner_id) 
-        ON DELETE CASCADE,
-        
-    CONSTRAINT fk_receipt_user 
-        FOREIGN KEY (user_id) 
-        REFERENCES tb_user(user_id) 
-        ON DELETE SET NULL
-
-    CONSTRAINT fk_receipt_treatment
-        FOREIGN KEY (treatment_id)
-        REFERENCES tb_treatment(treatment_id)
-        ON DELETE RESTRICT;
 );
 
 CREATE TABLE tb_expense (
@@ -157,4 +129,34 @@ CREATE TABLE tb_treatment_detail (
         FOREIGN KEY (service_id) 
         REFERENCES tb_service(service_id) 
         ON DELETE RESTRICT 
+);
+
+CREATE TABLE tb_receipt (
+    receipt_id VARCHAR(15) PRIMARY KEY,
+    issue_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total_amount DECIMAL(10,2) NOT NULL,
+    payment_status VARCHAR(20) CHECK (payment_status IN ('ยังไม่ได้ชำระ', 'ชำระเสร็จสิ้น')) DEFAULT 'ยังไม่ได้ชำระ',
+    pay_method VARCHAR(50),
+    pay_date TIMESTAMP,
+    proof_image VARCHAR(255),
+    owner_id VARCHAR(20),
+    user_id VARCHAR(20),
+    treatment_id VARCHAR(15),
+    create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_datetime TIMESTAMP,
+
+    CONSTRAINT fk_receipt_owner
+        FOREIGN KEY (owner_id)
+        REFERENCES tb_owner(owner_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_receipt_user
+        FOREIGN KEY (user_id)
+        REFERENCES tb_user(user_id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_receipt_treatment
+        FOREIGN KEY (treatment_id)
+        REFERENCES tb_treatment(treatment_id)
+        ON DELETE RESTRICT
 );
