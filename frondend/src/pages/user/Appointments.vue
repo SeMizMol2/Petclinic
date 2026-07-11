@@ -1,53 +1,59 @@
 <template>
-  <div class="p-8 max-w-7xl mx-auto">
-    <div class="flex items-center justify-between mb-8">
+  <div class="appointments-page">
+    <section class="hero-section">
       <div>
-        <h2 class="text-3xl font-extrabold text-gray-800 tracking-tight">📅 การนัดหมายของฉัน</h2>
-        <p class="text-gray-500 mt-2 font-medium">ตรวจสอบวันและเวลานัดหมายกับทางคลินิก</p>
+        <h1>การนัดหมายของฉัน</h1>
+        <p class="hero-text">ตรวจสอบวัน เวลา เหตุผลการนัดหมาย และสถานะการยืนยันจากคลินิกได้แบบรวดเร็ว</p>
       </div>
-    </div>
+    </section>
 
-    <div v-if="appointments.length === 0" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-16 text-center">
-      <div class="text-4xl mb-4">🗓️</div>
-      <h3 class="text-xl font-bold text-gray-700">ยังไม่มีการนัดหมาย</h3>
-    </div>
+    <section v-if="appointments.length === 0" class="empty-section">
+      <h2>ยังไม่มีการนัดหมาย</h2>
+      <p>เมื่อมีการจองนัดหมาย รายการต่างๆ จะแสดงในหน้านี้</p>
+    </section>
 
-    <div v-else class="grid gap-4">
-      <div v-for="item in appointments" :key="item.appt_id" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-6">
-          <div class="bg-indigo-50 text-indigo-600 rounded-xl p-4 text-center min-w-[80px]">
-            <div class="text-sm font-bold uppercase">{{ getMonth(item.appt_date) }}</div>
-            <div class="text-2xl font-extrabold">{{ getDay(item.appt_date) }}</div>
-          </div>
-          <div>
-            <h4 class="text-lg font-bold text-gray-800">{{ item.appt_reason }}</h4>
-            <div class="text-gray-500 text-sm mt-1 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <span class="font-medium text-indigo-500">🐾 น้อง{{ item.pet_name }}</span>
-              <span class="hidden sm:inline text-gray-300">|</span>
-              <span>⏰ เวลา: {{ formatTime(item.appt_time) }} น.</span>
-            </div>
+    <section v-else class="appointment-list">
+      <article v-for="item in appointments" :key="item.appt_id" class="appointment-card">
+        <div class="date-badge">
+          <span>{{ getMonth(item.appt_date) }}</span>
+          <strong>{{ getDay(item.appt_date) }}</strong>
+        </div>
+
+        <div class="appointment-main">
+          <h2>{{ item.appt_reason || 'ไม่ระบุเหตุผลการนัดหมาย' }}</h2>
+          <div class="appointment-meta">
+            <span>สัตว์เลี้ยง: {{ item.pet_name || '-' }}</span>
+            <span>เวลา: {{ formatTime(item.appt_time) }} น.</span>
           </div>
         </div>
-        <div>
-          <span class="px-4 py-2 rounded-full text-sm font-bold"
-                :class="item.appt_status === 'ยืนยัน' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'">
+
+        <div class="status-area">
+          <span :class="['status-badge', item.appt_status === 'ยืนยัน' ? 'confirmed' : 'pending']">
             {{ item.appt_status || 'รอยืนยัน' }}
           </span>
         </div>
-      </div>
-    </div>
+      </article>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import axios from 'axios'
 
 const appointments = ref([])
 
-const getDay = (dateStr) => new Date(dateStr).getDate()
-const getMonth = (dateStr) => new Date(dateStr).toLocaleDateString('th-TH', { month: 'short' })
-const formatTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-'
+const getDay = (dateStr) => {
+  const date = new Date(dateStr)
+  return Number.isNaN(date.getTime()) ? '-' : date.getDate()
+}
+
+const getMonth = (dateStr) => {
+  const date = new Date(dateStr)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('th-TH', { month: 'short' })
+}
+
+const formatTime = (timeStr) => (timeStr ? String(timeStr).substring(0, 5) : '-')
 
 const loadAppointments = async () => {
   try {
@@ -55,15 +61,136 @@ const loadAppointments = async () => {
     const userData = JSON.parse(localStorage.getItem('user'))
     if (!userData || !token) return
 
-    // อย่าลืมแนบ Token ไปด้วยเพราะ API พี่ใช้ auth middleware
-    const res = await axios.get(`http://localhost:3000/api/appointments/my-appointments/${userData.user_id}`, {
+    const response = await axios.get(`http://localhost:3000/api/appointments/my-appointments/${userData.user_id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    if (res.data.success) appointments.value = res.data.data
+
+    if (response.data?.success) {
+      appointments.value = response.data.data || []
+    }
   } catch (error) {
-    console.error("Error loading appointments:", error)
+    console.error('loadAppointments error:', error)
+    alert('ไม่สามารถโหลดข้อมูลการนัดหมายได้')
   }
 }
 
-onMounted(() => loadAppointments())
+onMounted(loadAppointments)
 </script>
+
+<style scoped>
+.appointments-page {
+  display: grid;
+  gap: 20px;
+}
+
+.hero-section,
+.empty-section,
+.appointment-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.hero-section {
+  padding: 28px;
+}
+
+.hero-section h1,
+.empty-section h2,
+.appointment-main h2 {
+  margin: 0;
+  color: #111827;
+}
+
+.hero-text {
+  margin: 10px 0 0;
+  color: #4b5563;
+  line-height: 1.7;
+}
+
+.empty-section {
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.empty-section p {
+  margin: 10px 0 0;
+  color: #6b7280;
+}
+
+.appointment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.appointment-card {
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  gap: 20px;
+  align-items: center;
+  padding: 20px;
+}
+
+.date-badge {
+  background: linear-gradient(180deg, #eef2ff 0%, #e9d5ff 100%);
+  color: #4338ca;
+  border-radius: 8px;
+  padding: 15px 10px;
+  text-align: center;
+}
+
+.date-badge span {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.date-badge strong {
+  display: block;
+  font-size: 28px;
+  margin-top: 4px;
+}
+
+.appointment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 8px;
+  color: #4b5563;
+}
+
+.status-area {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.confirmed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+@media (max-width: 720px) {
+  .appointment-card {
+    grid-template-columns: 1fr;
+  }
+
+  .status-area {
+    justify-content: flex-start;
+  }
+}
+</style>

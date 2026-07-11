@@ -1,5 +1,5 @@
 <template>
-  <section class="service-section">
+  <section id="clinic-contact" class="service-section">
     <div class="container">
       <div class="section-header">
         <h2>ติดต่อเรา</h2>
@@ -76,17 +76,12 @@ defineProps({
 }
 
 .card {
-  background: white;
-  border-radius: 20px;
+  background: #ffffff;
+  border-radius: 8px;
   padding: 40px 20px;
   text-align: center;
-  color: #333;
+  color: #333333;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s;
-}
-
-.card:hover {
-  transform: translateY(-10px);
 }
 
 .card h3 {
@@ -118,9 +113,20 @@ defineProps({
   margin: 0 auto 10px;
 }
 
-.bg-blue { background-color: #eff6ff; color: #3b82f6; }
-.bg-purple { background-color: #f5f3ff; color: #8b5cf6; }
-.bg-red { background-color: #fef2f2; color: #ef4444; }
+.bg-blue {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+
+.bg-purple {
+  background: #f5f3ff;
+  color: #8b5cf6;
+}
+
+.bg-red {
+  background: #fef2f2;
+  color: #ef4444;
+}
 
 @media (max-width: 768px) {
   .cards-grid {

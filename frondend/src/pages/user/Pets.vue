@@ -1,609 +1,631 @@
 <template>
-  <div class="custom-page-container">
-
-    <div class="back-nav">
-      <router-link to="/user/profile" class="btn-white">
-        <span class="icon-lg">←</span> 
-        ย้อนกลับ
-      </router-link>
-    </div>
-
-    <div class="header-container">
-      <div class="header-content">
-        <h1 class="page-title">
-          <span class="icon-box">🐾</span> 
-          สัตว์เลี้ยงของฉัน
-        </h1>
-        <p class="subtitle">จัดการข้อมูลน้องๆ ทั้งหมดของคุณได้ที่นี่</p>
+  <div class="pets-page">
+    <section class="hero-section">
+      <div>
+        <h1>สัตว์เลี้ยงของฉัน</h1>
+        <p class="hero-text">ดูรายละเอียด แก้ไขข้อมูล และเปิดประวัติการรักษาของสัตว์เลี้ยงแต่ละตัวได้จากหน้านี้</p>
       </div>
-      
-      <router-link to="/user/pets/add" class="btn-white">
-        <span class="icon-lg">+</span> 
-        เพิ่มสัตว์เลี้ยง
-      </router-link>
-    </div>
+      <router-link to="/user/pets/add" class="primary-link">เพิ่มสัตว์เลี้ยง</router-link>
+    </section>
 
-    <div v-if="loading" class="loading-container">
-       <div class="spinner"></div>
-       <p>กำลังโหลดข้อมูล...</p>
-    </div>
+    <section v-if="loading" class="state-section">กำลังโหลดข้อมูลสัตว์เลี้ยง...</section>
 
-    <div v-else-if="pets.length" class="custom-grid">
-      
-      <div
-        v-for="pet in pets"
-        :key="pet.pet_id"
-        class="pet-card group"
-      >
-        
-        <div class="action-buttons">
-          <button @click.stop="openEdit(pet)" class="btn-icon btn-edit" title="แก้ไข">
-            ✏️
-          </button>
-          <button @click.stop="deletePet(pet.pet_id)" class="btn-icon btn-delete" title="ลบ">
-            🗑️
-          </button>
-        </div>
+    <section v-else-if="pets.length === 0" class="state-section empty-state">
+      <h2>ยังไม่มีข้อมูลสัตว์เลี้ยง</h2>
+      <p>เริ่มเพิ่มสัตว์เลี้ยงตัวแรกเพื่อเก็บประวัติการรักษา นัดหมาย และใบเสร็จ</p>
+      <router-link to="/user/pets/add" class="primary-link">เพิ่มสัตว์เลี้ยงตัวแรก</router-link>
+    </section>
 
-        <div class="card-header">
-          <div class="pet-avatar">
-            {{ getPetIcon(pet.pet_type) }}
+    <section v-else class="pets-grid">
+      <article v-for="pet in pets" :key="pet.pet_id" class="pet-card">
+        <div class="pet-header">
+          <div class="pet-identity">
+            <div class="pet-avatar">{{ getPetIcon(pet.pet_type) }}</div>
+            <div>
+              <h2>{{ pet.pet_name }}</h2>
+              <p>{{ pet.pet_breed || 'ไม่ระบุสายพันธุ์' }}</p>
+            </div>
           </div>
-          <div class="pet-info">
-            <h2 class="pet-name">{{ pet.pet_name }}</h2>
-            <p class="pet-breed">{{ pet.pet_breed || 'ไม่ระบุสายพันธุ์' }}</p>
+
+          <div class="pet-actions">
+            <button type="button" class="ghost-btn" @click="openEdit(pet)">แก้ไข</button>
+            <button type="button" class="danger-btn" @click="deletePet(pet.pet_id)">ลบ</button>
           </div>
         </div>
 
-        <div class="info-row">
-          <div class="info-box">
-            <p class="label">ประเภท</p>
-            <p class="value">{{ pet.pet_type }}</p>
+        <div class="metric-grid">
+          <div class="metric-item">
+            <span>ประเภท</span>
+            <strong>{{ pet.pet_type || '-' }}</strong>
           </div>
-          <div class="info-box">
-            <p class="label">เพศ</p>
-            <p class="value flex-center">
-              <span v-if="pet.pet_gender === 'ผู้'" style="color: #3b82f6;">♂</span>
-              <span v-else style="color: #ec4899;">♀</span>
-              {{ pet.pet_gender }}
-            </p>
+          <div class="metric-item">
+            <span>เพศ</span>
+            <strong>{{ pet.pet_gender || '-' }}</strong>
+          </div>
+          <div class="metric-item">
+            <span>ลักษณะ/สี</span>
+            <strong>{{ pet.pet_color || '-' }}</strong>
+          </div>
+          <div class="metric-item">
+            <span>วันเกิด</span>
+            <strong>{{ formatDateDisplay(pet.pet_birthdate) }}</strong>
           </div>
         </div>
 
         <div class="status-row">
-             <div>
-                <span class="status-badge" :class="pet.sterile_status === 'ทำแล้ว' ? 'status-green' : 'status-orange'">
-                  {{ pet.sterile_status === 'ทำแล้ว' ? '✓ ทำหมันแล้ว' : '✕ ยังไม่ทำ' }}
-                </span>
-             </div>
+          <span class="status-badge" :class="pet.sterile_status === 'ทำแล้ว' ? 'status-success' : 'status-warn'">
+            {{ pet.sterile_status === 'ทำแล้ว' ? 'ทำหมันแล้ว' : 'ยังไม่ทำหมัน' }}
+          </span>
+          <span class="age-chip">อายุ {{ calculateAge(pet.pet_birthdate) }}</span>
         </div>
 
-        <div class="details-section">
-            <div class="detail-item">
-               <span class="emoji">✨</span>
-               <div>
-                  <p class="detail-label">ลักษณะเด่น</p>
-                  <p class="detail-text">{{ pet.pet_color || '-' }}</p>
-               </div>
-            </div>
-
-            <div class="detail-item">
-               <span class="emoji">⚠️</span>
-               <div>
-                  <p class="detail-label">แพ้ยา</p>
-                  <p class="detail-text" :style="{ color: pet.drug_allergy ? '#ef4444' : '#6b7280' }">
-                    {{ pet.drug_allergy || 'ไม่มีประวัติแพ้ยา' }}
-                  </p>
-               </div>
-            </div>
-        </div>
-        
-        <div class="card-footer">
-           <span>🎂 วันเกิด:</span>
-           <span class="birthdate-text">{{ formatDateDisplay(pet.pet_birthdate) }}</span>
+        <div class="note-box">
+          <span>ประวัติแพ้ยา</span>
+          <p>{{ pet.drug_allergy || 'ไม่มีข้อมูลการแพ้ยา' }}</p>
         </div>
 
-        <div class="history-section">
-          <div class="history-title-row">
-            <h3 class="history-title">🏥 ประวัติการรักษาล่าสุด</h3>
-            <router-link :to="`/user/history/${pet.pet_id}`" class="history-link">ดูทั้งหมด →</router-link>
+        <div class="history-panel">
+          <div class="history-header">
+            <h3>ประวัติการรักษาล่าสุด</h3>
+            <router-link :to="`/user/history/${pet.pet_id}`" class="history-link">ดูทั้งหมด</router-link>
           </div>
 
-          <div class="history-list">
-            <div v-if="getRecentHistory(pet.pet_id).length === 0" class="history-empty">
-              ยังไม่มีประวัติการรักษา
-            </div>
+          <div v-if="getRecentHistory(pet.pet_id).length === 0" class="history-empty">
+            ยังไม่มีประวัติการรักษา
+          </div>
+
+          <div v-else class="history-list">
             <div v-for="history in getRecentHistory(pet.pet_id)" :key="history.treatment_id" class="history-item">
-              <div class="history-item-header">
-                 <span class="history-date">📅 {{ formatDateDisplay(history.treatment_date) }}</span>
-                 <span class="history-vet">👨‍⚕️ {{ history.doctor_name || 'ไม่ระบุ' }}</span>
+              <div class="history-meta">
+                <span>{{ formatDateDisplay(history.treatment_date) }}</span>
+                <span>{{ history.doctor_name || history.vet_name || 'ไม่ระบุสัตวแพทย์' }}</span>
               </div>
-              <p class="history-name">{{ history.diagnosis || history.symptom || 'ไม่มีข้อมูลการวินิจฉัย' }}</p>
-              <p class="history-note">📝 อาการ: {{ history.symptom || '-' }}</p>
+              <strong>{{ history.diagnosis || history.symptom || 'ไม่มีรายละเอียดการรักษา' }}</strong>
+              <p>อาการ: {{ history.symptom || '-' }}</p>
             </div>
           </div>
         </div>
-        </div>
-    </div>
-
-    <div v-else class="empty-state">
-      <div class="empty-icon">🕸️</div>
-      <h3 class="empty-title">ยังไม่มีข้อมูลสัตว์เลี้ยง</h3>
-      <router-link to="/user/pets/add" class="btn-white">
-        + เพิ่มสัตว์เลี้ยงตัวแรก
-      </router-link>
-    </div>
+      </article>
+    </section>
 
     <Teleport to="body">
       <div v-if="showEdit" class="modal-overlay" @click.self="showEdit = false">
         <div class="modal-card">
-           <div class="modal-header">
-             <h2>✏️ แก้ไขข้อมูลน้อง</h2>
-             <button @click="showEdit=false" class="close-btn">&times;</button>
-           </div>
-           
-           <div class="modal-body">
-              <div class="form-group">
-                <label>ชื่อสัตว์เลี้ยง</label>
-                <input v-model="editPet.pet_name" class="input-field" />
-              </div>
-              <div class="form-row">
-                 <div class="form-group"><label>ประเภท</label><input v-model="editPet.pet_type" class="input-field"/></div>
-                 <div class="form-group"><label>สายพันธุ์</label><input v-model="editPet.pet_breed" class="input-field"/></div>
-              </div>
-              <div class="form-row">
-                 <div class="form-group">
-                   <label>เพศ</label>
-                   <select v-model="editPet.pet_gender" class="input-field">
-                     <option value="ผู้">♂ ตัวผู้</option>
-                     <option value="เมีย">♀ ตัวเมีย</option>
-                   </select>
-                 </div>
-                 <div class="form-group"><label>ลักษณะ/สี</label><input v-model="editPet.pet_color" class="input-field"/></div>
-              </div>
-              <div class="form-row">
-                 <div class="form-group">
-                   <label>สถานะ</label>
-                   <select v-model="editPet.sterile_status" class="input-field">
-                     <option value="ทำแล้ว">✅ ทำหมันแล้ว</option>
-                     <option value="ยังไม่ทำ">⏳ ยังไม่ทำ</option>
-                   </select>
-                 </div>
-                 <div class="form-group"><label>วันเกิด</label><input type="date" v-model="editPet.pet_birthdate" class="input-field"/></div>
-              </div>
-              <div class="form-group">
-                <label>ประวัติแพ้ยา</label>
-                <textarea v-model="editPet.drug_allergy" class="input-field" rows="2"></textarea>
-              </div>
-           </div>
+          <div class="modal-header">
+            <div>
+              <h2>ข้อมูลสัตว์เลี้ยง</h2>
+            </div>
+            <button type="button" class="close-btn" @click="showEdit = false">x</button>
+          </div>
 
-           <div class="modal-footer">
-              <button @click="showEdit=false" class="btn-cancel">ยกเลิก</button>
-              <button @click="updatePet" class="btn-save">บันทึก</button>
-           </div>
+          <div class="modal-body">
+            <div class="form-grid single">
+              <label>
+                <span>ชื่อสัตว์เลี้ยง</span>
+                <input v-model="editPet.pet_name" class="input-field" />
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>ประเภท</span>
+                <input v-model="editPet.pet_type" class="input-field" />
+              </label>
+              <label>
+                <span>สายพันธุ์</span>
+                <input v-model="editPet.pet_breed" class="input-field" />
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>เพศ</span>
+                <select v-model="editPet.pet_gender" class="input-field">
+                  <option value="ผู้">ผู้</option>
+                  <option value="เมีย">เมีย</option>
+                </select>
+              </label>
+              <label>
+                <span>ลักษณะ/สี</span>
+                <input v-model="editPet.pet_color" class="input-field" />
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>สถานะการทำหมัน</span>
+                <select v-model="editPet.sterile_status" class="input-field">
+                  <option value="ทำแล้ว">ทำแล้ว</option>
+                  <option value="ยังไม่ทำ">ยังไม่ทำ</option>
+                </select>
+              </label>
+              <label>
+                <span>วันเกิด</span>
+                <input v-model="editPet.pet_birthdate" type="date" class="input-field" />
+              </label>
+            </div>
+
+            <label class="textarea-wrap">
+              <span>ประวัติแพ้ยา</span>
+              <textarea v-model="editPet.drug_allergy" class="input-field" rows="3"></textarea>
+            </label>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="secondary-btn" @click="showEdit = false">ยกเลิก</button>
+            <button type="button" class="primary-btn" @click="updatePet">บันทึก</button>
+          </div>
         </div>
       </div>
     </Teleport>
-
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import axios from 'axios'
 
 const pets = ref([])
 const loading = ref(false)
 const showEdit = ref(false)
 const editPet = ref({})
-
-// ⭐ ประวัติการรักษาจริงของแต่ละสัตว์เลี้ยง ดึงจาก /api/history/pet-history/:pet_id
-// เก็บเป็น object แยกตาม pet_id เพื่อโชว์ในการ์ดของสัตว์เลี้ยงแต่ละตัว
 const historyByPet = ref({})
 
 const getHeaders = () => ({
-  headers: { Authorization: 'Bearer ' + localStorage.getItem('token') }
+  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
 })
 
-// แสดงแค่ 2 รายการล่าสุดต่อการ์ด ไม่ให้การ์ดยาวเกินไป
+const formatDateDisplay = (date) => {
+  if (!date) return '-'
+  const parsedDate = new Date(date)
+  if (Number.isNaN(parsedDate.getTime())) return '-'
+  return parsedDate.toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  })
+}
+
+const calculateAge = (birthdate) => {
+  if (!birthdate) return '-'
+  const birth = new Date(birthdate)
+  if (Number.isNaN(birth.getTime())) return '-'
+
+  const now = new Date()
+  let age = now.getFullYear() - birth.getFullYear()
+  const monthDiff = now.getMonth() - birth.getMonth()
+
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    age -= 1
+  }
+
+  return `${Math.max(age, 0)} ปี`
+}
+
+const getPetIcon = (type) => {
+  const petType = (type || '').toLowerCase()
+  if (petType.includes('หมา') || petType.includes('สุนัข')) return '🐶'
+  if (petType.includes('แมว')) return '🐱'
+  if (petType.includes('กระต่าย')) return '🐰'
+  if (petType.includes('นก')) return '🐦'
+  if (petType.includes('ปลา')) return '🐠'
+  return '🐾'
+}
+
 const getRecentHistory = (petId) => (historyByPet.value[petId] || []).slice(0, 2)
 
 const loadHistoryForPet = async (petId) => {
   try {
-    const res = await axios.get(`http://localhost:3000/api/history/pet-history/${petId}`, getHeaders())
-    if (res.data.success) {
-      historyByPet.value[petId] = res.data.data
-    }
+    const response = await axios.get(`http://localhost:3000/api/history/pet-history/${petId}`, getHeaders())
+    historyByPet.value[petId] = response.data?.success ? response.data.data || [] : []
   } catch (error) {
-    console.error('Error loading history for pet', petId, error)
+    console.error('loadHistoryForPet error:', error)
+    historyByPet.value[petId] = []
   }
 }
 
 const loadPets = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:3000/api/pets', getHeaders())
-    pets.value = res.data
-    // โหลดประวัติของสัตว์เลี้ยงทุกตัวพร้อมกัน
-    await Promise.all(pets.value.map(pet => loadHistoryForPet(pet.pet_id)))
+    const response = await axios.get('http://localhost:3000/api/pets', getHeaders())
+    pets.value = Array.isArray(response.data) ? response.data : []
+    await Promise.all(pets.value.map((pet) => loadHistoryForPet(pet.pet_id)))
   } catch (error) {
-    console.error('Error loading pets:', error)
+    console.error('loadPets error:', error)
+    pets.value = []
+    alert('ไม่สามารถโหลดข้อมูลสัตว์เลี้ยงได้')
   } finally {
     loading.value = false
   }
 }
 
-const calculateAge = (birthdate) => {
-  if (!birthdate) return '-'
-  const birth = new Date(birthdate)
-  const now = new Date()
-  let age = now.getFullYear() - birth.getFullYear()
-  const m = now.getMonth() - birth.getMonth()
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
-    age--
-  }
-  return age < 0 ? 0 : age
-}
-
-const getPetIcon = (type) => {
-  const t = type?.toLowerCase() || ''
-  if (t.includes('สุนัข') || t.includes('หมา')) return '🐕'
-  if (t.includes('แมว')) return '🐈'
-  if (t.includes('ปลา')) return '🐠'
-  if (t.includes('นก')) return '🦜'
-  if (t.includes('กระต่าย')) return '🐇'
-  return '🐾'
-}
-
 const openEdit = (pet) => {
-  try {
-    const petData = { ...pet }
-    if (petData.pet_birthdate) {
-      const dateObj = new Date(petData.pet_birthdate)
-      if (!isNaN(dateObj)) {
-         petData.pet_birthdate = dateObj.toLocaleDateString('en-CA')
-      } else {
-         petData.pet_birthdate = ''
-      }
-    }
-    editPet.value = petData
-    showEdit.value = true
-  } catch (error) {
-    console.error("Error opening popup:", error)
+  const petData = { ...pet }
+  if (petData.pet_birthdate) {
+    const parsedDate = new Date(petData.pet_birthdate)
+    petData.pet_birthdate = Number.isNaN(parsedDate.getTime()) ? '' : parsedDate.toLocaleDateString('en-CA')
   }
+
+  editPet.value = petData
+  showEdit.value = true
 }
 
 const updatePet = async () => {
   try {
     await axios.put(`http://localhost:3000/api/pets/${editPet.value.pet_id}`, editPet.value, getHeaders())
-    alert('แก้ไขข้อมูลสำเร็จ ✅')
+    alert('บันทึกข้อมูลสัตว์เลี้ยงเรียบร้อยแล้ว')
     showEdit.value = false
-    loadPets()
+    await loadPets()
   } catch (error) {
-    alert('เกิดข้อผิดพลาดในการแก้ไข')
+    console.error('updatePet error:', error)
+    alert(error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลสัตว์เลี้ยงได้')
   }
 }
 
-const deletePet = async (id) => {
-  if (!confirm('ยืนยันการลบข้อมูลน้อง?')) return
+const deletePet = async (petId) => {
+  if (!window.confirm('ยืนยันการลบข้อมูลสัตว์เลี้ยงรายการนี้?')) return
+
   try {
-    await axios.delete(`http://localhost:3000/api/pets/${id}`, getHeaders())
-    loadPets()
+    await axios.delete(`http://localhost:3000/api/pets/${petId}`, getHeaders())
+    alert('ลบข้อมูลสัตว์เลี้ยงเรียบร้อยแล้ว')
+    await loadPets()
   } catch (error) {
-    alert('ลบข้อมูลไม่สำเร็จ')
+    console.error('deletePet error:', error)
+    alert(error.response?.data?.message || 'ไม่สามารถลบข้อมูลสัตว์เลี้ยงได้')
   }
-}
-
-const formatDateDisplay = (date) => {
-  if (!date) return '-'
-  return new Date(date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 onMounted(loadPets)
 </script>
 
 <style scoped>
-/* =========================================
-   CUSTOM CSS
-   ========================================= */
-
-/* 1. Page Container */
-.custom-page-container {
-  min-height: 100vh;
-  background-color: #5a72ea;
-  padding: 2rem;
-  font-family: 'Inter', sans-serif;
+.pets-page {
+  display: grid;
+  gap: 20px;
 }
 
-/* Back Nav Container  */
-.back-nav {
-  max-width: 1200px;
-  margin: 0 auto 1.5rem;
+.hero-section,
+.state-section,
+.pet-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 }
 
-/* 2. Header */
-.header-container {
-  max-width: 1200px;
-  margin: 0 auto 2.5rem;
+.hero-section {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-.header-content { color: white; }
-.page-title {
-  font-size: 2rem;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0;
-}
-.icon-box {
-  background-color: rgba(255, 255, 255, 0.2);
-  padding: 0.5rem;
-  border-radius: 12px;
-  backdrop-filter: blur(4px);
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
-}
-.subtitle {
-  color: #bfdbfe;
-  margin-top: 0.25rem;
-  font-size: 0.95rem;
-  padding-left: 0.5rem;
+  align-items: start;
+  gap: 16px;
+  padding: 28px;
 }
 
-/* 3. Shared Button Style  */
-.btn-white {
-  background-color: white;
-  color: #5a72ea;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  font-weight: 700;
+.hero-section h1,
+.pet-card h2,
+.history-header h3,
+.modal-header h2,
+.empty-state h2 {
+  margin: 0;
+  color: #111827;
+}
+
+.hero-text {
+  margin: 8px 0 0;
+  max-width: 620px;
+  color: #4b5563;
+  line-height: 1.65;
+}
+
+.primary-link,
+.primary-btn,
+.secondary-btn,
+.ghost-btn,
+.danger-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
   text-decoration: none;
-  font-size: 1rem;
-}
-.btn-white:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px rgba(0,0,0,0.15);
-}
-.icon-lg { 
-  font-size: 1.4rem; 
-  line-height: 1; 
-  font-weight: 400; 
+  cursor: pointer;
 }
 
-/* 4. Grid Layout */
-.custom-grid {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 1.5rem;
-}
-@media (min-width: 768px) {
-  .custom-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (min-width: 1024px) {
-  .custom-grid { grid-template-columns: repeat(3, 1fr); }
+.primary-link,
+.primary-btn {
+  background: #4f46e5;
+  color: #ffffff;
+  border: none;
 }
 
-/* 5. Pet Card */
-.pet-card {
-  background-color: #ffffff !important;
-  border-radius: 1.5rem;
-  padding: 1.5rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  position: relative;
-  border: 4px solid transparent;
-  transition: all 0.3s ease;
+.state-section {
+  padding: 36px 24px;
+  text-align: center;
+  color: #4b5563;
+}
+
+.empty-state {
   display: flex;
   flex-direction: column;
-}
-.pet-card:hover {
-  transform: translateY(-5px);
-  border-color: #bfdbfe;
-}
-
-/* Action Buttons */
-.action-buttons {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  gap: 0.5rem;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.pet-card:hover .action-buttons { opacity: 1; }
-.btn-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: none;
-  background-color: #f3f4f6;
-  cursor: pointer;
-  display: flex;
+  gap: 12px;
   align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  transition: background 0.2s;
 }
-.btn-edit:hover { background-color: #fef9c3; color: #ca8a04; }
-.btn-delete:hover { background-color: #fee2e2; color: #dc2626; }
 
-/* Card Content */
-.card-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
-.pet-avatar {
-  width: 64px;
-  height: 64px;
-  background-color: #fff7ed;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  border: 1px solid #ffedd5;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+.empty-state p {
+  margin: 0;
+  max-width: 560px;
 }
-.pet-info { flex: 1; overflow: hidden; }
-.pet-name { font-size: 1.5rem; font-weight: 800; color: #1f2937; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pet-breed { color: #6200ea; font-size: 0.875rem; font-weight: 500; margin: 0; }
 
-.info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
-.info-box { background-color: #f9fafb; padding: 0.5rem; border-radius: 0.5rem; }
-.label { font-size: 0.65rem; text-transform: uppercase; color: #9ca3af; font-weight: 700; margin: 0 0 0.25rem 0; }
-.value { font-size: 1rem; font-weight: 700; color: #374151; margin: 0; }
-.flex-center { display: flex; align-items: center; gap: 0.25rem; }
-
-.status-row { 
-  display: flex; justify-content: space-between; align-items: flex-end; 
-  padding-bottom: 1rem; margin-bottom: 1rem; 
-  border-bottom: 1px dashed #e5e7eb; 
+.pets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
 }
-.age-value { font-size: 1.25rem; font-weight: 800; color: #1f2937; line-height: 1; }
-.unit { font-size: 0.875rem; font-weight: 400; color: #9ca3af; }
-.status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  display: inline-block;
-}
-.status-green { background-color: #dcfce7; color: #15803d; }
-.status-orange { background-color: #ffedd5; color: #c2410c; }
 
-.details-section { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
-.detail-item { display: flex; gap: 0.75rem; align-items: flex-start; }
-.emoji { font-size: 1.25rem; line-height: 1; }
-.detail-label { font-size: 0.7rem; color: #9ca3af; font-weight: 700; text-transform: uppercase; margin: 0; }
-.detail-text { font-size: 0.875rem; font-weight: 500; color: #4b5563; margin: 0; }
-
-.card-footer {
-  padding-top: 1rem;
-  border-top: 1px solid #f3f4f6;
-  font-size: 0.75rem;
-  color: #9ca3af;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.pet-card {
+  background: rgba(255, 255, 255, 0.96);
+  padding: 22px;
 }
-.birthdate-text { color: #6b7280; font-weight: 500; }
 
-/* 📍 ส่วนที่เพิ่มเข้ามาใหม่: CSS ของประวัติการรักษา 📍 */
-.history-section {
-  margin-top: 1.25rem;
-  padding-top: 1.25rem;
-  border-top: 2px dashed #e5e7eb; /* เส้นประคั่นเนื้อหา */
-}
-.history-title-row {
+.pet-header {
   display: flex;
   justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.pet-identity {
+  display: flex;
+  gap: 14px;
   align-items: center;
-  margin-bottom: 1rem;
 }
-.history-title {
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: #374151;
-  margin: 0;
+
+.pet-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
 }
-.history-link {
-  font-size: 0.8rem;
+
+.pet-identity p {
+  margin: 6px 0 0;
+  color: #6b7280;
+}
+
+.pet-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ghost-btn {
+  background: #eef2ff;
+  color: #4338ca;
+  border: none;
+}
+
+.danger-btn {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: none;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric-item,
+.note-box,
+.history-item {
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.metric-item {
+  padding: 14px;
+}
+
+.metric-item span,
+.note-box span,
+.modal-body span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
   font-weight: 700;
-  color: #10b981;
+  color: #6b7280;
+}
+
+.metric-item strong,
+.note-box p {
+  color: #111827;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.status-badge,
+.age-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.age-chip {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.note-box {
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+.note-box p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.history-panel {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+}
+
+.history-header,
+.history-meta,
+.modal-header,
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.history-link {
+  color: #4338ca;
+  font-weight: 700;
   text-decoration: none;
 }
-.history-link:hover {
-  text-decoration: underline;
-}
+
 .history-empty {
-  font-size: 0.85rem;
-  color: #9ca3af;
-  text-align: center;
-  padding: 0.75rem 0;
+  color: #6b7280;
 }
+
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 10px;
 }
+
 .history-item {
-  background-color: #f8fafc;
-  padding: 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid #f1f5f9;
-  transition: background 0.2s;
+  padding: 12px;
 }
-.history-item:hover {
-  background-color: #f1f5f9;
-}
-.history-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-.history-date { 
-  font-size: 0.75rem; 
-  color: #64748b; 
-  font-weight: 700; 
-}
-.history-vet { 
-  font-size: 0.7rem; 
-  color: #4f46e5; 
-  font-weight: 700; 
-  background: #e0e7ff; 
-  padding: 0.2rem 0.5rem; 
-  border-radius: 99px; 
-}
-.history-name { 
-  font-size: 0.9rem; 
-  font-weight: 700; 
-  color: #1e293b; 
-  margin: 0 0 0.25rem 0; 
-}
-.history-note { 
-  font-size: 0.8rem; 
-  color: #64748b; 
-  margin: 0; 
-  line-height: 1.4;
-}
-/* 📍 สิ้นสุด CSS ประวัติการรักษา 📍 */
 
-/* 7. Modal Styles */
+.history-meta {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.history-item strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #111827;
+}
+
+.history-item p {
+  margin: 0;
+  color: #4b5563;
+}
+
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999;
-  display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 9999;
 }
+
 .modal-card {
-  background: white; width: 100%; max-width: 500px; border-radius: 1.5rem;
-  overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); margin: 1rem;
+  width: min(720px, 100%);
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
 }
-.modal-header { background: #5a72ea; padding: 1.5rem; color: white; display: flex; justify-content: space-between; align-items: center; }
-.modal-header h2 { margin: 0; font-size: 1.25rem; font-weight: 700; }
-.close-btn { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
-.modal-body { padding: 1.5rem; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
-.form-group label { font-size: 0.875rem; font-weight: 700; color: #4b5563; margin-bottom: 0.25rem; display: block; }
+
+.modal-header,
+.modal-footer {
+  padding: 18px 20px;
+}
+
+.modal-header {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-footer {
+  border-top: 1px solid #e5e7eb;
+  justify-content: flex-end;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.form-grid.single,
+.textarea-wrap {
+  display: block;
+}
+
 .input-field {
-  width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 0.5rem;
-  font-size: 0.95rem; outline: none; box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #111827;
+  box-sizing: border-box;
 }
-.input-field:focus { border-color: #6200ea; box-shadow: 0 0 0 3px rgba(98,0,234,0.1); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.modal-footer { padding: 1.5rem; background: #f9fafb; display: flex; justify-content: flex-end; gap: 0.75rem; }
-.btn-cancel { padding: 0.6rem 1.2rem; background: white; border: 1px solid #d1d5db; border-radius: 0.5rem; color: #374151; font-weight: 600; }
-.btn-save { padding: 0.6rem 1.5rem; background: #6200ea; border: none; border-radius: 0.5rem; color: white; font-weight: 600; }
 
-/* Loading */
-.loading-container { text-align: center; color: white; padding-top: 5rem; }
-.spinner { width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.secondary-btn,
+.close-btn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+}
 
+@media (max-width: 720px) {
+  .hero-section,
+  .pet-header,
+  .status-row,
+  .history-header,
+  .modal-header,
+  .modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .metric-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pet-actions {
+    width: 100%;
+  }
+}
 </style>

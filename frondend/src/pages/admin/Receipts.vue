@@ -18,8 +18,8 @@
         <input v-model="newTreatmentId" placeholder="รหัสการรักษา" required />
         <select v-model="newPayMethod">
           <option value="">ยังไม่ระบุช่องทาง</option>
-          <option value="เงินสด">เงินสด</option>
-          <option value="โอนเงิน">โอนเงิน</option>
+          <option :value="cashMethod">เงินสด</option>
+          <option :value="transferMethod">โอนเงิน</option>
         </select>
         <button class="primary-btn" type="submit">สร้างใบเสร็จ</button>
       </form>
@@ -29,8 +29,8 @@
       <input v-model="searchQuery" class="search-input" placeholder="ค้นหาเลขที่ใบเสร็จ เจ้าของ หรือสัตว์เลี้ยง" />
       <select v-model="statusFilter" class="filter-select">
         <option value="">ทุกสถานะ</option>
-        <option value="ยังไม่ได้ชำระ">ยังไม่ได้ชำระ</option>
-        <option value="ชำระเสร็จสิ้น">ชำระเสร็จสิ้น</option>
+        <option :value="unpaidStatus">ยังไม่ได้ชำระ</option>
+        <option :value="paidStatus">ชำระเสร็จสิ้น</option>
       </select>
     </section>
 
@@ -168,12 +168,15 @@ const statusFilter = ref('')
 const newTreatmentId = ref('')
 const newPayMethod = ref('')
 
-const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 const paidStatus = 'ชำระเสร็จสิ้น'
 const unpaidStatus = 'ยังไม่ได้ชำระ'
+const cashMethod = 'เงินสด'
+const transferMethod = 'โอนเงิน'
+
+const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
 const normalizeStatus = (value) => {
-  const text = String(value || '')
+  const text = String(value || '').trim()
   if (text.includes('เสร็จ') || text.includes('ชำระแล้ว')) return paidStatus
   return unpaidStatus
 }
@@ -246,10 +249,13 @@ const updateStatus = async (receipt, paymentStatus) => {
   try {
     await axios.put(
       `http://localhost:3000/api/receipts/${receipt.receipt_id}/status`,
-      { payment_status: paymentStatus, pay_method: receipt.pay_method || 'เงินสด' },
+      { payment_status: paymentStatus, pay_method: receipt.pay_method || cashMethod },
       { headers: headers() }
     )
-    fetchReceipts()
+    await fetchReceipts()
+    if (selectedReceipt.value?.receipt?.receipt_id === receipt.receipt_id) {
+      await openReceipt(receipt)
+    }
   } catch (err) {
     alert(err.response?.data?.message || 'อัปเดตสถานะไม่สำเร็จ')
   }

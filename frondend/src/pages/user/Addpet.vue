@@ -1,134 +1,73 @@
 <template>
-  <div class="custom-page-container">
-    
-    <div class="header-section">
-      <div class="icon-wrapper">
-        <span class="header-icon">🐾</span>
+  <div class="add-pet-page">
+    <section class="hero-section">
+      <div>
+        <h1>เพิ่มสัตว์เลี้ยงใหม่</h1>
+        <p class="hero-text">กรอกข้อมูลพื้นฐานเพื่อเริ่มใช้งานประวัติการรักษา การนัดหมาย และใบเสร็จของสัตว์เลี้ยงตัวนี้</p>
       </div>
-      <h1 class="page-title">เพิ่มข้อมูลสัตว์เลี้ยง</h1>
-      <p class="page-subtitle">กรอกข้อมูลน้องๆ เพื่อเริ่มดูแลสุขภาพของพวกเขา</p>
-    </div>
+      <router-link to="/user/pets" class="back-link">กลับไปหน้าสัตว์เลี้ยง</router-link>
+    </section>
 
-    <div class="form-card">
-      
-      <form @submit.prevent="submitPet">
-        
-        <div class="form-group">
-          <label class="input-label">
-            <span class="label-icon">🏷️</span> ชื่อสัตว์เลี้ยง
+    <form class="form-shell" @submit.prevent="submitPet">
+      <section class="form-section">
+        <h2>ข้อมูลพื้นฐาน</h2>
+        <div class="form-grid">
+          <label>
+            <span>ชื่อสัตว์เลี้ยง</span>
+            <input v-model.trim="pet.pet_name" class="input-field" placeholder="เช่น มะลิ" required />
           </label>
-          <input 
-            v-model="pet.pet_name" 
-            class="input-field" 
-            placeholder="กรอกชื่อสัตว์เลี้ยง" 
-            required 
-          />
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="input-label">
-              <span class="label-icon">🐕</span> ประเภท
-            </label>
-            <input 
-              v-model="pet.pet_type" 
-              class="input-field" 
-              placeholder="เช่น สุนัข, แมว" 
-              required 
-            />
-          </div>
-          <div class="form-group">
-            <label class="input-label">
-              <span class="label-icon">🧬</span> สายพันธุ์
-            </label>
-            <input 
-              v-model="pet.pet_breed" 
-              class="input-field" 
-              placeholder="เช่น โกลเด้นรีทรีฟเวอร์" 
-            />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="input-label">
-              <span class="label-icon">⚧</span> เพศ
-            </label>
-            <div class="select-wrapper">
-              <select v-model="pet.pet_gender" class="input-field cursor-pointer" required>
-                <option value="" disabled selected>เลือกเพศ</option>
-                <option value="ผู้">ตัวผู้</option>
-                <option value="เมีย">ตัวเมีย</option>
-              </select>
-              <span class="select-arrow">▼</span>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="input-label">
-              <span class="label-icon">💉</span> สถานะการทำหมัน
-            </label>
-            <div class="select-wrapper">
-              <select v-model="pet.sterile_status" class="input-field cursor-pointer" required>
-                <option value="" disabled selected>เลือกสถานะ</option>
-                <option value="ทำแล้ว">ทำหมันแล้ว</option>
-                <option value="ยังไม่ทำ">ยังไม่ทำหมัน</option>
-              </select>
-              <span class="select-arrow">▼</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="input-label">
-            <span class="label-icon">✨</span> ลักษณะเด่น / สี
+          <label>
+            <span>ประเภท</span>
+            <input v-model.trim="pet.pet_type" class="input-field" placeholder="เช่น สุนัข, แมว" required />
           </label>
-          <input 
-            v-model="pet.pet_color" 
-            class="input-field" 
-            placeholder="บรรยายลักษณะเด่นของสัตว์เลี้ยง หรือสี" 
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="input-label">
-            <span class="label-icon">🎂</span> วันเกิด
+          <label>
+            <span>สายพันธุ์</span>
+            <input v-model.trim="pet.pet_breed" class="input-field" placeholder="เช่น เปอร์เซีย, ชิสุ" />
           </label>
-          <input 
-            type="date" 
-            v-model="pet.pet_birthdate" 
-            class="input-field"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="input-label">
-            <span class="label-icon">⚠️</span> ประวัติการแพ้ยา
+          <label>
+            <span>ลักษณะ/สี</span>
+            <input v-model.trim="pet.pet_color" class="input-field" placeholder="เช่น ขาวน้ำตาล" />
           </label>
-          <textarea
-            v-model="pet.drug_allergy"
-            class="input-field textarea-field"
-            rows="3"
-            placeholder="ระบุยาที่แพ้ (ถ้าไม่มีให้เว้นว่างหรือพิมพ์ 'ไม่มี')"
-          ></textarea>
         </div>
+      </section>
 
-        <div class="button-group">
-          <button type="submit" class="btn btn-save">
-            <span>✓</span> ยืนยันการเพิ่มข้อมูล
-          </button>
-
-          <router-link to="/user/pets" class="btn btn-cancel">
-            <span>✕</span> ยกเลิก
-          </router-link>
+      <section class="form-section">
+        <h2>ข้อมูลสุขภาพเบื้องต้น</h2>
+        <div class="form-grid">
+          <label>
+            <span>เพศ</span>
+            <select v-model="pet.pet_gender" class="input-field" required>
+              <option value="" disabled>เลือกเพศ</option>
+              <option value="ผู้">ผู้</option>
+              <option value="เมีย">เมีย</option>
+            </select>
+          </label>
+          <label>
+            <span>สถานะการทำหมัน</span>
+            <select v-model="pet.sterile_status" class="input-field" required>
+              <option value="" disabled>เลือกสถานะ</option>
+              <option value="ทำแล้ว">ทำแล้ว</option>
+              <option value="ยังไม่ทำ">ยังไม่ทำ</option>
+            </select>
+          </label>
+          <label>
+            <span>วันเกิด</span>
+            <input v-model="pet.pet_birthdate" type="date" class="input-field" />
+          </label>
+          <label>
+            <span>ประวัติแพ้ยา</span>
+            <input v-model.trim="pet.drug_allergy" class="input-field" placeholder="ถ้าไม่มีให้เว้นว่าง" />
+          </label>
         </div>
+      </section>
 
-      </form>
-    </div>
-
-    <div class="footer-text">
-      <span>🐾</span> ดูแลสัตว์เลี้ยงด้วยความรัก <span>🐾</span>
-    </div>
-
+      <div class="actions">
+        <router-link to="/user/pets" class="secondary-btn">ยกเลิก</router-link>
+        <button type="submit" class="primary-btn" :disabled="submitting">
+          {{ submitting ? 'กำลังบันทึก...' : 'บันทึกข้อมูลสัตว์เลี้ยง' }}
+        </button>
+      </div>
+    </form>
   </div>
 </template>
 
@@ -138,7 +77,7 @@ import axios from 'axios'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const token = localStorage.getItem('token')
+const submitting = ref(false)
 
 const pet = ref({
   pet_name: '',
@@ -152,194 +91,153 @@ const pet = ref({
 })
 
 const submitPet = async () => {
+  const token = localStorage.getItem('token')
+
   if (!token) {
-    alert("กรุณาเข้าสู่ระบบก่อน")
+    alert('กรุณาเข้าสู่ระบบก่อนใช้งาน')
     router.push('/login')
     return
   }
 
+  submitting.value = true
+
   try {
-    await axios.post(
-      'http://localhost:3000/api/pets',
-      pet.value,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
+    await axios.post('http://localhost:3000/api/pets', pet.value, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
 
-    alert('เพิ่มข้อมูลน้องเรียบร้อยแล้ว! 🎉')
+    alert('เพิ่มข้อมูลสัตว์เลี้ยงเรียบร้อยแล้ว')
     router.push('/user/pets')
-
-  } catch (err) {
-    console.error("ERROR:", err.response?.data)
-    alert(err.response?.data?.message || 'เพิ่มสัตว์เลี้ยงไม่สำเร็จ')
+  } catch (error) {
+    console.error('submitPet error:', error)
+    alert(error.response?.data?.message || 'ไม่สามารถเพิ่มข้อมูลสัตว์เลี้ยงได้')
+  } finally {
+    submitting.value = false
   }
 }
 </script>
 
 <style scoped>
-/* =========================================
-   CUSTOM CSS (บังคับใช้ Style นี้แน่นอน)
-   ========================================= */
+.add-pet-page {
+  display: grid;
+  gap: 20px;
+}
 
-/* Main Page Container */
-.custom-page-container {
-  min-height: 100vh;
-  background-color: #5a72ea; /* พื้นหลังสีฟ้า */
+.hero-section,
+.form-shell {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.hero-section {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 1rem;
-  font-family: 'Inter', sans-serif;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  padding: 28px;
 }
 
-/* Header Section */
-.header-section {
-  text-align: center;
-  margin-bottom: 2rem;
-  color: white;
+.hero-section h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 30px;
 }
-.icon-wrapper {
+
+.hero-text {
+  margin: 10px 0 0;
+  max-width: 640px;
+  color: #4b5563;
+  line-height: 1.7;
+}
+
+.back-link,
+.secondary-btn,
+.primary-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 5rem;
-  height: 5rem;
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  margin-bottom: 1rem;
-  backdrop-filter: blur(4px);
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
-}
-.header-icon { font-size: 2.5rem; }
-.page-title {
-  font-size: 2rem;
-  font-weight: 800;
-  margin: 0 0 0.5rem;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-.page-subtitle {
-  color: #bfdbfe; /* blue-100 */
-  font-size: 0.95rem;
-  margin: 0;
-  opacity: 0.9;
-}
-
-/* Card Container */
-.form-card {
-  background-color: #ffffff !important; /* บังคับพื้นขาว */
-  width: 100%;
-  max-width: 800px;
-  border-radius: 2rem;
-  padding: 2.5rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  position: relative;
-  box-sizing: border-box;
-}
-
-/* Form Styles */
-.form-group { margin-bottom: 1.25rem; }
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.25rem;
-  margin-bottom: 1.25rem;
-}
-@media (min-width: 768px) {
-  .form-row { grid-template-columns: 1fr 1fr; }
-}
-
-.input-label {
-  display: flex;
-  align-items: center;
-  font-size: 0.95rem;
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-size: 14px;
   font-weight: 700;
-  color: #374151; /* gray-700 */
-  margin-bottom: 0.5rem;
+  text-decoration: none;
+  cursor: pointer;
 }
-.label-icon { margin-right: 0.5rem; }
+
+.back-link,
+.secondary-btn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+}
+
+.form-shell {
+  padding: 24px;
+}
+
+.form-section + .form-section {
+  margin-top: 22px;
+}
+
+.form-section h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  color: #111827;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+label span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+}
 
 .input-field {
   width: 100%;
-  padding: 0.85rem 1rem;
-  background-color: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.75rem;
-  color: #4b5563;
-  font-size: 1rem;
-  outline: none;
-  transition: all 0.2s ease;
-  box-sizing: border-box; /* ป้องกัน Input ล้น */
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 11px 12px;
+  font-size: 14px;
+  color: #111827;
+  box-sizing: border-box;
 }
-.input-field:focus {
-  border-color: #6200ea;
-  box-shadow: 0 0 0 3px rgba(98, 0, 234, 0.1);
-}
-.input-field::placeholder { color: #9ca3af; font-weight: 400; }
 
-.textarea-field { min-height: 100px; resize: vertical; }
-
-/* Custom Select */
-.select-wrapper { position: relative; }
-.select-arrow {
-  position: absolute;
-  right: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #9ca3af;
-  font-size: 0.75rem;
-  pointer-events: none;
-}
-select.input-field { appearance: none; cursor: pointer; }
-
-/* Buttons */
-.button-group {
+.actions {
   display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
 }
-.btn {
-  padding: 0.85rem 1.5rem;
-  border-radius: 0.75rem;
-  font-weight: 700;
-  font-size: 1rem;
-  cursor: pointer;
+
+.primary-btn {
   border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  transition: all 0.2s;
-  text-decoration: none;
-}
-.btn-save {
-  flex-grow: 1;
-  background-color: #6200ea; /* สีม่วง */
-  color: white;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-.btn-save:hover {
-  background-color: #5200d6;
-  transform: translateY(-1px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-.btn-save:active { transform: translateY(0); }
-
-.btn-cancel {
-  background-color: #f3f4f6;
-  color: #374151;
-  min-width: 120px;
-}
-.btn-cancel:hover { background-color: #e5e7eb; color: #111827; }
-
-/* Footer */
-.footer-text {
-  margin-top: 2rem;
-  color: #bfdbfe;
-  font-size: 0.875rem;
-  opacity: 0.8;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  background: #4f46e5;
+  color: #ffffff;
 }
 
+.primary-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+@media (max-width: 720px) {
+  .hero-section,
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

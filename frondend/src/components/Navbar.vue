@@ -43,6 +43,7 @@ defineProps({
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
 }
 
 .brand {
@@ -50,7 +51,7 @@ defineProps({
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  color: white;
+  color: #ffffff;
 }
 
 .logo-icon {
@@ -69,7 +70,6 @@ defineProps({
 .brand-text {
   font-size: 1.5rem;
   font-weight: 800;
-  letter-spacing: 0.5px;
 }
 
 .auth-buttons {
@@ -80,30 +80,30 @@ defineProps({
 .btn {
   text-decoration: none;
   padding: 10px 24px;
-  border-radius: 50px;
+  border-radius: 999px;
   font-weight: 600;
   font-size: 0.95rem;
-  transition: all 0.3s ease;
 }
 
 .btn-login {
-  color: white;
+  color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: transparent;
 }
 
-.btn-login:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
 .btn-register {
-  background-color: white;
+  background: #ffffff;
   color: #7c3aed;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-.btn-register:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+@media (max-width: 720px) {
+  .navbar-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .auth-buttons {
+    justify-content: flex-end;
+  }
 }
 </style>

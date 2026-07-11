@@ -1,40 +1,56 @@
 <template>
-  <div class="profile-container">
-    <div class="profile-card">
-      <div class="card-header">
-        <div class="avatar-wrapper" @click="triggerFileInput">
+  <div class="profile-page">
+    <section class="hero-section">
+      <div>
+        <h1>ข้อมูลส่วนตัว</h1>
+        <p class="hero-text">จัดการรูปโปรไฟล์ ข้อมูลติดต่อ และรายละเอียดเจ้าของสัตว์เลี้ยงได้จากหน้าจอนี้</p>
+      </div>
+      <button class="action-btn" @click="isEditing ? saveProfile() : (isEditing = true)">
+        {{ isEditing ? 'บันทึกข้อมูล' : 'แก้ไขข้อมูล' }}
+      </button>
+    </section>
+
+    <section class="profile-grid">
+      <div class="profile-summary">
+        <div class="avatar-panel" @click="triggerFileInput">
           <img v-if="previewImage || user.profile_pic" :src="previewImage || user.profile_pic" class="avatar-img" />
           <div v-else class="avatar-text">{{ user.username?.charAt(0).toUpperCase() || 'U' }}</div>
-          <div class="avatar-overlay"><span class="text-xl">📷</span></div>
-          <input type="file" ref="fileInput" @change="onFileSelected" accept="image/*" class="hidden-input" />
+          <div class="avatar-overlay">อัปโหลดรูป</div>
+          <input ref="fileInput" type="file" accept="image/*" class="hidden-input" @change="onFileSelected" />
         </div>
 
-        <button class="edit-btn" @click="isEditing ? saveProfile() : (isEditing = true)">
-          {{ isEditing ? '💾 บันทึกข้อมูล' : '✏️ แก้ไขข้อมูล' }}
-        </button>
+        <div class="summary-copy">
+          <h2>{{ user.owner_name || user.username || 'เจ้าของสัตว์เลี้ยง' }}</h2>
+          <p>{{ user.email || 'ยังไม่ได้ระบุอีเมล' }}</p>
+          <span class="summary-tag">{{ user.tel || 'ยังไม่ได้ระบุเบอร์โทรศัพท์' }}</span>
+        </div>
       </div>
 
-      <div class="info-grid">
-        <div class="info-box">
-          <label>ชื่อ-นามสกุล</label>
-          <input v-if="isEditing" v-model="user.owner_name" class="edit-input" />
-          <div v-else class="info-value">{{ user.owner_name || 'ไม่พบข้อมูล' }}</div>
+      <div class="profile-details">
+        <div class="detail-card">
+          <span class="detail-label">ชื่อ-นามสกุล</span>
+          <input v-if="isEditing" v-model="user.owner_name" class="detail-input" />
+          <div v-else class="detail-value">{{ user.owner_name || 'ไม่พบข้อมูล' }}</div>
         </div>
 
-        <div class="info-box">
-          <label>อีเมล</label>
-          <input v-if="isEditing" v-model="user.email" class="edit-input" />
-          <div v-else class="info-value">📧 {{ user.email || 'ไม่ได้ระบุอีเมล' }}</div>
+        <div class="detail-card">
+          <span class="detail-label">อีเมล</span>
+          <input v-if="isEditing" v-model="user.email" class="detail-input" />
+          <div v-else class="detail-value">{{ user.email || 'ยังไม่ได้ระบุอีเมล' }}</div>
         </div>
 
-        <div class="info-box">
-          <label>เบอร์โทรศัพท์</label>
-          <input v-if="isEditing" v-model="user.tel" class="edit-input" />
-          <div v-else class="info-value">📞 {{ user.tel || 'ไม่ได้ระบุเบอร์โทร' }}</div>
+        <div class="detail-card">
+          <span class="detail-label">เบอร์โทรศัพท์</span>
+          <input v-if="isEditing" v-model="user.tel" class="detail-input" />
+          <div v-else class="detail-value">{{ user.tel || 'ยังไม่ได้ระบุเบอร์โทรศัพท์' }}</div>
         </div>
 
+        <div class="detail-card detail-note">
+          <span class="detail-label">หมายเหตุ</span>
+          <div class="detail-value muted">ข้อมูลนี้จะถูกใช้ประกอบการติดต่อ นัดหมาย และออกเอกสารของคลินิก</div>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
 
@@ -47,96 +63,283 @@ const fileInput = ref(null)
 const previewImage = ref(null)
 const isEditing = ref(false)
 
-onMounted(async () => {
+const loadProfile = async () => {
   const token = localStorage.getItem('token')
-  if (token) {
-    try {
-      const res = await axios.get('http://localhost:3000/api/user/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+  if (!token) return
 
-      // ⭐ แก้ตรงนี้ครับ: จับคู่ชื่อให้ตรงกับที่ใน input ต้องการ
-      user.value = {
-        ...res.data,           // เอาข้อมูลทั้งหมดมา
-        email: res.data.owner_email // บังคับให้ email มีค่าเท่ากับ owner_email ที่ได้จาก Server
-      }
-      
-      localStorage.setItem('user', JSON.stringify(user.value))
-    } catch (err) {
-      console.error("ดึงข้อมูลใหม่ไม่สำเร็จ:", err)
-      // ถ้าดึงไม่สำเร็จค่อยใช้ของเก่าจาก localStorage
-      const userData = JSON.parse(localStorage.getItem('user'))
-      if (userData) user.value = userData
+  try {
+    const res = await axios.get('http://localhost:3000/api/user/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    user.value = {
+      ...res.data,
+      email: res.data.owner_email
     }
+    localStorage.setItem('user', JSON.stringify(user.value))
+  } catch (err) {
+    console.error('โหลดข้อมูลผู้ใช้ไม่สำเร็จ:', err)
+    const userData = JSON.parse(localStorage.getItem('user'))
+    if (userData) user.value = userData
   }
-})
+}
 
-const triggerFileInput = () => fileInput.value.click()
+onMounted(loadProfile)
+
+const triggerFileInput = () => fileInput.value?.click()
 
 const onFileSelected = async (event) => {
   const file = event.target.files[0]
   if (!file) return
+
   previewImage.value = URL.createObjectURL(file)
   const formData = new FormData()
   formData.append('profileImage', file)
+
   try {
     const token = localStorage.getItem('token')
     const res = await axios.post('http://localhost:3000/api/user/upload-profile', formData, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      }
     })
+
     if (res.data.success) {
       user.value.profile_pic = res.data.imageUrl
       localStorage.setItem('user', JSON.stringify(user.value))
-      alert("อัปโหลดรูปสำเร็จ!")
+      alert('อัปโหลดรูปสำเร็จ')
     }
-  } catch (err) { alert("อัปโหลดไม่สำเร็จ") }
+  } catch (err) {
+    console.error(err)
+    alert('อัปโหลดรูปไม่สำเร็จ')
+  }
 }
 
 const saveProfile = async () => {
   try {
     const token = localStorage.getItem('token')
-    await axios.put('http://localhost:3000/api/user/me', {
-      owner_name: user.value.owner_name,
-      owner_email: user.value.email, 
-      tel: user.value.tel
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    
+    await axios.put(
+      'http://localhost:3000/api/user/me',
+      {
+        owner_name: user.value.owner_name,
+        owner_email: user.value.email,
+        tel: user.value.tel
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    )
+
     localStorage.setItem('user', JSON.stringify(user.value))
     isEditing.value = false
-    alert("บันทึกข้อมูลเรียบร้อย!")
+    alert('บันทึกข้อมูลเรียบร้อย')
   } catch (err) {
     console.error(err)
-    alert("บันทึกไม่สำเร็จ: " + (err.response?.data?.message || err.message))
+    alert(err.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ')
   }
 }
 </script>
 
 <style scoped>
-.profile-container { padding: 2rem; max-width: 900px; margin: 0 auto; font-family: 'Sarabun', sans-serif; }
-.profile-card { background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05); padding: 2.5rem; border: 1px solid #f1f5f9; }
-.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px dashed #e2e8f0; }
+.profile-page {
+  display: grid;
+  gap: 20px;
+}
 
-/* Avatar */
-.avatar-wrapper { position: relative; width: 100px; height: 100px; border-radius: 25px; overflow: hidden; cursor: pointer; box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2); border: 3px solid white; }
-.avatar-text { width: 100%; height: 100%; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: bold; }
-.avatar-img { width: 100%; height: 100%; object-fit: cover; }
-.avatar-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
-.avatar-wrapper:hover .avatar-overlay { opacity: 1; }
-.hidden-input { display: none; }
+.hero-section,
+.profile-summary,
+.profile-details {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
 
-/* Edit Controls */
-.edit-btn { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 10px; color: #475569; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-.edit-btn:hover { background: #f1f5f9; transform: translateY(-2px); }
+.hero-section {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  padding: 28px;
+}
 
-/* Grid Layout */
-.info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
-.info-box { background: #f8fafc; padding: 1.2rem; border-radius: 15px; }
-.info-box label { display: block; font-size: 0.75rem; font-weight: 700; color: #94a3b8; margin-bottom: 0.5rem; text-transform: uppercase; }
-.info-value { font-size: 1.1rem; font-weight: 700; color: #334155; }
+.hero-section h1 {
+  margin: 0;
+  font-size: 30px;
+  color: #111827;
+}
 
-/* Input Styling */
-.edit-input { width: 100%; padding: 0.7rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; color: #334155; outline: none; transition: border-color 0.2s; }
-.edit-input:focus { border-color: #6366f1; }
+.hero-text {
+  margin: 8px 0 0;
+  max-width: 580px;
+  color: #4b5563;
+  line-height: 1.65;
+}
+
+.action-btn {
+  border: none;
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #ffffff;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+}
+
+.profile-summary,
+.profile-details {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.profile-summary {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.avatar-panel {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  border-radius: 18px;
+  overflow: hidden;
+  cursor: pointer;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  margin-bottom: 18px;
+}
+
+.avatar-img,
+.avatar-text {
+  width: 100%;
+  height: 100%;
+}
+
+.avatar-img {
+  object-fit: cover;
+}
+
+.avatar-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 52px;
+  font-weight: 800;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.avatar-panel:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.summary-copy h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #111827;
+}
+
+.summary-copy p {
+  margin: 8px 0 12px;
+  color: #6b7280;
+}
+
+.summary-tag {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.profile-details {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.detail-card {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.detail-note {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.detail-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.6;
+}
+
+.detail-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #111827;
+  box-sizing: border-box;
+}
+
+.muted {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+@media (max-width: 900px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero-section {
+    flex-direction: column;
+  }
+
+  .profile-details {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

@@ -20,6 +20,38 @@ const normalizeStatus = (apptStatus) => {
         : APPT_STATUS_CONFIRMED;
 };
 
+const normalizeAppointmentDate = (value) => {
+    const raw = String(value || '').trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const currentYear = new Date().getFullYear();
+
+    if (year < currentYear - 1 || year > currentYear + 5) {
+        return null;
+    }
+
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+        Number.isNaN(date.getTime()) ||
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        return null;
+    }
+
+    return `${match[1]}-${match[2]}-${match[3]}`;
+};
+
+const normalizeAppointmentTime = (value) => {
+    const raw = String(value || '').trim();
+    return /^\d{2}:\d{2}(:\d{2})?$/.test(raw) ? raw : null;
+};
+
 router.get('/pets-list', auth, async (req, res) => {
     try {
         if (!ensureAdmin(req, res)) return;
@@ -75,9 +107,12 @@ router.post('/', auth, async (req, res) => {
         if (!ensureAdmin(req, res)) return;
 
         const { pet_id, appt_date, appt_time, appt_reason, appt_status } = req.body;
-        if (!pet_id || !appt_date || !appt_time) {
+        const normalizedDate = normalizeAppointmentDate(appt_date);
+        const normalizedTime = normalizeAppointmentTime(appt_time);
+
+        if (!pet_id || !normalizedDate || !normalizedTime) {
             return res.status(400).json({
-                message: '\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e17\u0e35\u0e48\u0e08\u0e33\u0e40\u0e1b\u0e47\u0e19\u0e43\u0e2b\u0e49\u0e04\u0e23\u0e1a\u0e16\u0e49\u0e27\u0e19'
+                message: 'กรุณากรอกวันและเวลานัดหมายให้ถูกต้อง'
             });
         }
 
@@ -101,7 +136,7 @@ router.post('/', auth, async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, NOW())
             RETURNING *
             `,
-            [apptId, pet_id, appt_date, appt_time, appt_reason || null, normalizedStatus]
+            [apptId, pet_id, normalizedDate, normalizedTime, appt_reason || null, normalizedStatus]
         );
 
         res.status(201).json({
@@ -127,7 +162,15 @@ router.put('/:id', auth, async (req, res) => {
 
         const { id } = req.params;
         const { appt_date, appt_time, appt_status, cancel_reason } = req.body;
+        const normalizedDate = normalizeAppointmentDate(appt_date);
+        const normalizedTime = normalizeAppointmentTime(appt_time);
         const normalizedStatus = normalizeStatus(appt_status);
+
+        if (!normalizedDate || !normalizedTime) {
+            return res.status(400).json({
+                message: 'กรุณากรอกวันและเวลานัดหมายให้ถูกต้อง'
+            });
+        }
 
         const result = await pool.query(
             `
@@ -139,7 +182,7 @@ router.put('/:id', auth, async (req, res) => {
                 update_datetime = NOW()
             WHERE appt_id = $5
             `,
-            [appt_date, appt_time, normalizedStatus, cancel_reason || null, id]
+            [normalizedDate, normalizedTime, normalizedStatus, cancel_reason || null, id]
         );
 
         if (result.rowCount === 0) {

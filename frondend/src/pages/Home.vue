@@ -26,17 +26,17 @@ const clinic = ref({
 
 onMounted(async () => {
   try {
-    const res = await axios.get('http://localhost:3000/api/clinic')
-    if (res.data) {
+    const response = await axios.get('http://localhost:3000/api/clinic')
+    if (response.data) {
       clinic.value = {
-        clinic_name: res.data.clinic_name || 'Pet Clinic',
-        address: res.data.address || '',
-        tel: res.data.tel || '',
-        open_hours: res.data.open_hours || ''
+        clinic_name: response.data.clinic_name || 'Pet Clinic',
+        address: response.data.address || '',
+        tel: response.data.tel || '',
+        open_hours: response.data.open_hours || ''
       }
     }
-  } catch (err) {
-    console.error('โหลดข้อมูลคลินิกไม่สำเร็จ:', err)
+  } catch (error) {
+    console.error('โหลดข้อมูลคลินิกไม่สำเร็จ:', error)
   }
 })
 </script>
@@ -46,8 +46,8 @@ onMounted(async () => {
   width: 100%;
   min-height: 100vh;
   background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #db2777 100%);
-  color: white;
-  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+  font-family: Inter, sans-serif;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;

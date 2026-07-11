@@ -1,145 +1,245 @@
 <template>
-  <div class="dashboard-wrapper">
-    
-    <div class="clinic-card header-card">
-      <div class="header-content">
-        <div class="icon-box">📊</div>
-        <div class="title-box">
-          <h1>ภาพรวมระบบ (Dashboard)</h1>
-          <p>รายงานสถิติการนัดหมาย และสรุปรายรับ-รายจ่ายของคลินิก</p>
-        </div>
-      </div>
-      
-      <div class="filter-box">
-        <select v-model="selectedMonth" @change="fetchDashboardData" class="custom-select">
-          <option v-for="(m, index) in months" :key="index" :value="index + 1">{{ m }}</option>
-        </select>
-        <select v-model="selectedYear" @change="fetchDashboardData" class="custom-select">
-          <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="summary-grid">
-      <div class="summary-card clickable" @click="openDetailModal('appointment')" title="คลิกเพื่อดูรายละเอียดนัดหมาย">
-        <div class="card-icon bg-blue-100 text-blue-600">📅</div>
-        <div class="card-info">
-          <p>จำนวนนัดหมาย (ประจำเดือน)</p>
-          <h3>{{ summary.totalAppointments }} <span class="unit">รายการ</span></h3>
-        </div>
-        <div class="click-hint">ดูรายละเอียด ➔</div>
-      </div>
-
-      <div class="summary-card clickable" @click="openDetailModal('revenue')" title="คลิกเพื่อดูรายละเอียดบิลรายรับ">
-        <div class="card-icon bg-emerald-100 text-emerald-600">💰</div>
-        <div class="card-info">
-          <p>รายรับรวม (ประจำเดือน)</p>
-          <h3 class="text-emerald-600">{{ formatPrice(summary.totalRevenue) }} <span class="unit">บาท</span></h3>
-        </div>
-        <div class="click-hint text-emerald-600">ดูรายละเอียด ➔</div>
-      </div>
-
-      <div class="summary-card clickable" @click="openDetailModal('expense')" title="คลิกเพื่อดูรายละเอียดรายจ่าย">
-        <div class="card-icon bg-rose-100 text-rose-600">💸</div>
-        <div class="card-info">
-          <p>รายจ่ายรวม (ประจำเดือน)</p>
-          <h3 class="text-rose-600">{{ formatPrice(summary.totalExpense) }} <span class="unit">บาท</span></h3>
-        </div>
-        <div class="click-hint text-rose-600">ดูรายละเอียด ➔</div>
-      </div>
-
-      <div class="summary-card highlight-card">
-        <div class="card-icon bg-white/20 text-white">🏆</div>
-        <div class="card-info text-white">
-          <p class="text-emerald-50">กำไรสุทธิ (ประจำเดือน)</p>
-          <h3 class="text-white">{{ formatPrice(summary.netProfit) }} <span class="unit text-emerald-100">บาท</span></h3>
-        </div>
-      </div>
-    </div>
-
-    <div class="charts-grid">
-      <div class="clinic-card chart-container">
-        <h3>📈 สถิติการนัดหมาย (รายวัน)</h3>
-        <div class="chart-box"><Line v-if="!loading" :data="apptChartData" :options="lineChartOptions" /></div>
-      </div>
-      <div class="clinic-card chart-container">
-        <h3>📊 รายรับ - รายจ่าย รายวัน</h3>
-        <div class="chart-box"><Bar v-if="!loading" :data="financialChartData" :options="barChartOptions" /></div>
-      </div>
-    </div>
-
-    <div v-if="isModalOpen" class="custom-modal-overlay" @click.self="isModalOpen = false">
-      <div class="custom-modal-box modal-lg">
-        
-        <div class="modal-header">
-          <div class="modal-title">
-            <div class="modal-icon">{{ getModalIcon() }}</div>
-            <div>
-              <h3>{{ getModalTitle() }}</h3>
-              <p>ประจำเดือน {{ months[selectedMonth - 1] }} {{ selectedYear }}</p>
-            </div>
+  <div class="dashboard-page">
+    <section class="overview-grid">
+      <article class="overview-card overview-card-main">
+        <div class="overview-head">
+          <div>
+            <p class="eyebrow">ภาพรวมประจำเดือน</p>
+            <h1>ภาพรวมของคลินิก</h1>
           </div>
-          <button @click="isModalOpen = false" class="close-btn">✕</button>
+          <div class="period-card">
+            <label class="filter-field">
+              <span>เดือน</span>
+              <select v-model="selectedMonth" @change="fetchDashboardData">
+                <option v-for="(month, index) in months" :key="month" :value="index + 1">{{ month }}</option>
+              </select>
+            </label>
+            <label class="filter-field">
+              <span>ปี</span>
+              <select v-model="selectedYear" @change="fetchDashboardData">
+                <option v-for="year in years" :key="year" :value="year">{{ year }}</option>
+              </select>
+            </label>
+          </div>
         </div>
-        
-        <div class="table-responsive">
-          <table v-if="modalType === 'appointment'" class="clinic-table">
+
+        <p class="overview-text">
+          ใช้มุมมองนี้เพื่อตรวจสอบปริมาณงานหน้าร้าน กระแสเงินสด และผลประกอบการของเดือนที่เลือก
+        </p>
+
+        <div class="metric-grid">
+          <button type="button" class="metric-card" @click="openDetailModal('appointment')">
+            <div class="metric-top">
+              <span class="metric-code">AP</span>
+              <span class="metric-label">นัดหมาย</span>
+            </div>
+            <strong>{{ summary.totalAppointments }}</strong>
+            <small>คิวที่ถูกบันทึกในเดือนนี้</small>
+          </button>
+
+          <button type="button" class="metric-card" @click="openDetailModal('revenue')">
+            <div class="metric-top">
+              <span class="metric-code revenue">RV</span>
+              <span class="metric-label">รายรับรวม</span>
+            </div>
+            <strong>{{ formatPrice(summary.totalRevenue) }}</strong>
+            <small>จากใบเสร็จที่ชำระแล้ว</small>
+          </button>
+
+          <button type="button" class="metric-card" @click="openDetailModal('expense')">
+            <div class="metric-top">
+              <span class="metric-code expense">EX</span>
+              <span class="metric-label">รายจ่ายรวม</span>
+            </div>
+            <strong>{{ formatPrice(summary.totalExpense) }}</strong>
+            <small>ต้นทุนและค่าใช้จ่ายของคลินิก</small>
+          </button>
+        </div>
+      </article>
+
+      <article class="overview-card overview-card-side">
+        <p class="eyebrow">ผลประกอบการ</p>
+        <h2>กำไรสุทธิ</h2>
+        <strong class="net-profit">{{ formatPrice(summary.netProfit) }}</strong>
+        <p class="side-text">คำนวณจากรายรับหักรายจ่ายของช่วงเวลาที่เลือก</p>
+
+        <div class="mini-breakdown">
+          <div>
+            <span>รายรับ</span>
+            <strong class="positive">{{ formatPrice(summary.totalRevenue) }}</strong>
+          </div>
+          <div>
+            <span>รายจ่าย</span>
+            <strong class="negative">{{ formatPrice(summary.totalExpense) }}</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel-card">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Daily activity</p>
+            <h3>สถิติการนัดหมายรายวัน</h3>
+          </div>
+          <span class="panel-chip">{{ months[selectedMonth - 1] }} {{ selectedYear }}</span>
+        </div>
+        <p class="panel-text">ดูความหนาแน่นของคิวในแต่ละวันเพื่อช่วยวางแผนงานหน้าร้านและทีมรักษา</p>
+
+        <div class="chart-frame">
+          <div v-if="loading" class="empty-state">กำลังโหลดข้อมูล...</div>
+          <div v-else-if="hasAppointmentData" class="chart-box">
+            <Line :data="apptChartData" :options="lineChartOptions" />
+          </div>
+          <div v-else class="empty-state">
+            <strong>ยังไม่มีข้อมูลนัดหมาย</strong>
+            <p>เมื่อมีการบันทึกคิว ระบบจะแสดงรูปแบบการนัดหมายของเดือนนี้ที่นี่</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Cash flow</p>
+            <h3>รายรับและรายจ่ายรายวัน</h3>
+          </div>
+          <span class="panel-chip">สรุปประจำเดือน</span>
+        </div>
+        <p class="panel-text">เปรียบเทียบกระแสเงินเข้าออกในแต่ละวันเพื่อมองเห็นช่วงที่ต้นทุนสูงหรือรายรับเด่น</p>
+
+        <div class="chart-frame">
+          <div v-if="loading" class="empty-state">กำลังโหลดข้อมูล...</div>
+          <div v-else-if="hasFinancialData" class="chart-box">
+            <Bar :data="financialChartData" :options="barChartOptions" />
+          </div>
+          <div v-else class="empty-state">
+            <strong>ยังไม่มีข้อมูลการเงินในช่วงนี้</strong>
+            <p>เมื่อมีรายรับหรือรายจ่าย ระบบจะสรุปเป็นกราฟให้ดูที่นี่</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="summary-row">
+      <div class="summary-card">
+        <span>จำนวนคิว</span>
+        <strong>{{ summary.totalAppointments }}</strong>
+      </div>
+      <div class="summary-card">
+        <span>รายรับ</span>
+        <strong class="positive">{{ formatPrice(summary.totalRevenue) }}</strong>
+      </div>
+      <div class="summary-card">
+        <span>รายจ่าย</span>
+        <strong class="negative">{{ formatPrice(summary.totalExpense) }}</strong>
+      </div>
+      <div class="summary-card">
+        <span>กำไรสุทธิ</span>
+        <strong>{{ formatPrice(summary.netProfit) }}</strong>
+      </div>
+    </section>
+
+    <div v-if="isModalOpen" class="modal-overlay" @click.self="isModalOpen = false">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Detail view</p>
+            <h3>{{ getModalTitle() }}</h3>
+            <p class="modal-subtitle">{{ months[selectedMonth - 1] }} {{ selectedYear }}</p>
+          </div>
+          <button class="close-btn" type="button" @click="isModalOpen = false">ปิด</button>
+        </div>
+
+        <div class="table-wrap">
+          <table v-if="modalType === 'appointment'" class="data-table">
             <thead>
-              <tr><th>วันที่และเวลา</th><th>สัตว์เลี้ยง</th><th>เจ้าของ</th><th>สาเหตุ</th></tr>
+              <tr>
+                <th>วันและเวลา</th>
+                <th>สัตว์เลี้ยง</th>
+                <th>เจ้าของ</th>
+                <th>เหตุผลการนัดหมาย</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="(item, idx) in details.appointments" :key="idx">
-                <td>{{ formatDate(item.appt_date) }} <span class="text-emerald-600 font-bold ml-2">⏱️ {{ formatTime(item.appt_time) }}</span></td>
-                <td>🐾 {{ item.pet_name || '-' }}</td>
-                <td>คุณ{{ item.owner_name || '-' }}</td>
+                <td>{{ formatDate(item.appt_date) }} {{ formatTime(item.appt_time) }}</td>
+                <td>{{ item.pet_name || '-' }}</td>
+                <td>{{ item.owner_name || '-' }}</td>
                 <td>{{ item.appt_reason || '-' }}</td>
               </tr>
-              <tr v-if="details.appointments.length === 0"><td colspan="4" class="text-center py-8 text-gray-500">ไม่มีข้อมูลนัดหมายในเดือนนี้</td></tr>
+              <tr v-if="details.appointments.length === 0">
+                <td colspan="4" class="table-empty">ไม่มีข้อมูลการนัดหมายในเดือนนี้</td>
+              </tr>
             </tbody>
           </table>
 
-          <table v-if="modalType === 'revenue'" class="clinic-table">
+          <table v-if="modalType === 'revenue'" class="data-table">
             <thead>
-              <tr><th>วันที่ชำระ</th><th>เลขที่ใบเสร็จ</th><th>ลูกค้า</th><th class="text-right">ยอดเงิน (บาท)</th></tr>
+              <tr>
+                <th>วันที่ชำระ</th>
+                <th>เลขที่ใบเสร็จ</th>
+                <th>ลูกค้า</th>
+                <th class="right">ยอดเงิน</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="(item, idx) in details.revenue" :key="idx">
                 <td>{{ formatDateTime(item.pay_date) }}</td>
-                <td class="font-bold">{{ item.receipt_id }}</td>
-                <td>คุณ{{ item.owner_name || 'ลูกค้าทั่วไป' }}</td>
-                <td class="text-right text-emerald-600 font-bold">+{{ formatPrice(item.total_amount) }}</td>
+                <td>{{ item.receipt_id }}</td>
+                <td>{{ item.owner_name || 'ลูกค้าทั่วไป' }}</td>
+                <td class="right positive">+{{ formatPrice(item.total_amount) }}</td>
               </tr>
-              <tr v-if="details.revenue.length === 0"><td colspan="4" class="text-center py-8 text-gray-500">ไม่มีข้อมูลรายรับในเดือนนี้</td></tr>
+              <tr v-if="details.revenue.length === 0">
+                <td colspan="4" class="table-empty">ไม่มีข้อมูลรายรับในเดือนนี้</td>
+              </tr>
             </tbody>
           </table>
 
-          <table v-if="modalType === 'expense'" class="clinic-table">
+          <table v-if="modalType === 'expense'" class="data-table">
             <thead>
-              <tr><th>วันที่จ่าย</th><th>รายการ</th><th>หมวดหมู่</th><th class="text-right">ยอดเงิน (บาท)</th></tr>
+              <tr>
+                <th>วันที่จ่าย</th>
+                <th>รายการ</th>
+                <th>หมวดหมู่</th>
+                <th class="right">ยอดเงิน</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="(item, idx) in details.expense" :key="idx">
                 <td>{{ formatDate(item.exp_date) }}</td>
-                <td class="font-bold">{{ item.exp_title }}</td>
-                <td><span class="category-badge">{{ item.category_name || 'ทั่วไป' }}</span></td>
-                <td class="text-right text-rose-500 font-bold">-{{ formatPrice(item.exp_amount) }}</td>
+                <td>{{ item.exp_title }}</td>
+                <td>{{ item.category_name || 'ทั่วไป' }}</td>
+                <td class="right negative">-{{ formatPrice(item.exp_amount) }}</td>
               </tr>
-              <tr v-if="details.expense.length === 0"><td colspan="4" class="text-center py-8 text-gray-500">ไม่มีข้อมูลรายจ่ายในเดือนนี้</td></tr>
+              <tr v-if="details.expense.length === 0">
+                <td colspan="4" class="table-empty">ไม่มีข้อมูลรายจ่ายในเดือนนี้</td>
+              </tr>
             </tbody>
           </table>
         </div>
-
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from 'chart.js'
-import { Line, Bar } from 'vue-chartjs'
+import {
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip
+} from 'chart.js'
+import { Bar, Line } from 'vue-chartjs'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler)
 
@@ -148,28 +248,53 @@ const selectedMonth = ref(currentDate.getMonth() + 1)
 const selectedYear = ref(currentDate.getFullYear())
 const loading = ref(true)
 
-const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม']
+const months = [
+  'มกราคม',
+  'กุมภาพันธ์',
+  'มีนาคม',
+  'เมษายน',
+  'พฤษภาคม',
+  'มิถุนายน',
+  'กรกฎาคม',
+  'สิงหาคม',
+  'กันยายน',
+  'ตุลาคม',
+  'พฤศจิกายน',
+  'ธันวาคม'
+]
+
 const years = computed(() => {
   const current = new Date().getFullYear()
   return [current - 2, current - 1, current, current + 1]
 })
 
-// ข้อมูลหลัก
 const summary = ref({ totalRevenue: 0, totalExpense: 0, netProfit: 0, totalAppointments: 0 })
 const rawApptData = ref([])
 const rawRevData = ref([])
 const rawExpData = ref([])
-const details = ref({ appointments: [], revenue: [], expense: [] }) // เก็บข้อมูลแสดงในตาราง
+const details = ref({ appointments: [], revenue: [], expense: [] })
 
-// Modal State
 const isModalOpen = ref(false)
 const modalType = ref('')
 
-// Utility Formatting
-const formatPrice = (val) => Number(val).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
-const formatDateTime = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
-const formatTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '-'
+const formatPrice = (value) =>
+  Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const formatDate = (dateStr) =>
+  dateStr ? new Date(dateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
+
+const formatDateTime = (dateStr) =>
+  dateStr
+    ? new Date(dateStr).toLocaleString('th-TH', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : '-'
+
+const formatTime = (timeStr) => (timeStr ? String(timeStr).substring(0, 5) : '-')
 
 const fetchDashboardData = async () => {
   loading.value = true
@@ -179,21 +304,19 @@ const fetchDashboardData = async () => {
       headers: { Authorization: `Bearer ${token}` },
       params: { month: selectedMonth.value, year: selectedYear.value }
     })
-    
+
     summary.value = res.data.summary
     rawApptData.value = res.data.charts.appointments
     rawRevData.value = res.data.charts.revenue
     rawExpData.value = res.data.charts.expense
-    details.value = res.data.details // รับข้อมูลตารางมาเก็บไว้
-
+    details.value = res.data.details
   } catch (err) {
-    console.error("Dashboard Fetch Error:", err)
+    console.error('Dashboard Fetch Error:', err)
   } finally {
     loading.value = false
   }
 }
 
-// Modal Functions
 const openDetailModal = (type) => {
   modalType.value = type
   isModalOpen.value = true
@@ -201,104 +324,520 @@ const openDetailModal = (type) => {
 
 const getModalTitle = () => {
   if (modalType.value === 'appointment') return 'รายละเอียดการนัดหมาย'
-  if (modalType.value === 'revenue') return 'รายละเอียดรายรับ (ใบเสร็จ)'
+  if (modalType.value === 'revenue') return 'รายละเอียดรายรับ'
   if (modalType.value === 'expense') return 'รายละเอียดรายจ่าย'
   return ''
 }
 
-const getModalIcon = () => {
-  if (modalType.value === 'appointment') return '📅'
-  if (modalType.value === 'revenue') return '💰'
-  if (modalType.value === 'expense') return '💸'
-  return '📋'
-}
+const hasAppointmentData = computed(() =>
+  rawApptData.value.some((item) => Number.parseInt(item.count, 10) > 0)
+)
 
-// Charts (เหมือนเดิม)
+const hasFinancialData = computed(() => {
+  const hasRevenue = rawRevData.value.some((item) => Number.parseFloat(item.total) > 0)
+  const hasExpense = rawExpData.value.some((item) => Number.parseFloat(item.total) > 0)
+  return hasRevenue || hasExpense
+})
+
 const apptChartData = computed(() => {
-  const labels = rawApptData.value.map(item => {
-    const d = new Date(item.date)
-    return `${d.getDate()}/${d.getMonth()+1}`
+  const labels = rawApptData.value.map((item) => {
+    const date = new Date(item.date)
+    return `${date.getDate()}/${date.getMonth() + 1}`
   })
+
   return {
     labels,
-    datasets: [{ label: 'นัดหมาย (คิว)', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: '#3b82f6', borderWidth: 2, pointBackgroundColor: '#ffffff', fill: true, tension: 0.4, data: rawApptData.value.map(item => parseInt(item.count)) }]
+    datasets: [
+      {
+        label: 'จำนวนการนัดหมาย',
+        backgroundColor: 'rgba(37, 99, 235, 0.10)',
+        borderColor: '#2563eb',
+        borderWidth: 2,
+        pointBackgroundColor: '#ffffff',
+        pointBorderColor: '#2563eb',
+        pointRadius: 3,
+        fill: true,
+        tension: 0.35,
+        data: rawApptData.value.map((item) => Number.parseInt(item.count, 10))
+      }
+    ]
   }
 })
-const lineChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { grid: { display: false } } } }
+
+const lineChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    y: {
+      beginAtZero: true,
+      ticks: { stepSize: 1, color: '#64748b' },
+      grid: { color: 'rgba(148, 163, 184, 0.14)' }
+    },
+    x: {
+      ticks: { color: '#64748b' },
+      grid: { display: false }
+    }
+  }
+}
 
 const financialChartData = computed(() => {
   const daysInMonth = new Date(selectedYear.value, selectedMonth.value, 0).getDate()
-  const labels = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-  const revDataArray = new Array(daysInMonth).fill(0)
-  const expDataArray = new Array(daysInMonth).fill(0)
+  const labels = Array.from({ length: daysInMonth }, (_, index) => index + 1)
+  const revenueByDay = new Array(daysInMonth).fill(0)
+  const expenseByDay = new Array(daysInMonth).fill(0)
 
-  rawRevData.value.forEach(item => { revDataArray[item.day - 1] = parseFloat(item.total) })
-  rawExpData.value.forEach(item => { expDataArray[item.day - 1] = parseFloat(item.total) })
+  rawRevData.value.forEach((item) => {
+    revenueByDay[item.day - 1] = Number.parseFloat(item.total)
+  })
+  rawExpData.value.forEach((item) => {
+    expenseByDay[item.day - 1] = Number.parseFloat(item.total)
+  })
 
-  return { labels, datasets: [ { label: 'รายรับ', backgroundColor: '#10b981', borderRadius: 4, data: revDataArray }, { label: 'รายจ่าย', backgroundColor: '#f43f5e', borderRadius: 4, data: expDataArray } ] }
+  return {
+    labels,
+    datasets: [
+      { label: 'รายรับ', backgroundColor: '#10b981', borderRadius: 8, data: revenueByDay, maxBarThickness: 18 },
+      { label: 'รายจ่าย', backgroundColor: '#fb7185', borderRadius: 8, data: expenseByDay, maxBarThickness: 18 }
+    ]
+  }
 })
-const barChartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', align: 'end' } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
 
-onMounted(() => { fetchDashboardData() })
+const barChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top',
+      align: 'end',
+      labels: {
+        color: '#475569',
+        boxWidth: 12,
+        usePointStyle: true,
+        pointStyle: 'rectRounded'
+      }
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+      ticks: { color: '#64748b' },
+      grid: { color: 'rgba(148, 163, 184, 0.14)' }
+    },
+    x: {
+      ticks: { color: '#64748b' },
+      grid: { display: false }
+    }
+  }
+}
+
+onMounted(fetchDashboardData)
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
+.dashboard-page {
+  display: grid;
+  gap: 20px;
+}
 
-.dashboard-wrapper { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; min-height: 100vh; padding: 24px; color: #1e293b; box-sizing: border-box; }
-.clinic-card { background: #ffffff; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; padding: 24px; }
+.overview-grid,
+.content-grid,
+.summary-row {
+  display: grid;
+  gap: 18px;
+}
 
-/* Header & Select */
-.header-card { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-.header-content { display: flex; align-items: center; gap: 16px; }
-.icon-box { width: 56px; height: 56px; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; box-shadow: 0 10px 15px -3px rgba(99,102,241,0.3); }
-.title-box h1 { margin: 0; font-size: 24px; font-weight: 800; }
-.title-box p { margin: 4px 0 0 0; font-size: 14px; color: #64748b; font-weight: 500; }
-.filter-box { display: flex; gap: 12px; }
-.custom-select { padding: 10px 16px; font-size: 15px; font-family: inherit; font-weight: 600; border-radius: 12px; border: 1px solid #e2e8f0; outline: none; cursor: pointer; }
+.overview-grid {
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.75fr);
+}
 
-/* Summary Cards (Clickable) */
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 24px; }
-.summary-card { background: #ffffff; border-radius: 20px; padding: 24px; display: flex; align-items: center; gap: 16px; border: 1px solid #f1f5f9; position: relative; overflow: hidden; }
-.clickable { cursor: pointer; transition: all 0.2s ease; }
-.clickable:hover { transform: translateY(-4px); box-shadow: 0 15px 25px -5px rgba(0,0,0,0.1); border-color: #cbd5e1; }
-.click-hint { position: absolute; bottom: 8px; right: 16px; font-size: 11px; font-weight: 700; color: #3b82f6; opacity: 0; transition: opacity 0.2s; }
-.clickable:hover .click-hint { opacity: 1; }
+.content-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 
-.card-icon { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
-.card-info { flex-grow: 1; }
-.card-info p { margin: 0 0 4px 0; font-size: 13px; color: #64748b; font-weight: 600; }
-.card-info h3 { margin: 0; font-size: 26px; font-weight: 800; line-height: 1; }
-.unit { font-size: 13px; font-weight: 500; color: #94a3b8; }
-.highlight-card { background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; }
+.summary-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 
-/* Charts */
-.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; }
-.chart-container h3 { margin: 0 0 20px 0; font-size: 16px; font-weight: 800; }
-.chart-box { position: relative; height: 300px; width: 100%; }
+.overview-card,
+.panel-card,
+.summary-card,
+.modal-card {
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.045);
+}
 
-/* Modal & Tables */
-.custom-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15,23,42,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-.custom-modal-box { background-color: #ffffff; width: 90%; border-radius: 24px; padding: 32px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1); }
-.modal-lg { max-width: 800px; max-height: 80vh; display: flex; flex-direction: column; }
-@keyframes slideUp { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.overview-card,
+.panel-card {
+  padding: 24px;
+}
 
-.modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 20px; }
-.modal-title { display: flex; gap: 16px; align-items: center; }
-.modal-icon { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 1px solid #e2e8f0; }
-.modal-title h3 { margin: 0; font-size: 20px; font-weight: 800; }
-.modal-title p { margin: 4px 0 0 0; font-size: 13px; color: #64748b; font-weight: 600; }
-.close-btn { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 50%; color: #64748b; cursor: pointer; font-weight: bold; transition: all 0.2s; }
-.close-btn:hover { background: #fee2e2; color: #ef4444; }
+.overview-card-main {
+  display: grid;
+  gap: 20px;
+}
 
-.table-responsive { overflow-y: auto; flex-grow: 1; }
-.clinic-table { width: 100%; border-collapse: collapse; min-width: 600px; }
-.clinic-table th { background-color: #f8fafc; padding: 14px 20px; text-align: left; font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; }
-.clinic-table td { padding: 14px 20px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 14px; }
-.clinic-table tbody tr:hover { background-color: #f8fafc; }
+.overview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
 
-.category-badge { display: inline-block; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #475569; }
-.text-right { text-align: right; }
-.font-bold { font-weight: 700; color: #1e293b; }
-.ml-2 { margin-left: 8px; }
+.eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.overview-card h1,
+.overview-card h2,
+.panel-card h3,
+.modal-header h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.overview-card h1 {
+  font-size: 34px;
+  line-height: 1.08;
+}
+
+.overview-card h2 {
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.overview-text,
+.panel-text,
+.side-text,
+.modal-subtitle,
+.empty-state p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.period-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(110px, 1fr));
+  gap: 10px;
+  min-width: 260px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-field span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filter-field select {
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid #dbe3ec;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid #e8eef5;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  text-align: left;
+  font: inherit;
+}
+
+.metric-card:hover {
+  border-color: #d6e3ee;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+}
+
+.metric-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.metric-code {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.metric-code.revenue {
+  background: #dcfce7;
+  color: #047857;
+}
+
+.metric-code.expense {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.metric-label {
+  color: #475569;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.metric-card strong,
+.summary-card strong,
+.net-profit {
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.metric-card strong {
+  font-size: 30px;
+}
+
+.metric-card small {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.overview-card-side {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.net-profit {
+  font-size: 42px;
+  font-weight: 800;
+}
+
+.mini-breakdown {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid #edf2f7;
+}
+
+.mini-breakdown span,
+.summary-card span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mini-breakdown strong {
+  font-size: 20px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.panel-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chart-frame {
+  margin-top: 18px;
+  min-height: 340px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fcfdff 0%, #f8fbfe 100%);
+  border: 1px solid #edf2f7;
+  overflow: hidden;
+}
+
+.chart-box {
+  height: 340px;
+  padding: 16px;
+}
+
+.empty-state {
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.empty-state strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.summary-card {
+  padding: 18px 20px;
+}
+
+.summary-card strong {
+  font-size: 22px;
+}
+
+.positive {
+  color: #059669 !important;
+}
+
+.negative {
+  color: #e11d48 !important;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.modal-card {
+  width: min(960px, 100%);
+  max-height: 84vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.close-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font: inherit;
+  font-weight: 700;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  color: #64748b;
+  text-align: left;
+  padding: 14px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e5edf5;
+}
+
+.data-table td {
+  padding: 14px 18px;
+  color: #0f172a;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.table-empty {
+  text-align: center;
+  color: #64748b;
+  padding: 32px 18px;
+}
+
+.right {
+  text-align: right;
+}
+
+@media (max-width: 1180px) {
+  .overview-grid,
+  .content-grid,
+  .summary-row,
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .period-card {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .overview-card,
+  .panel-card {
+    padding: 20px;
+  }
+
+  .panel-head,
+  .modal-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
 </style>

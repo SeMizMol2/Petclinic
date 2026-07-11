@@ -5,75 +5,60 @@
     <div class="auth-card">
       <div class="card-header">
         <h2 class="title">สมัครสมาชิก</h2>
-        <p class="subtitle">เริ่มต้นใช้งานระบบจัดการคลินิกสัตว์เลี้ยง</p>
+        <p class="subtitle">เริ่มต้นใช้งานระบบคลินิกสัตว์เลี้ยงด้วยบัญชีของคุณ</p>
       </div>
 
-      <form @submit.prevent="register" class="auth-form">
+      <form class="auth-form" @submit.prevent="register">
         <div class="form-group">
           <label class="label">ชื่อผู้ใช้</label>
-          <input
-            v-model="username"
-            type="text"
-            class="input-field"
-            placeholder="ตั้งชื่อผู้ใช้ของคุณ"
-            required
-          />
+          <input v-model.trim="username" type="text" class="input-field" placeholder="ตั้งชื่อผู้ใช้" required />
         </div>
 
         <div class="form-group">
           <label class="label">รหัสผ่าน</label>
-          <input
-            v-model="password"
-            type="password"
-            class="input-field"
-            placeholder="ตั้งรหัสผ่านที่ปลอดภัย"
-            required
-          />
+          <input v-model="password" type="password" class="input-field" placeholder="ตั้งรหัสผ่านที่ปลอดภัย" required />
         </div>
 
-        <button type="submit" class="btn-submit">
-          ลงทะเบียน
-        </button>
+        <button type="submit" class="btn-submit">ลงทะเบียน</button>
       </form>
 
       <div class="auth-footer">
         <p>มีบัญชีอยู่แล้ว? <router-link to="/login" class="link">เข้าสู่ระบบ</router-link></p>
-        <router-link to="/" class="back-link">← กลับหน้าหลัก</router-link>
+        <router-link to="/" class="back-link">กลับหน้าแรก</router-link>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import axios from "axios";
+import axios from 'axios'
 
 export default {
   data() {
     return {
-      username: "",
-      password: "",
-    };
+      username: '',
+      password: ''
+    }
   },
   methods: {
     async register() {
       try {
-        await axios.post("http://localhost:3000/api/auth/register", {
+        await axios.post('http://localhost:3000/api/auth/register', {
           username: this.username,
-          password: this.password,
-        });
+          password: this.password
+        })
 
-        alert("สมัครสมาชิกสำเร็จ");
-        this.$router.push("/login");
+        alert('สมัครสมาชิกสำเร็จ')
+        this.$router.push('/login')
       } catch (err) {
-        alert(err.response?.data?.message || "สมัครสมาชิกไม่สำเร็จ");
+        alert(err.response?.data?.message || 'สมัครสมาชิกไม่สำเร็จ')
       }
-    },
-  },
-};
+    }
+  }
+}
 </script>
 
 <style scoped>
-/* ใช้ CSS ชุดเดียวกับ Login.vue เพื่อความสม่ำเสมอ */
 .auth-container {
   min-height: 100vh;
   width: 100%;
@@ -83,7 +68,7 @@ export default {
   justify-content: center;
   padding: 20px;
   position: relative;
-  font-family: 'Inter', sans-serif;
+  font-family: Inter, sans-serif;
 }
 
 .bg-overlay {
@@ -95,20 +80,14 @@ export default {
 }
 
 .auth-card {
-  background: white;
+  background: #ffffff;
   width: 100%;
   max-width: 450px;
   padding: 40px;
   border-radius: 24px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
   position: relative;
-  z-index: 10;
-  animation: slideUp 0.5s ease-out;
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  z-index: 1;
 }
 
 .card-header {
@@ -117,18 +96,19 @@ export default {
 }
 
 .title {
+  margin: 0 0 10px;
   font-size: 2rem;
   font-weight: 800;
-  color: #1f2937;
-  margin: 0 0 10px;
   background: linear-gradient(to right, #7c3aed, #db2777);
   -webkit-background-clip: text;
   color: transparent;
 }
 
 .subtitle {
+  margin: 0;
   color: #6b7280;
   font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .form-group {
@@ -137,10 +117,10 @@ export default {
 
 .label {
   display: block;
+  margin-bottom: 8px;
   font-size: 0.9rem;
   font-weight: 600;
   color: #374151;
-  margin-bottom: 8px;
 }
 
 .input-field {
@@ -149,7 +129,6 @@ export default {
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   font-size: 1rem;
-  transition: all 0.3s;
   outline: none;
   background: #f9fafb;
   box-sizing: border-box;
@@ -157,28 +136,21 @@ export default {
 
 .input-field:focus {
   border-color: #7c3aed;
-  background: white;
+  background: #ffffff;
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
 }
 
 .btn-submit {
   width: 100%;
   padding: 14px;
-  background: linear-gradient(to right, #7c3aed, #6d28d9);
-  color: white;
   border: none;
   border-radius: 12px;
+  background: linear-gradient(to right, #7c3aed, #6d28d9);
+  color: #ffffff;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
   margin-top: 10px;
-  box-shadow: 0 4px 6px rgba(109, 40, 217, 0.2);
-}
-
-.btn-submit:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(109, 40, 217, 0.3);
 }
 
 .auth-footer {
@@ -194,20 +166,11 @@ export default {
   text-decoration: none;
 }
 
-.link:hover {
-  text-decoration: underline;
-}
-
 .back-link {
   display: block;
   margin-top: 15px;
   color: #9ca3af;
   font-size: 0.85rem;
   text-decoration: none;
-  transition: color 0.2s;
-}
-
-.back-link:hover {
-  color: #4b5563;
 }
 </style>
