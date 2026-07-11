@@ -1,1 +1,3 @@
 backend/.env
+*-dev.log
+*-dev.err.log

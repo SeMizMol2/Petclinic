@@ -98,8 +98,7 @@ const saveProfile = async () => {
     await axios.put('http://localhost:3000/api/user/me', {
       owner_name: user.value.owner_name,
       owner_email: user.value.email, 
-      tel: user.value.tel,
-      owner_address: user.value.owner_address
+      tel: user.value.tel
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })

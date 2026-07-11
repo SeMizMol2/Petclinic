@@ -4,11 +4,14 @@ const bcrypt = require('bcryptjs');
 const pool = require('../database/db');
 const jwt = require('jsonwebtoken');
 
+const adminUsername = process.env.ADMIN_USERNAME;
+const adminPassword = process.env.ADMIN_PASSWORD;
+const adminUserId = process.env.ADMIN_USER_ID || 'admin_001';
+const adminDisplayName = process.env.ADMIN_DISPLAY_NAME || 'Administrator';
 
 // ================= REGISTER =================
 router.post('/register', async (req, res) => {
   try {
-
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -26,7 +29,6 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ⭐ ใช้ timestamp ตัวเดียว
     const time = Date.now();
     const userId = 'U' + time;
     const ownerId = 'O' + time;
@@ -44,14 +46,11 @@ router.post('/register', async (req, res) => {
     );
 
     res.json({ message: 'สมัครสมาชิกสำเร็จ' });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'สมัครไม่สำเร็จ' });
   }
 });
-
-
 
 // ================= LOGIN =================
 router.post('/login', async (req, res) => {
@@ -62,28 +61,37 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'กรอกข้อมูลไม่ครบ' });
     }
 
-    // ⭐ ส่วนของ Admin (แก้ไขแล้ว)
-    if (username === 'admin' && password === 'admin1234') {
-      const token = jwt.sign(
-        { user_id : 'admin_001', role : 'admin'},
-        process.env.JWT_SECRET,
-        { expiresIn:'1d'}
+    if (adminUsername && adminPassword && username === adminUsername && password === adminPassword) {
+      const adminResult = await pool.query(
+        `SELECT user_id, username, user_role
+         FROM tb_user
+         WHERE username = $1 AND user_role = 'admin'
+         ORDER BY user_id ASC
+         LIMIT 1`,
+        [adminUsername]
       );
-      
-      // ✅ แก้ไขโครงสร้าง JSON ให้ถูกต้อง (Token กับ User แยกกัน)
+
+      const adminUser = adminResult.rows[0] || null;
+      const resolvedAdminUserId = adminUser?.user_id || adminUserId;
+      const resolvedAdminDisplayName = adminUser?.username || adminDisplayName;
+
+      const token = jwt.sign(
+        { user_id: resolvedAdminUserId, role: 'admin' },
+        process.env.JWT_SECRET,
+        { expiresIn: '1d' }
+      );
+
       return res.json({
         message: 'เข้าสู่ระบบผู้ดูแลระบบสำเร็จ',
-        token, // ส่ง token string กลับไป
+        token,
         user: {
-          user_id: 'admin_001',
-          username: 'Administrator',
+          user_id: resolvedAdminUserId,
+          username: resolvedAdminDisplayName,
           role: 'admin'
         }
       });
     }
 
-    // 🔎 หา user ปกติ
-    // 🔎 หา user ปกติ
     const result = await pool.query(
       'SELECT * FROM tb_user WHERE username = $1',
       [username]
@@ -94,29 +102,16 @@ router.post('/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-
-    // 📍 ---------------- แทรกตรงนี้เลยครับ ---------------- 📍
-    console.log("==============================");
-    console.log("👉 รหัสที่พี่พิมพ์ในเว็บ :", password);
-    console.log("👉 รหัสที่ดึงมาจาก DB   :", user.password);
-    console.log("👉 ความยาวรหัสใน DB  :", user.password.length, "ตัวอักษร (ต้องเป็น 60 เท่านั้น)");
-    console.log("==============================");
-    // 📍 -------------------------------------------------- 📍
-
-    // 🔐 เช็ครหัสผ่าน
     const isMatch = await bcrypt.compare(password, user.password);
-
-    
 
     if (!isMatch) {
       return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
     }
 
-    // ⭐ สร้าง token
     const token = jwt.sign(
       {
         user_id: user.user_id,
-        role: user.user_role // ตรวจสอบว่าใน DB ชื่อ column คือ user_role จริงๆ
+        role: user.user_role
       },
       process.env.JWT_SECRET,
       { expiresIn: '1d' }
@@ -131,7 +126,6 @@ router.post('/login', async (req, res) => {
         role: user.user_role
       }
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'เข้าสู่ระบบไม่สำเร็จ' });

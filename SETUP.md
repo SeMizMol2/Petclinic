@@ -9,7 +9,7 @@ psql -d petclinic -f database/enum.pgsql
 psql -d petclinic -f database/table.pgsql
 ```
 > ⚠️ ถ้าคุณเคยสร้างตารางจาก `table.pgsql` เวอร์ชันเก่าไว้แล้ว ให้ `DROP TABLE` ทั้งหมดก่อนรันใหม่
-> (โครงสร้างตารางมีการแก้ไข เพิ่มคอลัมน์ `owner_address`, `profile_pic` ในตาราง `tb_owner`)
+> (โครงสร้างตารางมีการแก้ไข เพิ่มคอลัมน์ `profile_pic` ในตาราง `tb_owner`)
 
 ### 2. ตั้งค่า Backend
 ไฟล์ `backend/.env` มีค่าคัดลอกมาจากของเดิมให้แล้ว ตรวจสอบให้ตรงกับเครื่องคุณ:
@@ -47,7 +47,7 @@ npm run dev
 ## สรุปสิ่งที่แก้ไขในรอบนี้
 
 ### 🔴 บั๊กที่บล็อกการใช้งาน (แก้แล้ว)
-1. **`database/table.pgsql`** — comma หายหน้า `CONSTRAINT fk_receipt_treatment` ทำให้ SQL รันไม่ผ่านทั้งไฟล์ + จัดลำดับตารางใหม่ให้ `tb_receipt` มาหลัง `tb_treatment` (เพราะอ้าง FK กัน) + เพิ่มคอลัมน์ `owner_address`, `profile_pic` ในตาราง `tb_owner` ที่ backend เรียกใช้จริงแต่ไม่มีในสคีมา
+1. **`database/table.pgsql`** — comma หายหน้า `CONSTRAINT fk_receipt_treatment` ทำให้ SQL รันไม่ผ่านทั้งไฟล์ + จัดลำดับตารางใหม่ให้ `tb_receipt` มาหลัง `tb_treatment` (เพราะอ้าง FK กัน) + เพิ่มคอลัมน์ `profile_pic` ในตาราง `tb_owner` ที่ backend เรียกใช้จริงแต่ไม่มีในสคีมา
 2. **`owner.routes.js`, `treatments.routes.js`** — แก้ `req.user.id` เป็น `req.user.user_id` ให้ตรงกับ JWT payload จริง (ของเดิมจะได้ `undefined` แล้ว query DB พัง)
 3. **`history.routes.js`** — เดิมอ้าง `tb_history` ที่ไม่มีอยู่จริงในสคีมา → เปลี่ยนไปดึงจาก `tb_treatment` + `tb_treatment_detail` จริง พร้อมรายละเอียดบริการที่ใช้แต่ละครั้ง
 

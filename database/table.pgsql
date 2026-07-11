@@ -11,7 +11,6 @@ CREATE TABLE tb_owner (
   owner_name VARCHAR(100),
   owner_email VARCHAR(100),
   owner_tel VARCHAR(15),
-  owner_address TEXT,
   profile_pic VARCHAR(255),
 
   CONSTRAINT fk_owner_user

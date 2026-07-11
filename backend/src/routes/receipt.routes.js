@@ -1,108 +1,347 @@
 const express = require('express');
-const router = express.Router();
-const pool = require('../database/db');
-const auth = require('./auth.middleware');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// ================= ตั้งค่าที่เก็บไฟล์หลักฐานการโอนเงิน =================
+const router = express.Router();
+const pool = require('../database/db');
+const auth = require('./auth.middleware');
+
 const proofUploadDir = path.join(__dirname, '../../../uploads/proofs');
-if (!fs.existsSync(proofUploadDir)) { fs.mkdirSync(proofUploadDir, { recursive: true }); }
+if (!fs.existsSync(proofUploadDir)) {
+    fs.mkdirSync(proofUploadDir, { recursive: true });
+}
 
 const proofStorage = multer.diskStorage({
-    destination: (req, file, cb) => { cb(null, proofUploadDir); },
+    destination: (req, file, cb) => cb(null, proofUploadDir),
     filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'proof-' + req.user.user_id + '-' + uniqueSuffix + path.extname(file.originalname));
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        cb(null, `proof-${req.user.user_id}-${uniqueSuffix}${path.extname(file.originalname)}`);
     }
 });
+
 const uploadProof = multer({ storage: proofStorage });
 
-// 🧾 API: ดึงใบเสร็จทั้งหมดของ User ที่กำลังล็อคอิน
-// ⭐ แก้ไข: ใส่ auth ป้องกันคนอื่นสวมรอยดูใบเสร็จของ user_id คนอื่น
-// ⭐ แก้ไข: tb_receipt.user_id คือ "พนักงานที่ออกบิล" ไม่ใช่เจ้าของสัตว์เลี้ยง
-//           จึงต้อง join ผ่าน tb_owner เพื่อหาบิลของเจ้าของที่ล็อกอินอยู่จริง
+const RECEIPT_STATUS_UNPAID = 'ยังไม่ได้ชำระ';
+const RECEIPT_STATUS_PAID = 'ชำระเสร็จสิ้น';
+
+const normalizeReceiptStatus = (value) => {
+    const text = String(value || '').trim().toLowerCase();
+    if (!text) return null;
+    if (text === RECEIPT_STATUS_UNPAID || text === 'unpaid' || text.includes('ค้าง')) {
+        return RECEIPT_STATUS_UNPAID;
+    }
+    if (text === RECEIPT_STATUS_PAID || text === 'paid' || text.includes('เสร็จ')) {
+        return RECEIPT_STATUS_PAID;
+    }
+    return null;
+};
+
+const mapRefTypeToLabel = (refType) => {
+    switch (refType) {
+        case 'treatment':
+            return 'รักษา';
+        case 'surgery':
+            return 'ผ่าตัด';
+        case 'vaccine':
+            return 'วัคซีน';
+        default:
+            return refType || '-';
+    }
+};
+
+const nextReceiptDetailId = async (dbClient) => {
+    const result = await dbClient.query(`
+        SELECT detail_id
+        FROM tb_receipt_detail
+        WHERE detail_id LIKE 'RD%'
+        ORDER BY detail_id DESC
+        LIMIT 1
+    `);
+
+    const lastId = result.rows[0]?.detail_id || 'RD0000000000000';
+    const lastNumber = Number(String(lastId).replace(/^RD/, '')) || 0;
+    return `RD${String(lastNumber + 1).padStart(13, '0')}`;
+};
+
+const buildReceiptDetails = async (dbClient, receiptId, treatmentId) => {
+    const existing = await dbClient.query(
+        'SELECT COUNT(*)::int AS count FROM tb_receipt_detail WHERE receipt_id = $1',
+        [receiptId]
+    );
+
+    if (existing.rows[0].count > 0) {
+        return;
+    }
+
+    const treatmentDetails = await dbClient.query(
+        `
+        SELECT
+            d.service_id,
+            d.quantity,
+            d.price,
+            s.service_name
+        FROM tb_treatment_detail d
+        LEFT JOIN tb_service s ON d.service_id = s.service_id
+        WHERE d.treatment_id = $1
+        ORDER BY d.detail_id ASC
+        `,
+        [treatmentId]
+    );
+
+    for (const item of treatmentDetails.rows) {
+        const detailId = await nextReceiptDetailId(dbClient);
+        const description = item.service_name || item.service_id || 'service item';
+        const amount = Number(item.price || 0) * Number(item.quantity || 0);
+
+        await dbClient.query(
+            `
+            INSERT INTO tb_receipt_detail (
+                detail_id,
+                receipt_id,
+                ref_id,
+                ref_type,
+                description,
+                amount,
+                create_datetime
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            `,
+            [detailId, receiptId, treatmentId, 'treatment', description, amount]
+        );
+    }
+};
+
+router.get('/', auth, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' });
+        }
+
+        const result = await pool.query(`
+            SELECT
+                r.receipt_id,
+                r.issue_date,
+                r.total_amount,
+                r.payment_status,
+                r.pay_method,
+                r.pay_date,
+                r.proof_image,
+                r.treatment_id,
+                o.owner_id,
+                o.owner_name,
+                o.owner_tel,
+                p.pet_id,
+                p.pet_name
+            FROM tb_receipt r
+            LEFT JOIN tb_owner o ON r.owner_id = o.owner_id
+            LEFT JOIN tb_treatment t ON r.treatment_id = t.treatment_id
+            LEFT JOIN tb_pet p ON t.pet_id = p.pet_id
+            ORDER BY r.issue_date DESC
+        `);
+
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        console.error('Error fetching receipts:', err);
+        res.status(500).json({ success: false, message: 'โหลดข้อมูลใบเสร็จไม่สำเร็จ' });
+    }
+});
+
+router.get('/detail/:id', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const receiptResult = await pool.query(`
+            SELECT
+                r.*,
+                o.owner_name,
+                o.owner_tel,
+                o.owner_email,
+                p.pet_name,
+                p.pet_type,
+                p.pet_breed,
+                t.symptom,
+                t.diagnosis,
+                t.treatment_date,
+                u.username AS issued_by
+            FROM tb_receipt r
+            LEFT JOIN tb_owner o ON r.owner_id = o.owner_id
+            LEFT JOIN tb_treatment t ON r.treatment_id = t.treatment_id
+            LEFT JOIN tb_pet p ON t.pet_id = p.pet_id
+            LEFT JOIN tb_user u ON r.user_id = u.user_id
+            WHERE r.receipt_id = $1
+        `, [id]);
+
+        if (receiptResult.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบใบเสร็จ' });
+        }
+
+        const receipt = receiptResult.rows[0];
+        if (req.user.role !== 'admin') {
+            const ownerResult = await pool.query('SELECT user_id FROM tb_owner WHERE owner_id = $1', [receipt.owner_id]);
+            if (ownerResult.rows.length === 0 || ownerResult.rows[0].user_id !== req.user.user_id) {
+                return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' });
+            }
+        }
+
+        let items = [];
+
+        const itemResult = await pool.query(`
+            SELECT
+                d.detail_id,
+                d.receipt_id,
+                d.ref_id,
+                d.ref_type,
+                d.description,
+                d.amount
+            FROM tb_receipt_detail d
+            WHERE d.receipt_id = $1
+            ORDER BY d.detail_id ASC
+        `, [receipt.receipt_id]);
+
+        items = itemResult.rows.map((item) => ({
+            ...item,
+            income_type: mapRefTypeToLabel(item.ref_type)
+        }));
+
+        if (items.length === 0 && receipt.treatment_id) {
+            const fallbackItems = await pool.query(`
+                SELECT
+                    d.detail_id,
+                    'รักษา' AS income_type,
+                    COALESCE(s.service_name, d.service_id, 'service item') AS description,
+                    (COALESCE(d.price, 0) * COALESCE(d.quantity, 0)) AS amount
+                FROM tb_treatment_detail d
+                LEFT JOIN tb_service s ON d.service_id = s.service_id
+                WHERE d.treatment_id = $1
+                ORDER BY d.detail_id ASC
+            `, [receipt.treatment_id]);
+
+            items = fallbackItems.rows;
+        }
+
+        res.json({ success: true, data: { receipt, items } });
+    } catch (err) {
+        console.error('Error fetching receipt detail:', err);
+        res.status(500).json({ success: false, message: 'โหลดรายละเอียดใบเสร็จไม่สำเร็จ' });
+    }
+});
+
 router.get('/my-receipts/:user_id', auth, async (req, res) => {
     try {
         const { user_id } = req.params;
 
-        // ป้องกันไม่ให้ user คนอื่นสวมรอยดูใบเสร็จ (ยกเว้น admin)
         if (req.user.role !== 'admin' && req.user.user_id !== user_id) {
             return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' });
         }
 
-        const sql = `
-            SELECT 
-                r.receipt_id, 
-                r.issue_date, 
-                r.total_amount, 
-                r.payment_status, 
+        const result = await pool.query(`
+            SELECT
+                r.receipt_id,
+                r.issue_date,
+                r.total_amount,
+                r.payment_status,
                 r.pay_method,
                 r.pay_date,
                 r.proof_image,
                 r.treatment_id
             FROM tb_receipt r
             JOIN tb_owner o ON r.owner_id = o.owner_id
-            WHERE o.user_id = $1 
+            WHERE o.user_id = $1
             ORDER BY r.issue_date DESC
-        `;
-        
-        const result = await pool.query(sql, [user_id]);
+        `, [user_id]);
 
-        res.json({
-            success: true,
-            data: result.rows
-        });
-
+        res.json({ success: true, data: result.rows });
     } catch (err) {
-        console.error("เกิดข้อผิดพลาดในการดึงใบเสร็จ:", err);
-        res.status(500).json({ success: false, message: "ดึงข้อมูลใบเสร็จไม่สำเร็จ" });
+        console.error('Error fetching user receipts:', err);
+        res.status(500).json({ success: false, message: 'ดึงข้อมูลใบเสร็จไม่สำเร็จ' });
     }
 });
 
-// ================= สร้างใบเสร็จจากการรักษา (Admin/สัตวแพทย์) =================
 router.post('/', auth, async (req, res) => {
+    const client = await pool.connect();
+
     try {
+        await client.query('BEGIN');
+
         if (req.user.role !== 'admin') {
+            await client.query('ROLLBACK');
             return res.status(403).json({ success: false, message: 'ไม่มีสิทธิ์ทำรายการ' });
         }
 
         const { treatment_id, pay_method } = req.body;
         if (!treatment_id) {
+            await client.query('ROLLBACK');
             return res.status(400).json({ success: false, message: 'กรุณาระบุรหัสการรักษา' });
         }
 
-        // หา pet -> owner และยอดรวมจาก treatment ที่ระบุ
-        const treatmentResult = await pool.query(
-            `SELECT t.total_amount, p.owner_id
-             FROM tb_treatment t
-             JOIN tb_pet p ON t.pet_id = p.pet_id
-             WHERE t.treatment_id = $1`,
+        const treatmentResult = await client.query(
+            `
+            SELECT t.total_amount, p.owner_id
+            FROM tb_treatment t
+            JOIN tb_pet p ON t.pet_id = p.pet_id
+            WHERE t.treatment_id = $1
+            `,
             [treatment_id]
         );
 
         if (treatmentResult.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลการรักษานี้' });
         }
 
-        const { total_amount, owner_id } = treatmentResult.rows[0];
-        const receipt_id = 'RC' + Date.now();
-
-        const newReceipt = await pool.query(
-            `INSERT INTO tb_receipt (receipt_id, total_amount, owner_id, user_id, treatment_id, pay_method)
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [receipt_id, total_amount, owner_id, req.user.user_id, treatment_id, pay_method || null]
+        const existingReceipt = await client.query(
+            'SELECT * FROM tb_receipt WHERE treatment_id = $1 LIMIT 1',
+            [treatment_id]
         );
 
+        if (existingReceipt.rows.length > 0) {
+            const receiptRow = existingReceipt.rows[0];
+            await buildReceiptDetails(client, receiptRow.receipt_id, treatment_id);
+            await client.query('COMMIT');
+            return res.json({ success: true, message: 'มีใบเสร็จของการรักษานี้แล้ว', data: receiptRow });
+        }
+
+        const { total_amount, owner_id } = treatmentResult.rows[0];
+        const receiptId = `RC${Date.now()}`;
+
+        await client.query(
+            `
+            INSERT INTO tb_receipt (
+                receipt_id,
+                total_amount,
+                owner_id,
+                user_id,
+                treatment_id,
+                pay_method
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            `,
+            [receiptId, total_amount, owner_id, req.user.user_id, treatment_id, pay_method || null]
+        );
+
+        await buildReceiptDetails(client, receiptId, treatment_id);
+
+        const newReceipt = await client.query(
+            'SELECT * FROM tb_receipt WHERE receipt_id = $1',
+            [receiptId]
+        );
+
+        await client.query('COMMIT');
         res.status(201).json({ success: true, message: 'สร้างใบเสร็จสำเร็จ', data: newReceipt.rows[0] });
     } catch (err) {
-        console.error("Error Create Receipt:", err);
+        try {
+            await client.query('ROLLBACK');
+        } catch (rollbackErr) {
+            console.error('Rollback Create Receipt failed:', rollbackErr);
+        }
+        console.error('Error Create Receipt:', err);
         res.status(500).json({ success: false, message: 'สร้างใบเสร็จไม่สำเร็จ' });
+    } finally {
+        client.release();
     }
 });
 
-// ================= อัปเดตสถานะการชำระเงิน (Admin) =================
 router.put('/:id/status', auth, async (req, res) => {
     try {
         if (req.user.role !== 'admin') {
@@ -110,44 +349,56 @@ router.put('/:id/status', auth, async (req, res) => {
         }
 
         const { id } = req.params;
-        const { payment_status, pay_method } = req.body;
+        const rawStatus = String(req.body.payment_status || '').trim();
+        const normalizedStatus = normalizeReceiptStatus(rawStatus) || rawStatus;
+        const { pay_method } = req.body;
 
-        if (!['ยังไม่ได้ชำระ', 'ชำระเสร็จสิ้น'].includes(payment_status)) {
+        if (!rawStatus) {
             return res.status(400).json({ success: false, message: 'สถานะไม่ถูกต้อง' });
         }
 
-        const payDate = payment_status === 'ชำระเสร็จสิ้น' ? new Date() : null;
+        const payDate = normalizedStatus === RECEIPT_STATUS_PAID ? new Date() : null;
 
         await pool.query(
-            `UPDATE tb_receipt 
-             SET payment_status = $1, pay_method = COALESCE($2, pay_method), pay_date = $3, update_datetime = NOW()
-             WHERE receipt_id = $4`,
-            [payment_status, pay_method || null, payDate, id]
+            `
+            UPDATE tb_receipt
+            SET payment_status = $1,
+                pay_method = COALESCE($2, pay_method),
+                pay_date = $3,
+                update_datetime = NOW()
+            WHERE receipt_id = $4
+            `,
+            [normalizedStatus, pay_method || null, payDate, id]
         );
 
         res.json({ success: true, message: 'อัปเดตสถานะการชำระเงินสำเร็จ' });
     } catch (err) {
-        console.error("Error Update Receipt Status:", err);
+        console.error('Error Update Receipt Status:', err);
         res.status(500).json({ success: false, message: 'อัปเดตสถานะไม่สำเร็จ' });
     }
 });
 
-// ================= อัปโหลดหลักฐานการโอนเงิน (User) =================
 router.post('/:id/proof', auth, uploadProof.single('proofImage'), async (req, res) => {
     try {
-        if (!req.file) return res.status(400).json({ success: false, message: 'ไม่พบไฟล์' });
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'ไม่พบไฟล์' });
+        }
 
         const { id } = req.params;
         const imageUrl = `http://localhost:3000/uploads/proofs/${req.file.filename}`;
 
         await pool.query(
-            `UPDATE tb_receipt SET proof_image = $1, update_datetime = NOW() WHERE receipt_id = $2`,
+            'UPDATE tb_receipt SET proof_image = $1, update_datetime = NOW() WHERE receipt_id = $2',
             [imageUrl, id]
         );
 
-        res.json({ success: true, imageUrl, message: 'อัปโหลดหลักฐานการโอนเงินสำเร็จ กรุณารอแอดมินตรวจสอบ' });
+        res.json({
+            success: true,
+            imageUrl,
+            message: 'อัปโหลดหลักฐานการโอนเงินสำเร็จ กรุณารอแอดมินตรวจสอบ'
+        });
     } catch (err) {
-        console.error("Error Upload Proof:", err);
+        console.error('Error Upload Proof:', err);
         res.status(500).json({ success: false, message: 'อัปโหลดหลักฐานไม่สำเร็จ' });
     }
 });

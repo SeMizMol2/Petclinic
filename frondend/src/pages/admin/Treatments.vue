@@ -5,11 +5,11 @@
         <div class="icon-box">🩺</div>
         <div class="title-box">
           <h1>บันทึกการรักษา</h1>
-          <p>บันทึกอาการ วินิจฉัยโรค และสั่งจ่ายรายการค่ารักษา</p>
+          <p>บันทึกอาการ วินิจฉัยโรค และส่งต่อรายการค่ารักษา</p>
         </div>
       </div>
       <button @click="openAddModal" class="btn-primary">
-        <span class="icon-sm">➕</span> เริ่มการรักษาใหม่
+        <span class="icon-sm">➕</span> เพิ่มการรักษาใหม่
       </button>
     </div>
 
@@ -21,6 +21,7 @@
               <th>รหัสการรักษา</th>
               <th>วันที่รักษา</th>
               <th>สัตว์เลี้ยง (เจ้าของ)</th>
+              <th>สัตวแพทย์</th>
               <th>การวินิจฉัย</th>
               <th class="text-right">ยอดรวม (บาท)</th>
             </tr>
@@ -29,23 +30,30 @@
             <tr v-for="t in treatments" :key="t.treatment_id">
               <td><span class="badge">{{ t.treatment_id }}</span></td>
               <td>{{ formatDateTime(t.treatment_date) }}</td>
-              <td>🐾 {{ t.pet_name }} <br><span class="text-xs text-gray-500">คุณ{{ t.owner_name }}</span></td>
+              <td>
+                🐾 {{ t.pet_name }}
+                <br>
+                <span class="text-xs text-gray-500">คุณ{{ t.owner_name }}</span>
+              </td>
+              <td>{{ t.vet_name || t.doctor_name || '-' }}</td>
               <td>{{ t.diagnosis || '-' }}</td>
               <td class="text-right font-bold text-emerald-600">{{ formatPrice(t.total_amount) }}</td>
             </tr>
-            <tr v-if="treatments.length === 0"><td colspan="5" class="text-center py-8">ยังไม่มีประวัติการรักษา</td></tr>
+            <tr v-if="treatments.length === 0">
+              <td colspan="6" class="text-center py-8">ยังไม่มีประวัติการรักษา</td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <div v-if="isModalOpen" class="custom-modal-overlay" @click.self="isModalOpen = false">
+    <div v-if="isModalOpen" class="custom-modal-overlay" @click.self="closeModal">
       <div class="custom-modal-box modal-xl">
         <div class="modal-header">
           <h3>🩺 บันทึกการรักษาใหม่</h3>
-          <button @click="isModalOpen = false" class="close-btn">✕</button>
+          <button @click="closeModal" class="close-btn">✕</button>
         </div>
-        
+
         <div class="form-grid">
           <div class="left-panel">
             <div class="form-group">
@@ -57,10 +65,22 @@
                 </option>
               </select>
             </div>
+
+            <div class="form-group">
+              <label>สัตวแพทย์</label>
+              <select v-model="form.vet_id" class="custom-input">
+                <option value="">-- เลือกสัตวแพทย์ --</option>
+                <option v-for="vet in vetsList" :key="vet.vet_id" :value="vet.vet_id">
+                  {{ vet.vet_name }}
+                </option>
+              </select>
+            </div>
+
             <div class="form-group">
               <label>อาการเบื้องต้น</label>
               <textarea v-model="form.symptom" rows="3" class="custom-input"></textarea>
             </div>
+
             <div class="form-group">
               <label>การวินิจฉัยโรค</label>
               <textarea v-model="form.diagnosis" rows="3" class="custom-input"></textarea>
@@ -83,38 +103,36 @@
               <div v-for="(item, index) in form.services" :key="index" class="item-row">
                 <div class="flex-1">
                   <div class="font-bold text-sm">{{ item.service_name }}</div>
-                  
                   <div class="flex items-center gap-1 text-xs text-gray-500 mt-1">
                     <span></span>
                     <input type="number" v-model.number="item.price" min="0" step="0.5" class="price-edit-input">
                     <span>บาท</span>
                   </div>
-                  
                 </div>
                 <input type="number" v-model.number="item.quantity" min="1" class="qty-input">
-                
                 <div class="font-bold text-emerald-600 w-20 text-right">{{ formatPrice(item.price * item.quantity) }}</div>
                 <button @click="removeServiceItem(index)" class="btn-remove">✕</button>
               </div>
-              <div v-if="form.services.length === 0" class="text-center text-gray-400 py-4 text-sm">ยังไม่มีรายการค่ารักษา</div>
+              <div v-if="form.services.length === 0" class="text-center text-gray-400 py-4 text-sm">
+                ยังไม่มีรายการค่ารักษา
+              </div>
             </div>
 
             <div class="total-box">
-              <span>ยอดรวมทั้งสิ้น:</span>
+              <span>ยอดรวมทั้งหมด:</span>
               <span class="text-2xl font-black text-emerald-600">{{ formatPrice(totalAmount) }} บาท</span>
             </div>
           </div>
         </div>
 
         <div class="modal-actions">
-          <button @click="isModalOpen = false" class="btn-cancel">ยกเลิก</button>
+          <button @click="closeModal" class="btn-cancel">ยกเลิก</button>
           <button @click="submitTreatment" :disabled="isSubmitting || !form.pet_id" class="btn-submit">
             {{ isSubmitting ? 'กำลังบันทึก...' : 'บันทึกการรักษา' }}
           </button>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -125,6 +143,7 @@ import axios from 'axios'
 const treatments = ref([])
 const petsList = ref([])
 const servicesList = ref([])
+const vetsList = ref([])
 
 const isModalOpen = ref(false)
 const isSubmitting = ref(false)
@@ -132,42 +151,57 @@ const selectedServiceId = ref('')
 
 const form = ref({
   pet_id: '',
+  vet_id: '',
   symptom: '',
   diagnosis: '',
-  services: [] // เก็บรายการที่เลือก
+  services: []
 })
 
-const formatPrice = (val) => Number(val).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const formatDateTime = (d) => new Date(d).toLocaleString('th-TH')
+const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
+
+const formatPrice = (val) =>
+  Number(val || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const formatDateTime = (d) => (d ? new Date(d).toLocaleString('th-TH') : '-')
 
 const fetchAllData = async () => {
-  const token = localStorage.getItem('token')
-  const headers = { Authorization: `Bearer ${token}` }
-  try {
-    const [tRes, pRes, sRes] = await Promise.all([
-      axios.get('http://localhost:3000/api/treatments', { headers }),
-      axios.get('http://localhost:3000/api/treatments/pets', { headers }),
-      axios.get('http://localhost:3000/api/treatments/services', { headers })
-    ])
-    treatments.value = tRes.data
-    petsList.value = pRes.data
-    servicesList.value = sRes.data
-  } catch (err) { console.error(err) }
+  const [tRes, pRes, sRes, vRes] = await Promise.all([
+    axios.get('http://localhost:3000/api/treatments', { headers: headers() }),
+    axios.get('http://localhost:3000/api/treatments/pets', { headers: headers() }),
+    axios.get('http://localhost:3000/api/treatments/services', { headers: headers() }),
+    axios.get('http://localhost:3000/api/admin/veterinarians', { headers: headers() })
+  ])
+
+  treatments.value = tRes.data || []
+  petsList.value = pRes.data || []
+  servicesList.value = sRes.data || []
+  vetsList.value = vRes.data || []
 }
 
 const openAddModal = () => {
-  form.value = { pet_id: '', symptom: '', diagnosis: '', services: [] }
+  form.value = {
+    pet_id: '',
+    vet_id: '',
+    symptom: '',
+    diagnosis: '',
+    services: []
+  }
   selectedServiceId.value = ''
   isModalOpen.value = true
 }
 
+const closeModal = () => {
+  isModalOpen.value = false
+}
+
 const addServiceItem = () => {
   if (!selectedServiceId.value) return
-  const svc = servicesList.value.find(s => s.service_id === selectedServiceId.value)
-  // เช็คว่าเคยเพิ่มไปแล้วหรือยัง
-  const existing = form.value.services.find(i => i.service_id === svc.service_id)
+  const svc = servicesList.value.find((s) => s.service_id === selectedServiceId.value)
+  if (!svc) return
+
+  const existing = form.value.services.find((i) => i.service_id === svc.service_id)
   if (existing) {
-    existing.quantity++
+    existing.quantity += 1
   } else {
     form.value.services.push({ ...svc, quantity: 1, price: svc.service_price })
   }
@@ -178,27 +212,31 @@ const removeServiceItem = (index) => {
   form.value.services.splice(index, 1)
 }
 
-const totalAmount = computed(() => {
-  return form.value.services.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-})
+const totalAmount = computed(() =>
+  form.value.services.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0)
+)
 
 const submitTreatment = async () => {
-  if (form.value.services.length === 0 && !confirm("ไม่มีรายการค่ารักษา ต้องการบันทึกใช่หรือไม่?")) return
+  if (form.value.services.length === 0 && !confirm('ยังไม่มีรายการค่ารักษา ต้องการบันทึกหรือไม่?')) return
+
   isSubmitting.value = true
   try {
-    const token = localStorage.getItem('token')
-    const payload = { ...form.value, total_amount: totalAmount.value }
-    await axios.post('http://localhost:3000/api/treatments', payload, { headers: { Authorization: `Bearer ${token}` } })
-    isModalOpen.value = false
-    fetchAllData()
+    const payload = {
+      ...form.value,
+      total_amount: totalAmount.value
+    }
+
+    await axios.post('http://localhost:3000/api/treatments', payload, { headers: headers() })
+    closeModal()
+    await fetchAllData()
   } catch (err) {
-    alert("เกิดข้อผิดพลาดในการบันทึก")
+    alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึก')
   } finally {
     isSubmitting.value = false
   }
 }
 
-onMounted(() => fetchAllData())
+onMounted(fetchAllData)
 </script>
 
 <style scoped>
@@ -217,7 +255,6 @@ onMounted(() => fetchAllData())
 .clinic-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; }
 .badge { background: #f1f5f9; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 13px; color: #475569; }
 
-/* Modal Styles */
 .custom-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 50; padding: 20px;}
 .modal-xl { background: white; width: 100%; max-width: 1000px; max-height: 90vh; overflow-y: auto; border-radius: 24px; padding: 32px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px; margin-bottom: 24px; }
@@ -230,7 +267,6 @@ onMounted(() => fetchAllData())
 .custom-input { width: 100%; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; outline: none; }
 .custom-input:focus { border-color: #10b981; background: white; }
 
-/* Right Panel (Cart) */
 .right-panel { background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; }
 .btn-add { background: #3b82f6; color: white; border: none; border-radius: 12px; padding: 0 20px; font-weight: 700; cursor: pointer; }
 .selected-items-box { flex-grow: 1; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 12px; max-height: 250px; overflow-y: auto; margin-bottom: 16px; }
@@ -244,7 +280,9 @@ onMounted(() => fetchAllData())
 .btn-submit { padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
 .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
-@media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+@media (max-width: 768px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
 
 .price-edit-input {
   width: 70px;

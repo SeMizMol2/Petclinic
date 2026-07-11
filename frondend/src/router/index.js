@@ -19,6 +19,14 @@ import AdminAppointments from '../pages/admin/Appointments.vue'
 import Services from '../pages/admin/Services.vue'
 import Treatments from '../pages/admin/Treatments.vue'
 import Expenses from '../pages/admin/Expenses.vue'
+import AdminOwners from '../pages/admin/Owners.vue'
+import AdminPets from '../pages/admin/Pets.vue'
+import AdminReceipts from '../pages/admin/Receipts.vue'
+import AdminVeterinarians from '../pages/admin/Veterinarians.vue'
+import AdminClinic from '../pages/admin/Clinic.vue'
+import AdminSurgeries from '../pages/admin/Surgeries.vue'
+import AdminVaccines from '../pages/admin/Vaccines.vue'
+import AdminReports from '../pages/admin/Reports.vue'
 import History from '../pages/user/History.vue'
 
 const routes = [
@@ -51,10 +59,18 @@ const routes = [
       { path: '', redirect: '/admin/dashboard' },
       { path: 'dashboard', component: AdminDashboard },
       { path: 'users', component: AdminUsers},
-      { path: 'Appointments', component: AdminAppointments},
-      { path: 'Services', component: Services},
-      { path: 'Treatments', component: Treatments },
-      { path: 'Expenses', component: Expenses }
+      { path: 'owners', component: AdminOwners },
+      { path: 'pets', component: AdminPets },
+      { path: 'veterinarians', component: AdminVeterinarians },
+      { path: 'clinic', component: AdminClinic },
+      { path: 'surgeries', component: AdminSurgeries },
+      { path: 'vaccines', component: AdminVaccines },
+      { path: 'appointments', component: AdminAppointments},
+      { path: 'services', component: Services},
+      { path: 'treatments', component: Treatments },
+      { path: 'receipts', component: AdminReceipts },
+      { path: 'expenses', component: Expenses },
+      { path: 'reports', component: AdminReports }
     ]
   }
 ]

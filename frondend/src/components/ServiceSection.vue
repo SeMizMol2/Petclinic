@@ -1,36 +1,46 @@
 <template>
   <section class="service-section">
     <div class="container">
-      
       <div class="section-header">
         <h2>ติดต่อเรา</h2>
         <div class="decorative-dots">♦ ♦ ♦ ♦ ♦</div>
       </div>
 
       <div class="cards-grid">
-        
         <div class="card">
-          <div class="icon-circle bg-blue">📞</div>
+          <div class="icon-circle bg-blue">P</div>
           <h3>เบอร์โทรศัพท์</h3>
-          <p>02-0000-0000</p>
+          <p>{{ clinic.tel || '-' }}</p>
         </div>
 
         <div class="card">
-          <div class="icon-circle bg-purple">✉️</div>
-          <h3>อีเมล</h3>
-          <p>contact@petclinic.com</p>
+          <div class="icon-circle bg-purple">T</div>
+          <h3>เวลาทำการ</h3>
+          <p>{{ clinic.open_hours || '-' }}</p>
         </div>
 
         <div class="card">
-          <div class="icon-circle bg-red">📍</div>
+          <div class="icon-circle bg-red">A</div>
           <h3>ที่อยู่</h3>
-          <p>123 ถนนสุขุมวิท เขตคลองเตย<br>กรุงเทพฯ</p>
+          <p class="multiline">{{ clinic.address || '-' }}</p>
         </div>
-
       </div>
     </div>
   </section>
 </template>
+
+<script setup>
+defineProps({
+  clinic: {
+    type: Object,
+    default: () => ({
+      tel: '',
+      open_hours: '',
+      address: ''
+    })
+  }
+})
+</script>
 
 <style scoped>
 .service-section {
@@ -59,26 +69,24 @@
   letter-spacing: 5px;
 }
 
-/* Grid Layout */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* แบ่ง 3 คอลัมน์ */
+  grid-template-columns: repeat(3, 1fr);
   gap: 30px;
 }
 
-/* Card Style */
 .card {
   background: white;
-  border-radius: 20px; /* มุมโค้ง */
+  border-radius: 20px;
   padding: 40px 20px;
   text-align: center;
-  color: #333; /* ตัวหนังสือสีเข้ม */
+  color: #333;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s;
 }
 
 .card:hover {
-  transform: translateY(-10px); /* ลอยขึ้นเมื่อเอาเมาส์ชี้ */
+  transform: translateY(-10px);
 }
 
 .card h3 {
@@ -94,7 +102,10 @@
   line-height: 1.5;
 }
 
-/* Icons */
+.multiline {
+  white-space: pre-line;
+}
+
 .icon-circle {
   width: 70px;
   height: 70px;
@@ -102,7 +113,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 1.25rem;
+  font-weight: 800;
   margin: 0 auto 10px;
 }
 
@@ -110,10 +122,9 @@
 .bg-purple { background-color: #f5f3ff; color: #8b5cf6; }
 .bg-red { background-color: #fef2f2; color: #ef4444; }
 
-/* Responsive */
 @media (max-width: 768px) {
   .cards-grid {
-    grid-template-columns: 1fr; /* มือถือเรียงแนวตั้ง */
+    grid-template-columns: 1fr;
   }
 }
 </style>

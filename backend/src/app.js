@@ -18,6 +18,8 @@ const serviceRoutes = require('./routes/services.routes');
 const treatmentRoutes = require('./routes/treatments.routes');
 const ownerRoutes = require('./routes/owner.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const clinicRoutes = require('./routes/clinic.routes');
+const reportRoutes = require('./routes/reports.routes');
 
 app.use(cors());
 app.use(express.json());
@@ -38,6 +40,8 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/treatments', treatmentRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/clinic', clinicRoutes);
+app.use('/api/reports', reportRoutes);
 
 
 const routes = require('./routes');

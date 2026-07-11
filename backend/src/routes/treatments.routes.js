@@ -31,7 +31,7 @@ router.get('/services', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
     const client = await pool.connect(); // ใช้ client สำหรับ Transaction
     try {
-        const { pet_id, symptom, diagnosis, services, total_amount } = req.body;
+        const { pet_id, vet_id, symptom, diagnosis, services, total_amount } = req.body;
         const user_id = req.user.user_id; // ดึงรหัสหมอจาก Token ที่ Login
 
         await client.query('BEGIN'); // เริ่มต้น Transaction
@@ -46,9 +46,9 @@ router.post('/', auth, async (req, res) => {
 
         // 3.2 บันทึกหัวบิลลง tb_treatment
         await client.query(
-            `INSERT INTO tb_treatment (treatment_id, pet_id, user_id, symptom, diagnosis, total_amount) 
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [newTrId, pet_id, user_id, symptom, diagnosis, total_amount]
+            `INSERT INTO tb_treatment (treatment_id, pet_id, user_id, vet_id, symptom, diagnosis, total_amount) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [newTrId, pet_id, user_id, vet_id || null, symptom, diagnosis, total_amount]
         );
 
         // 3.3 วนลูปบันทึกรายการย่อยลง tb_treatment_detail
@@ -77,11 +77,12 @@ router.get('/', auth, async (req, res) => {
     try {
         const history = await pool.query(`
             SELECT t.treatment_id, t.treatment_date, t.symptom, t.diagnosis, t.total_amount, 
-                   p.pet_name, o.owner_name, u.username as doctor_name
+                   p.pet_name, o.owner_name, u.username as doctor_name, v.vet_name
             FROM tb_treatment t
             JOIN tb_pet p ON t.pet_id = p.pet_id
             JOIN tb_owner o ON p.owner_id = o.owner_id
             LEFT JOIN tb_user u ON t.user_id = u.user_id
+            LEFT JOIN tb_veterinarian v ON t.vet_id = v.vet_id
             ORDER BY t.treatment_date DESC
         `);
         res.json(history.rows);

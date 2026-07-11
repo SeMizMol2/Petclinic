@@ -3,11 +3,20 @@
     <div class="container footer-content">
       <div class="divider"></div>
       <div class="footer-text">
-        <p>&copy; 2026 Pet Clinic Management System. All rights reserved.</p>
+        <p>&copy; 2026 {{ clinicName || 'Pet Clinic' }} Management System. All rights reserved.</p>
       </div>
     </div>
   </footer>
 </template>
+
+<script setup>
+defineProps({
+  clinicName: {
+    type: String,
+    default: 'Pet Clinic'
+  }
+})
+</script>
 
 <style scoped>
 .footer {
@@ -24,7 +33,7 @@
 
 .divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.2); /* เส้นขีดบางๆ */
+  background: rgba(255, 255, 255, 0.2);
   margin-bottom: 20px;
 }
 </style>
