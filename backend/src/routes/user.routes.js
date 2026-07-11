@@ -92,4 +92,57 @@ router.post('/upload-profile', auth, upload.single('profileImage'), async (req, 
     }
 });
 
+
+// ================= [ADMIN] GET ALL USERS =================
+// ดึงรายชื่อผู้ใช้ทั้งหมด (สำหรับหน้าจัดการของ Admin)
+router.get('/all', auth, async (req, res) => {
+  try {
+    // 🛡️ ดักความปลอดภัย: ถ้าไม่ใช่ admin ให้เตะออก
+    const myRole = req.user.user_role || req.user.role;
+    if (myRole !== 'admin') {
+      return res.status(403).json({ message: "คุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้" });
+    }
+
+    const result = await pool.query(
+      `SELECT u.user_id, u.username, u.user_role, o.owner_name, o.owner_tel 
+       FROM tb_user u 
+       LEFT JOIN tb_owner o ON u.user_id = o.user_id
+       ORDER BY u.username ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching all users:", err);
+    res.status(500).json({ message: "โหลดข้อมูลไม่สำเร็จ" });
+  }
+});
+
+// ================= [ADMIN] UPDATE USER ROLE =================
+// เปลี่ยนสิทธิ์ผู้ใช้ (Promote / Demote)
+router.put('/role/:id', auth, async (req, res) => {
+  try {
+    // 🛡️ ดักความปลอดภัย: ถ้าไม่ใช่ admin ห้ามเปลี่ยนสิทธิ์คนอื่น!
+    const myRole = req.user.user_role || req.user.role;
+    if (myRole !== 'admin') {
+      return res.status(403).json({ message: "คุณไม่มีสิทธิ์แก้ไขข้อมูลนี้" });
+    }
+
+    const targetUserId = req.params.id;
+    const { user_role } = req.body; // รับค่า 'admin' หรือ 'user'
+
+    // ป้องกันไม่ให้ Admin เปลี่ยนสิทธิ์ตัวเอง (เดี๋ยวพลาดแล้วระบบไม่มี Admin)
+    if (targetUserId === req.user.user_id || targetUserId === req.user.id) {
+        return res.status(400).json({ message: "ไม่สามารถเปลี่ยนสิทธิ์ของตัวเองได้" });
+    }
+
+    const sql = `UPDATE tb_user SET user_role = $1 WHERE user_id = $2`;
+    await pool.query(sql, [user_role, targetUserId]);
+
+    res.json({ message: 'อัปเดตสิทธิ์สำเร็จ' });
+  } catch (err) {
+    console.error("Error updating role:", err);
+    res.status(500).json({ message: "อัปเดตสิทธิ์ไม่สำเร็จ" });
+  }
+});
+
+
 module.exports = router;
