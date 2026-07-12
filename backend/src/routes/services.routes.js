@@ -3,6 +3,24 @@ const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
 
+router.get('/public', async (req, res) => {
+    try {
+        const services = await pool.query(
+            `
+            SELECT service_id, service_name, service_desc, service_price
+            FROM tb_service
+            ORDER BY service_id ASC
+            `
+        );
+        res.json(services.rows);
+    } catch (err) {
+        console.error('Error Get Public Services:', err);
+        res.status(500).json({
+            message: 'เกิดข้อผิดพลาดในการดึงข้อมูลบริการ'
+        });
+    }
+});
+
 router.get('/', auth, async (req, res) => {
     try {
         const services = await pool.query(

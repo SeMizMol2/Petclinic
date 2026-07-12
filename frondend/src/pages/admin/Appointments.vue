@@ -4,7 +4,9 @@
       <div>
         <p class="eyebrow">Appointment management</p>
         <h1>จัดการตารางนัดหมาย</h1>
-        <p class="subtitle">จัดคิวการเข้ารับบริการ ตรวจสอบวันเวลา และติดตามสถานะนัดหมายของสัตว์เลี้ยง</p>
+        <p class="subtitle">
+          ดูคำขอนัดหมายจากเจ้าของสัตว์เลี้ยง สร้างคิวนัดใหม่ และอัปเดตสถานะการยืนยันจากคลินิก
+        </p>
       </div>
       <button @click="openAddModal" class="primary-btn" type="button">เพิ่มการนัดหมาย</button>
     </section>
@@ -70,8 +72,8 @@
               </td>
               <td>
                 <div class="status-stack">
-                  <span :class="['status-chip', apt.appt_status === APPT_STATUS_CONFIRMED ? 'is-success' : 'is-danger']">
-                    {{ apt.appt_status === APPT_STATUS_CONFIRMED ? 'ยืนยันแล้ว' : 'ยกเลิก' }}
+                  <span :class="['status-chip', getStatusClass(apt.appt_status)]">
+                    {{ getStatusLabel(apt.appt_status) }}
                   </span>
                   <span v-if="apt.cancel_reason" class="cancel-reason">{{ apt.cancel_reason }}</span>
                 </div>
@@ -87,7 +89,7 @@
               <td colspan="5" class="state">
                 <div class="empty-card">
                   <strong>ยังไม่มีข้อมูลนัดหมาย</strong>
-                  <p>กดปุ่มเพิ่มการนัดหมายเพื่อเริ่มจัดคิวให้ลูกค้า</p>
+                  <p>เมื่อมีการสร้างคิวหรือมีผู้ใช้จองนัด รายการทั้งหมดจะแสดงที่นี่</p>
                 </div>
               </td>
             </tr>
@@ -101,7 +103,13 @@
         <div class="modal-head">
           <div>
             <h2>{{ modalMode === 'add' ? 'เพิ่มการนัดหมายใหม่' : 'แก้ไขการนัดหมาย' }}</h2>
-            <p>{{ modalMode === 'add' ? 'กรอกข้อมูลให้ครบเพื่อสร้างคิวนัดหมาย' : 'อัปเดตวัน เวลา หรือสถานะของการนัดหมาย' }}</p>
+            <p>
+              {{
+                modalMode === 'add'
+                  ? 'กรอกข้อมูลให้ครบเพื่อสร้างคิวนัดหมาย'
+                  : 'อัปเดตวัน เวลา สถานะ หรือหมายเหตุของการนัดหมาย'
+              }}
+            </p>
           </div>
           <button @click="closeModal" class="close-btn" type="button">ปิด</button>
         </div>
@@ -142,7 +150,8 @@
             <label class="full-width">
               <span>สถานะนัดหมาย *</span>
               <select v-model="form.appt_status">
-                <option :value="APPT_STATUS_CONFIRMED">ยืนยัน / รอดำเนินการ</option>
+                <option :value="APPT_STATUS_PENDING">รอยืนยัน</option>
+                <option :value="APPT_STATUS_CONFIRMED">ยืนยัน</option>
                 <option :value="APPT_STATUS_CANCELED">ยกเลิก</option>
               </select>
             </label>
@@ -161,11 +170,11 @@
 
           <div class="form-grid" v-if="modalMode === 'edit'">
             <label class="full-width">
-              <span>เหตุผลที่เลื่อนหรือยกเลิก</span>
+              <span>หมายเหตุการเลื่อนหรือยกเลิก</span>
               <textarea
                 v-model="form.cancel_reason"
                 rows="2"
-                placeholder="เช่น เจ้าของไม่สะดวก เปลี่ยนเวลา หรือยกเลิกการนัด"
+                placeholder="เช่น เปลี่ยนเวลา เจ้าของไม่สะดวก หรือยกเลิกการนัด"
               ></textarea>
             </label>
           </div>
@@ -193,6 +202,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import axios from 'axios'
 
+const APPT_STATUS_PENDING = 'รอ'
 const APPT_STATUS_CONFIRMED = 'ยืนยัน'
 const APPT_STATUS_CANCELED = 'ยกเลิก'
 
@@ -243,7 +253,23 @@ const formatInputDate = (value) => {
 
 const normalizeAppointmentStatus = (status) => {
   const text = String(status || '').trim()
-  return text === APPT_STATUS_CANCELED ? APPT_STATUS_CANCELED : APPT_STATUS_CONFIRMED
+  if (text === APPT_STATUS_CANCELED) return APPT_STATUS_CANCELED
+  if (text === APPT_STATUS_PENDING) return APPT_STATUS_PENDING
+  return APPT_STATUS_CONFIRMED
+}
+
+const getStatusClass = (status) => {
+  const normalized = normalizeAppointmentStatus(status)
+  if (normalized === APPT_STATUS_CANCELED) return 'is-danger'
+  if (normalized === APPT_STATUS_PENDING) return 'is-pending'
+  return 'is-success'
+}
+
+const getStatusLabel = (status) => {
+  const normalized = normalizeAppointmentStatus(status)
+  if (normalized === APPT_STATUS_CANCELED) return 'ยกเลิก'
+  if (normalized === APPT_STATUS_PENDING) return 'รอยืนยัน'
+  return 'ยืนยันแล้ว'
 }
 
 const normalizeAppointmentRecord = (appointment) => ({
@@ -258,6 +284,7 @@ const waitForRender = () => new Promise((resolve) => setTimeout(resolve, 50))
 
 const filters = computed(() => [
   { label: 'ทั้งหมด', value: 'all' },
+  { label: 'รอยืนยัน', value: APPT_STATUS_PENDING },
   { label: 'ยืนยันแล้ว', value: APPT_STATUS_CONFIRMED },
   { label: 'ยกเลิก', value: APPT_STATUS_CANCELED }
 ])
@@ -359,197 +386,276 @@ const fetchPetsList = async () => {
 const openAddModal = () => {
   modalMode.value = 'add'
   form.value = {
+    pet_id: '',
     appt_status: APPT_STATUS_CONFIRMED,
     appt_date: todayInputValue(),
     appt_time: '',
     appt_reason: '',
-    cancel_reason: '',
-    pet_id: ''
+    cancel_reason: ''
   }
   searchPetQuery.value = ''
   showPetDropdown.value = false
   isModalOpen.value = true
 }
 
-const openEditModal = (apt) => {
-  const normalizedAppointment = normalizeAppointmentRecord(apt)
+const openEditModal = (appointment) => {
   modalMode.value = 'edit'
+  const normalizedAppointment = normalizeAppointmentRecord(appointment)
   form.value = {
-    appt_id: normalizedAppointment.appt_id,
+    appt_id: appointment.appt_id,
+    pet_id: appointment.pet_id,
+    pet_display: `${appointment.pet_name || '-'} (เจ้าของ: ${appointment.owner_name || 'ไม่ระบุ'})`,
     appt_status: normalizedAppointment.appt_status,
     appt_date: normalizedAppointment.appt_date,
     appt_time: normalizedAppointment.appt_time,
-    appt_reason: normalizedAppointment.appt_reason || '',
-    cancel_reason: normalizedAppointment.cancel_reason || '',
-    pet_id: normalizedAppointment.pet_id,
-    pet_display: `${apt.pet_name || 'ไม่ทราบชื่อ'} (เจ้าของ: ${apt.owner_name || 'ไม่ระบุ'})`
+    cancel_reason: normalizedAppointment.cancel_reason
   }
   isModalOpen.value = true
 }
 
 const closeModal = () => {
   isModalOpen.value = false
+  searchPetQuery.value = ''
   showPetDropdown.value = false
 }
 
-const validateAppointmentDate = () => {
-  const year = Number(String(form.value.appt_date || '').slice(0, 4))
-  const currentYear = new Date().getFullYear()
-  return year >= currentYear - 1 && year <= currentYear + 5
-}
-
-const buildEmailNotificationMessage = (result, mode) => {
-  const actionLabel = mode === 'add' ? 'บันทึกนัดหมายสำเร็จ' : 'อัปเดตนัดหมายสำเร็จ'
-
-  if (!result) return actionLabel
-  if (result.sent) return `${actionLabel}\nส่งอีเมลแจ้งเตือนไปยังเจ้าของสัตว์เลี้ยงแล้ว`
-  if (result.skipped && result.reason === 'missing-recipient') {
-    return `${actionLabel}\nแต่ยังไม่ได้ส่งอีเมล เพราะเจ้าของสัตว์เลี้ยงยังไม่ได้ระบุอีเมล`
-  }
-  if (result.skipped && result.reason === 'mail-not-configured') {
-    return `${actionLabel}\nแต่ยังไม่ได้ส่งอีเมล เพราะระบบยังไม่ได้ตั้งค่า SMTP`
-  }
-  return `${actionLabel}\nแต่ส่งอีเมลแจ้งเตือนไม่สำเร็จ`
+const showAppointmentFeedback = (response) => {
+  const emailMessage = response?.data?.email_notification?.message
+  const baseMessage = modalMode.value === 'add' ? 'บันทึกนัดหมายสำเร็จ' : 'อัปเดตการนัดหมายสำเร็จ'
+  alert(emailMessage ? `${baseMessage}\n${emailMessage}` : baseMessage)
 }
 
 const handleSubmit = async () => {
-  if (modalMode.value === 'add' && !form.value.pet_id) {
-    alert('กรุณาเลือกสัตว์เลี้ยงจากรายการให้ถูกต้อง')
-    showPetDropdown.value = true
-    return
-  }
-
-  if (!validateAppointmentDate()) {
-    alert('กรุณาตรวจสอบปีของวันนัดหมายให้ถูกต้อง')
-    return
-  }
-
   isSubmitting.value = true
   try {
     const token = localStorage.getItem('token')
-    let response
+    const headers = { Authorization: `Bearer ${token}` }
 
     if (modalMode.value === 'add') {
-      response = await axios.post('http://localhost:3000/api/appointments', form.value, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-    } else {
-      response = await axios.put(`http://localhost:3000/api/appointments/${form.value.appt_id}`, form.value, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      appointments.value = appointments.value.map((item) =>
-        item.appt_id === form.value.appt_id
-          ? normalizeAppointmentRecord({
-              ...item,
-              appt_date: form.value.appt_date,
-              appt_time: form.value.appt_time,
-              appt_status: form.value.appt_status,
-              cancel_reason: form.value.cancel_reason
-            })
-          : item
+      const response = await axios.post(
+        'http://localhost:3000/api/appointments',
+        {
+          pet_id: form.value.pet_id,
+          appt_date: form.value.appt_date,
+          appt_time: form.value.appt_time,
+          appt_reason: form.value.appt_reason,
+          appt_status: APPT_STATUS_CONFIRMED
+        },
+        { headers }
       )
+      showAppointmentFeedback(response)
+    } else {
+      const response = await axios.put(
+        `http://localhost:3000/api/appointments/${form.value.appt_id}`,
+        {
+          appt_date: form.value.appt_date,
+          appt_time: form.value.appt_time,
+          appt_status: form.value.appt_status,
+          cancel_reason: form.value.appt_status === APPT_STATUS_CANCELED ? form.value.cancel_reason : null
+        },
+        { headers }
+      )
+      showAppointmentFeedback(response)
     }
 
     closeModal()
-    await nextTick()
-    await waitForRender()
-
-    if (modalMode.value === 'add') {
-      await fetchAppointments()
-      alert(buildEmailNotificationMessage(response?.data?.email_notification, modalMode.value))
-      return
-    }
-
-    alert(buildEmailNotificationMessage(response?.data?.email_notification, modalMode.value))
-    window.location.reload()
-  } catch (err) {
-    alert(err.response?.data?.message || 'บันทึกข้อมูลนัดหมายไม่สำเร็จ')
-    console.error(err)
+    await Promise.all([fetchAppointments(), fetchPetsList()])
+  } catch (error) {
+    console.error('Appointment submit error:', error)
+    alert(error.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ')
   } finally {
     isSubmitting.value = false
   }
 }
 
-const deleteAppointment = async (id) => {
+const deleteAppointment = async (apptId) => {
   if (!confirm('ยืนยันที่จะลบข้อมูลการนัดหมายนี้อย่างถาวรหรือไม่?')) return
+
   try {
     const token = localStorage.getItem('token')
-    await axios.delete(`http://localhost:3000/api/appointments/${id}`, {
+    await axios.delete(`http://localhost:3000/api/appointments/${apptId}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     await fetchAppointments()
-  } catch (err) {
-    alert('ลบข้อมูลไม่สำเร็จ')
+  } catch (error) {
+    console.error('Delete appointment error:', error)
+    alert(error.response?.data?.message || 'ลบข้อมูลไม่สำเร็จ')
   }
 }
 
-onMounted(() => {
-  fetchAppointments()
-  fetchPetsList()
+onMounted(async () => {
+  await Promise.all([fetchAppointments(), fetchPetsList()])
+  await nextTick()
+  await waitForRender()
 })
 </script>
 
 <style scoped>
 .appointments-admin-page {
   display: grid;
-  gap: 20px;
+  gap: 22px;
+}
+
+.page-header,
+.toolbar,
+.table-panel,
+.modal {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(217, 226, 236, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.page-header {
+  padding: 24px 26px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-header h1,
+.modal-head h2 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.subtitle,
+.modal-head p {
+  margin: 10px 0 0;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.primary-btn,
+.ghost-btn,
+.danger-btn,
+.close-btn,
+.pill-btn {
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  padding: 0 16px;
+  font-weight: 700;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.18);
+}
+
+.ghost-btn,
+.close-btn,
+.pill-btn {
+  background: #fff;
+  color: #0f172a;
+  border-color: rgba(203, 213, 225, 0.88);
+}
+
+.danger-btn {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  border-color: rgba(239, 68, 68, 0.16);
+}
+
+.primary-btn:hover,
+.ghost-btn:hover,
+.danger-btn:hover,
+.close-btn:hover,
+.pill-btn:hover {
+  transform: translateY(-1px);
+}
+
+.toolbar {
+  padding: 14px;
 }
 
 .filter-pills {
-  display: inline-flex;
-  gap: 8px;
-  padding: 6px;
-  border-radius: 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.pill-btn {
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 12px;
-  background: transparent;
-  color: #64748b;
-  font: inherit;
-  font-weight: 700;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .pill-btn.active {
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
-  color: #ffffff;
+  background: rgba(20, 184, 166, 0.12);
+  color: #0f766e;
+  border-color: rgba(20, 184, 166, 0.2);
+}
+
+.table-panel {
+  padding: 18px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 16px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  vertical-align: top;
+}
+
+th {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .date-cell,
 .pet-cell {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .date-block {
-  width: 54px;
-  height: 54px;
+  min-width: 68px;
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  background: linear-gradient(180deg, #ecfdf5 0%, #f0fdfa 100%);
+  border: 1px solid rgba(20, 184, 166, 0.14);
+  color: #0f766e;
+  text-align: center;
+  padding: 10px 8px;
 }
 
-.date-block .month {
-  font-size: 10px;
+.date-block span {
+  display: block;
+  font-size: 11px;
   font-weight: 700;
-  color: #64748b;
 }
 
 .date-block strong {
-  color: #0f172a;
-  font-size: 20px;
-  line-height: 1.1;
+  display: block;
+  margin-top: 4px;
+  font-size: 24px;
+}
+
+.pet-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 800;
 }
 
 .primary-line {
@@ -558,110 +664,149 @@ onMounted(() => {
 }
 
 .secondary-line {
-  margin-top: 3px;
+  margin-top: 4px;
   color: #64748b;
-  font-size: 12px;
-}
-
-.pet-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-weight: 800;
+  font-size: 13px;
 }
 
 .reason-chip {
-  display: inline-block;
-  max-width: 260px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #475569;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: #334155;
+  line-height: 1.6;
 }
 
 .status-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  gap: 8px;
 }
 
 .status-chip {
+  width: fit-content;
   display: inline-flex;
   align-items: center;
-  width: fit-content;
-  padding: 6px 12px;
   border-radius: 999px;
+  padding: 8px 12px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.is-success {
+.status-chip.is-success {
   background: #dcfce7;
   color: #166534;
 }
 
-.is-danger {
-  background: #fef2f2;
+.status-chip.is-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-chip.is-danger {
+  background: #fee2e2;
   color: #b91c1c;
 }
 
 .cancel-reason {
-  color: #be123c;
-  font-size: 11px;
-  font-weight: 700;
+  color: #b91c1c;
+  font-size: 12px;
 }
 
 .row-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .mini-btn {
   min-height: 36px;
   padding: 0 12px;
-  border-radius: 10px;
+  font-size: 13px;
 }
 
-.danger-btn {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+.state {
+  padding: 28px 14px;
 }
 
 .empty-card {
-  padding: 24px;
+  text-align: center;
 }
 
 .empty-card strong {
   display: block;
-  margin-bottom: 6px;
-  font-size: 18px;
   color: #0f172a;
+  font-size: 18px;
 }
 
 .empty-card p {
-  margin: 0;
+  margin: 8px 0 0;
   color: #64748b;
 }
 
-.appointment-modal {
-  max-width: 760px;
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 50;
+}
+
+.modal {
+  width: min(760px, 100%);
+  padding: 24px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+form {
+  margin-top: 18px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .full-width {
   grid-column: 1 / -1;
 }
 
-.field-wrap {
-  position: relative;
+.field-wrap,
+label {
+  display: grid;
+  gap: 8px;
+}
+
+label span {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(203, 213, 225, 0.88);
+  background: #fff;
+  padding: 13px 14px;
+  color: #0f172a;
+  font: inherit;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(20, 184, 166, 0.6);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
 }
 
 .search-box {
@@ -670,60 +815,86 @@ onMounted(() => {
 
 .inline-clear {
   position: absolute;
-  top: 12px;
-  right: 14px;
-  background: none;
-  color: #64748b;
-  font: inherit;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #0f766e;
   font-weight: 700;
 }
 
 .dropdown-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 1;
 }
 
 .pet-dropdown {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 1001;
-  margin: 0;
-  padding: 0;
+  z-index: 2;
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 8px;
   list-style: none;
-  max-height: 260px;
-  overflow-y: auto;
-  background: #ffffff;
-  border: 1px solid #d9e2ec;
   border-radius: 16px;
-  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(203, 213, 225, 0.88);
+  background: #fff;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.dropdown-item,
+.dropdown-empty {
+  padding: 12px;
+  border-radius: 12px;
 }
 
 .dropdown-item {
-  padding: 12px 14px;
-  border-bottom: 1px solid #edf2f7;
   cursor: pointer;
 }
 
-.dropdown-item:last-child {
-  border-bottom: none;
-}
-
 .dropdown-item:hover {
-  background: #f0fdfa;
+  background: rgba(20, 184, 166, 0.08);
 }
 
 .dropdown-empty {
-  padding: 16px;
-  text-align: center;
   color: #64748b;
 }
 
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 8px;
+}
+
 @media (max-width: 900px) {
-  .row-actions {
+  .page-header {
     flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-head,
+  .modal-actions,
+  .row-actions,
+  .date-cell,
+  .pet-cell {
+    flex-direction: column;
+  }
+
+  .primary-btn,
+  .ghost-btn,
+  .danger-btn,
+  .close-btn {
+    width: 100%;
   }
 }
 </style>

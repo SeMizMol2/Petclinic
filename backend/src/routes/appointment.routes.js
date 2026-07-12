@@ -4,6 +4,7 @@ const pool = require('../database/db');
 const auth = require('./auth.middleware');
 const { sendAppointmentNotification } = require('../services/mail.service');
 
+const APPT_STATUS_PENDING = '\u0e23\u0e2d';
 const APPT_STATUS_CONFIRMED = '\u0e22\u0e37\u0e19\u0e22\u0e31\u0e19';
 const APPT_STATUS_CANCELED = '\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01';
 
@@ -15,10 +16,12 @@ const ensureAdmin = (req, res) => {
     return true;
 };
 
-const normalizeStatus = (apptStatus) => {
-    return String(apptStatus || '').trim() === APPT_STATUS_CANCELED
-        ? APPT_STATUS_CANCELED
-        : APPT_STATUS_CONFIRMED;
+const normalizeStatus = (apptStatus, fallback = APPT_STATUS_CONFIRMED) => {
+    const text = String(apptStatus || '').trim();
+    if (text === APPT_STATUS_CANCELED) return APPT_STATUS_CANCELED;
+    if (text === APPT_STATUS_PENDING) return APPT_STATUS_PENDING;
+    if (text === APPT_STATUS_CONFIRMED) return APPT_STATUS_CONFIRMED;
+    return fallback;
 };
 
 const normalizeAppointmentDate = (value) => {
@@ -110,6 +113,13 @@ const getAppointmentNotificationData = async (appointmentId) => {
     return result.rows[0] || null;
 };
 
+const createAppointmentId = () => {
+    const randomNum = Math.floor(Math.random() * 100000000)
+        .toString()
+        .padStart(8, '0');
+    return `AP${randomNum}`;
+};
+
 router.get('/pets-list', auth, async (req, res) => {
     try {
         if (!ensureAdmin(req, res)) return;
@@ -174,11 +184,8 @@ router.post('/', auth, async (req, res) => {
             });
         }
 
-        const randomNum = Math.floor(Math.random() * 100000000)
-            .toString()
-            .padStart(8, '0');
-        const apptId = `AP${randomNum}`;
-        const normalizedStatus = normalizeStatus(appt_status);
+        const apptId = createAppointmentId();
+        const normalizedStatus = normalizeStatus(appt_status, APPT_STATUS_CONFIRMED);
 
         if (normalizedStatus !== APPT_STATUS_CANCELED) {
             const conflictingAppointment = await findConflictingAppointment({
@@ -234,6 +241,96 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
+router.post('/self', auth, async (req, res) => {
+    try {
+        const { pet_id, appt_date, appt_time, appt_reason } = req.body;
+        const normalizedDate = normalizeAppointmentDate(appt_date);
+        const normalizedTime = normalizeAppointmentTime(appt_time);
+
+        if (!pet_id || !normalizedDate || !normalizedTime) {
+            return res.status(400).json({
+                success: false,
+                message: '\u0e01\u0e23\u0e38\u0e13\u0e32\u0e01\u0e23\u0e2d\u0e01\u0e27\u0e31\u0e19\u0e41\u0e25\u0e30\u0e40\u0e27\u0e25\u0e32\u0e19\u0e31\u0e14\u0e2b\u0e21\u0e32\u0e22\u0e43\u0e2b\u0e49\u0e16\u0e39\u0e01\u0e15\u0e49\u0e2d\u0e07'
+            });
+        }
+
+        const ownedPet = await pool.query(
+            `
+            SELECT p.pet_id, p.pet_name
+            FROM tb_pet p
+            JOIN tb_owner o ON p.owner_id = o.owner_id
+            WHERE p.pet_id = $1 AND o.user_id = $2
+            LIMIT 1
+            `,
+            [pet_id, req.user.user_id]
+        );
+
+        if (ownedPet.rows.length === 0) {
+            return res.status(403).json({
+                success: false,
+                message: '\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e08\u0e2d\u0e07\u0e19\u0e31\u0e14\u0e43\u0e2b\u0e49\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e40\u0e25\u0e35\u0e49\u0e22\u0e07\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e19\u0e35\u0e49'
+            });
+        }
+
+        const conflictingAppointment = await findConflictingAppointment({
+            apptDate: normalizedDate,
+            apptTime: normalizedTime
+        });
+
+        if (conflictingAppointment) {
+            return res.status(409).json({
+                success: false,
+                message: `\u0e0a\u0e48\u0e27\u0e07\u0e40\u0e27\u0e25\u0e32\u0e19\u0e35\u0e49\u0e21\u0e35\u0e19\u0e31\u0e14\u0e2b\u0e21\u0e32\u0e22\u0e2d\u0e22\u0e39\u0e48\u0e41\u0e25\u0e49\u0e27 (${conflictingAppointment.pet_name || '-'} / ${conflictingAppointment.owner_name || '-'})`
+            });
+        }
+
+        const apptId = createAppointmentId();
+        const normalizedStatus = APPT_STATUS_PENDING;
+
+        const newAppointment = await pool.query(
+            `
+            INSERT INTO tb_appointment (
+                appt_id,
+                pet_id,
+                appt_date,
+                appt_time,
+                appt_reason,
+                appt_status,
+                create_datetime
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            RETURNING *
+            `,
+            [apptId, pet_id, normalizedDate, normalizedTime, appt_reason || null, normalizedStatus]
+        );
+
+        const appointmentForMail = await getAppointmentNotificationData(apptId);
+        const emailNotification = await sendAppointmentNotification({
+            type: 'created',
+            appointment: appointmentForMail
+        });
+
+        res.status(201).json({
+            success: true,
+            message: '\u0e08\u0e2d\u0e07\u0e19\u0e31\u0e14\u0e2b\u0e21\u0e32\u0e22\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08',
+            appointment: newAppointment.rows[0],
+            email_notification: emailNotification
+        });
+    } catch (err) {
+        console.error('Error Create Self Appointment:', err);
+        if (err.code === '23503') {
+            return res.status(400).json({
+                success: false,
+                message: '\u0e44\u0e21\u0e48\u0e1e\u0e1a pet_id \u0e2b\u0e23\u0e37\u0e2d\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e2d\u0e49\u0e32\u0e07\u0e2d\u0e34\u0e07\u0e17\u0e35\u0e48\u0e40\u0e01\u0e35\u0e48\u0e22\u0e27\u0e02\u0e49\u0e2d\u0e07'
+            });
+        }
+        res.status(500).json({
+            success: false,
+            message: '\u0e08\u0e2d\u0e07\u0e19\u0e31\u0e14\u0e2b\u0e21\u0e32\u0e22\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
+        });
+    }
+});
+
 router.put('/:id', auth, async (req, res) => {
     try {
         if (!ensureAdmin(req, res)) return;
@@ -242,7 +339,7 @@ router.put('/:id', auth, async (req, res) => {
         const { appt_date, appt_time, appt_status, cancel_reason } = req.body;
         const normalizedDate = normalizeAppointmentDate(appt_date);
         const normalizedTime = normalizeAppointmentTime(appt_time);
-        const normalizedStatus = normalizeStatus(appt_status);
+        const normalizedStatus = normalizeStatus(appt_status, APPT_STATUS_CONFIRMED);
 
         if (!normalizedDate || !normalizedTime) {
             return res.status(400).json({
@@ -313,7 +410,7 @@ router.put('/:id/status', auth, async (req, res) => {
             });
         }
 
-        const normalizedStatus = normalizeStatus(appt_status);
+        const normalizedStatus = normalizeStatus(appt_status, APPT_STATUS_CONFIRMED);
 
         if (normalizedStatus !== APPT_STATUS_CANCELED) {
             const currentAppointment = await pool.query(
@@ -415,7 +512,7 @@ router.get('/my-appointments/:user_id', auth, async (req, res) => {
 
         const appointments = await pool.query(
             `
-            SELECT a.appt_id, a.appt_date, a.appt_time, a.appt_reason, a.appt_status, p.pet_name
+            SELECT a.appt_id, a.appt_date, a.appt_time, a.appt_reason, a.appt_status, a.cancel_reason, p.pet_name
             FROM tb_appointment a
             JOIN tb_pet p ON a.pet_id = p.pet_id
             JOIN tb_owner o ON p.owner_id = o.owner_id
