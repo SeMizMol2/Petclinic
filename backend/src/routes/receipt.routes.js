@@ -44,18 +44,42 @@ const normalizeReceiptStatus = (value) => {
     if (
         text === RECEIPT_STATUS_UNPAID ||
         text === 'unpaid' ||
-        text.includes('\u0e04\u0e49\u0e32\u0e07')
+        text.includes('\u0e04\u0e49\u0e32\u0e07') ||
+        text.includes('à¸„à¹‰à¸²à¸‡')
     ) {
         return RECEIPT_STATUS_UNPAID;
     }
     if (
         text === RECEIPT_STATUS_PAID ||
         text === 'paid' ||
-        text.includes('\u0e40\u0e2a\u0e23\u0e47\u0e08')
+        text.includes('\u0e40\u0e2a\u0e23\u0e47\u0e08') ||
+        text.includes('à¹€à¸ªà¸£à¹‡à¸ˆ')
     ) {
         return RECEIPT_STATUS_PAID;
     }
     return null;
+};
+
+const normalizePayMethod = (value) => {
+    const text = String(value || '').trim().toLowerCase();
+    if (!text) return null;
+    if (
+        text === PAY_METHOD_CASH ||
+        text.includes('เงินสด') ||
+        text.includes('à¹€à¸‡à¸´à¸™à¸ªà¸”') ||
+        text === 'cash'
+    ) {
+        return PAY_METHOD_CASH;
+    }
+    if (
+        text === PAY_METHOD_TRANSFER ||
+        text.includes('โอนเงิน') ||
+        text.includes('à¹‚à¸­à¸™à¹€à¸‡à¸´à¸™') ||
+        text === 'transfer'
+    ) {
+        return PAY_METHOD_TRANSFER;
+    }
+    return value || null;
 };
 
 const mapRefTypeToLabel = (refType) => {
@@ -306,6 +330,7 @@ router.post('/', auth, async (req, res) => {
         }
 
         const { treatment_id, pay_method } = req.body;
+        const normalizedPayMethod = normalizePayMethod(pay_method);
         if (!treatment_id) {
             await client.query('ROLLBACK');
             return res.status(400).json({
@@ -363,7 +388,7 @@ router.post('/', auth, async (req, res) => {
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             `,
-            [receiptId, total_amount, owner_id, req.user.user_id, treatment_id, pay_method || null]
+            [receiptId, total_amount, owner_id, req.user.user_id, treatment_id, normalizedPayMethod]
         );
 
         await buildReceiptDetails(client, receiptId, treatment_id);
@@ -402,6 +427,7 @@ router.put('/:id/status', auth, async (req, res) => {
         const rawStatus = String(req.body.payment_status || '').trim();
         const normalizedStatus = normalizeReceiptStatus(rawStatus) || rawStatus;
         const { pay_method } = req.body;
+        const normalizedPayMethod = normalizePayMethod(pay_method);
 
         if (!rawStatus) {
             return res.status(400).json({
@@ -420,7 +446,7 @@ router.put('/:id/status', auth, async (req, res) => {
                 update_datetime = NOW()
             WHERE receipt_id = $4
             `,
-            [normalizedStatus, pay_method || null, payDate, id]
+            [normalizedStatus, normalizedPayMethod, payDate, id]
         );
 
         res.json({

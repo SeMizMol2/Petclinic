@@ -89,7 +89,10 @@ const authHeader = () => {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-const isPaid = (item) => item.payment_status === 'ชำระเสร็จสิ้น'
+const isPaid = (item) => {
+  const status = String(item.payment_status || '').trim()
+  return status === 'ชำระเสร็จสิ้น' || status.includes('เสร็จ') || status.includes('à¹€à¸ªà¸£à¹‡à¸ˆ')
+}
 
 const paidCount = computed(() => receipts.value.filter((item) => isPaid(item)).length)
 const unpaidCount = computed(() => receipts.value.filter((item) => !isPaid(item)).length)

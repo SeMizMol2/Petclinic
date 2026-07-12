@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
+const { sendAppointmentNotification } = require('../services/mail.service');
 
 const APPT_STATUS_CONFIRMED = '\u0e22\u0e37\u0e19\u0e22\u0e31\u0e19';
 const APPT_STATUS_CANCELED = '\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01';
@@ -50,6 +51,63 @@ const normalizeAppointmentDate = (value) => {
 const normalizeAppointmentTime = (value) => {
     const raw = String(value || '').trim();
     return /^\d{2}:\d{2}(:\d{2})?$/.test(raw) ? raw : null;
+};
+
+const findConflictingAppointment = async ({ apptDate, apptTime, excludeId = null }) => {
+    const result = await pool.query(
+        `
+        SELECT
+            a.appt_id,
+            p.pet_name,
+            o.owner_name
+        FROM tb_appointment a
+        LEFT JOIN tb_pet p ON a.pet_id = p.pet_id
+        LEFT JOIN tb_owner o ON p.owner_id = o.owner_id
+        WHERE a.appt_date = $1
+          AND a.appt_time = $2
+          AND COALESCE(TRIM(a.appt_status), '') NOT LIKE '%ยกเลิก%'
+          AND ($3::varchar IS NULL OR a.appt_id <> $3)
+        ORDER BY a.appt_id ASC
+        LIMIT 1
+        `,
+        [apptDate, apptTime, excludeId]
+    );
+
+    return result.rows[0] || null;
+};
+
+const getAppointmentNotificationData = async (appointmentId) => {
+    const result = await pool.query(
+        `
+        SELECT
+            a.appt_id,
+            a.appt_date,
+            a.appt_time,
+            a.appt_reason,
+            a.appt_status,
+            a.cancel_reason,
+            p.pet_name,
+            o.owner_name,
+            o.owner_email,
+            c.clinic_name,
+            c.tel AS clinic_tel,
+            c.address AS clinic_address
+        FROM tb_appointment a
+        LEFT JOIN tb_pet p ON a.pet_id = p.pet_id
+        LEFT JOIN tb_owner o ON p.owner_id = o.owner_id
+        LEFT JOIN (
+            SELECT clinic_name, tel, address
+            FROM tb_clinic
+            ORDER BY clinic_id ASC
+            LIMIT 1
+        ) c ON true
+        WHERE a.appt_id = $1
+        LIMIT 1
+        `,
+        [appointmentId]
+    );
+
+    return result.rows[0] || null;
 };
 
 router.get('/pets-list', auth, async (req, res) => {
@@ -122,6 +180,19 @@ router.post('/', auth, async (req, res) => {
         const apptId = `AP${randomNum}`;
         const normalizedStatus = normalizeStatus(appt_status);
 
+        if (normalizedStatus !== APPT_STATUS_CANCELED) {
+            const conflictingAppointment = await findConflictingAppointment({
+                apptDate: normalizedDate,
+                apptTime: normalizedTime
+            });
+
+            if (conflictingAppointment) {
+                return res.status(409).json({
+                    message: `ช่วงเวลานี้มีนัดหมายอยู่แล้ว (${conflictingAppointment.pet_name || '-'} / ${conflictingAppointment.owner_name || '-'})`
+                });
+            }
+        }
+
         const newAppointment = await pool.query(
             `
             INSERT INTO tb_appointment (
@@ -139,9 +210,16 @@ router.post('/', auth, async (req, res) => {
             [apptId, pet_id, normalizedDate, normalizedTime, appt_reason || null, normalizedStatus]
         );
 
+        const appointmentForMail = await getAppointmentNotificationData(apptId);
+        const emailNotification = await sendAppointmentNotification({
+            type: 'created',
+            appointment: appointmentForMail
+        });
+
         res.status(201).json({
             message: '\u0e2a\u0e23\u0e49\u0e32\u0e07\u0e01\u0e32\u0e23\u0e19\u0e31\u0e14\u0e2b\u0e21\u0e32\u0e22\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08',
-            appointment: newAppointment.rows[0]
+            appointment: newAppointment.rows[0],
+            email_notification: emailNotification
         });
     } catch (err) {
         console.error('Error Add Appointment:', err);
@@ -172,6 +250,20 @@ router.put('/:id', auth, async (req, res) => {
             });
         }
 
+        if (normalizedStatus !== APPT_STATUS_CANCELED) {
+            const conflictingAppointment = await findConflictingAppointment({
+                apptDate: normalizedDate,
+                apptTime: normalizedTime,
+                excludeId: id
+            });
+
+            if (conflictingAppointment) {
+                return res.status(409).json({
+                    message: `ช่วงเวลานี้มีนัดหมายอยู่แล้ว (${conflictingAppointment.pet_name || '-'} / ${conflictingAppointment.owner_name || '-'})`
+                });
+            }
+        }
+
         const result = await pool.query(
             `
             UPDATE tb_appointment
@@ -191,7 +283,16 @@ router.put('/:id', auth, async (req, res) => {
             });
         }
 
-        res.json({ message: '\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08' });
+        const appointmentForMail = await getAppointmentNotificationData(id);
+        const emailNotification = await sendAppointmentNotification({
+            type: normalizedStatus === APPT_STATUS_CANCELED ? 'canceled' : 'updated',
+            appointment: appointmentForMail
+        });
+
+        res.json({
+            message: '\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08',
+            email_notification: emailNotification
+        });
     } catch (err) {
         console.error('Error Update Appointment:', err);
         res.status(500).json({
@@ -212,13 +313,45 @@ router.put('/:id/status', auth, async (req, res) => {
             });
         }
 
+        const normalizedStatus = normalizeStatus(appt_status);
+
+        if (normalizedStatus !== APPT_STATUS_CANCELED) {
+            const currentAppointment = await pool.query(
+                `
+                SELECT appt_date, appt_time
+                FROM tb_appointment
+                WHERE appt_id = $1
+                LIMIT 1
+                `,
+                [id]
+            );
+
+            if (currentAppointment.rows.length === 0) {
+                return res.status(404).json({
+                    message: '\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e01\u0e32\u0e23\u0e19\u0e31\u0e14\u0e2b\u0e21\u0e32\u0e22'
+                });
+            }
+
+            const conflictingAppointment = await findConflictingAppointment({
+                apptDate: currentAppointment.rows[0].appt_date,
+                apptTime: currentAppointment.rows[0].appt_time,
+                excludeId: id
+            });
+
+            if (conflictingAppointment) {
+                return res.status(409).json({
+                    message: `ช่วงเวลานี้มีนัดหมายอยู่แล้ว (${conflictingAppointment.pet_name || '-'} / ${conflictingAppointment.owner_name || '-'})`
+                });
+            }
+        }
+
         const result = await pool.query(
             `
             UPDATE tb_appointment
             SET appt_status = $1, update_datetime = NOW()
             WHERE appt_id = $2
             `,
-            [normalizeStatus(appt_status), id]
+            [normalizedStatus, id]
         );
 
         if (result.rowCount === 0) {
@@ -227,7 +360,16 @@ router.put('/:id/status', auth, async (req, res) => {
             });
         }
 
-        res.json({ message: '\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08' });
+        const appointmentForMail = await getAppointmentNotificationData(id);
+        const emailNotification = await sendAppointmentNotification({
+            type: normalizedStatus === APPT_STATUS_CANCELED ? 'canceled' : 'updated',
+            appointment: appointmentForMail
+        });
+
+        res.json({
+            message: '\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08',
+            email_notification: emailNotification
+        });
     } catch (err) {
         console.error('Error Update Status:', err);
         res.status(500).json({
@@ -263,6 +405,13 @@ router.delete('/:id', auth, async (req, res) => {
 router.get('/my-appointments/:user_id', auth, async (req, res) => {
     try {
         const { user_id } = req.params;
+
+        if (req.user.role !== 'admin' && req.user.user_id !== user_id) {
+            return res.status(403).json({
+                success: false,
+                message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้'
+            });
+        }
 
         const appointments = await pool.query(
             `

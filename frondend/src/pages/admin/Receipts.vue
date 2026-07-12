@@ -177,7 +177,15 @@ const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}
 
 const normalizeStatus = (value) => {
   const text = String(value || '').trim()
-  if (text.includes('เสร็จ') || text.includes('ชำระแล้ว')) return paidStatus
+  if (
+    text === paidStatus ||
+    text.includes('เสร็จ') ||
+    text.includes('ชำระแล้ว') ||
+    text.includes('à¹€à¸ªà¸£à¹‡à¸ˆ') ||
+    text.includes('à¸Šà¸³à¸£à¸°à¹à¸¥à¹‰à¸§')
+  ) {
+    return paidStatus
+  }
   return unpaidStatus
 }
 

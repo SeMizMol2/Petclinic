@@ -3,7 +3,6 @@ const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
 
-// ต้องเป็น admin เท่านั้นถึงจะจัดการรายจ่าย/หมวดหมู่ของคลินิกได้
 const requireAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึง' });
@@ -11,9 +10,6 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// ================= หมวดหมู่ (Category) =================
-
-// ดึงหมวดหมู่ทั้งหมด (จะกรองด้วย ?type=รายจ่าย หรือ รายรับ ก็ได้)
 router.get('/categories', auth, requireAdmin, async (req, res) => {
   try {
     const { type } = req.query;
@@ -28,29 +24,31 @@ router.get('/categories', auth, requireAdmin, async (req, res) => {
   }
 });
 
-// เพิ่มหมวดหมู่ใหม่
 router.post('/categories', auth, requireAdmin, async (req, res) => {
   try {
     const { category_name, type } = req.body;
+    const normalizedType = String(type || '').trim();
 
-    if (!category_name || !type) {
+    if (!category_name || !normalizedType) {
       return res.status(400).json({ message: 'กรุณากรอกชื่อหมวดหมู่และประเภทให้ครบ' });
     }
-    if (!['รายรับ', 'รายจ่าย'].includes(type)) {
+
+    if (!['รายรับ', 'รายจ่าย'].includes(normalizedType)) {
       return res.status(400).json({ message: 'ประเภทต้องเป็น "รายรับ" หรือ "รายจ่าย" เท่านั้น' });
     }
 
     const lastCat = await pool.query('SELECT category_id FROM tb_category ORDER BY category_id DESC LIMIT 1');
     let newId = 'C001';
     if (lastCat.rows.length > 0) {
-      const num = parseInt(lastCat.rows[0].category_id.substring(1)) + 1;
+      const num = parseInt(lastCat.rows[0].category_id.substring(1), 10) + 1;
       newId = 'C' + num.toString().padStart(3, '0');
     }
 
     await pool.query(
       'INSERT INTO tb_category (category_id, category_name, type) VALUES ($1, $2, $3)',
-      [newId, category_name, type]
+      [newId, category_name, normalizedType]
     );
+
     res.status(201).json({ message: 'เพิ่มหมวดหมู่สำเร็จ', category_id: newId });
   } catch (err) {
     console.error(err.message);
@@ -58,7 +56,6 @@ router.post('/categories', auth, requireAdmin, async (req, res) => {
   }
 });
 
-// ลบหมวดหมู่
 router.delete('/categories/:id', auth, requireAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM tb_category WHERE category_id = $1', [req.params.id]);
@@ -69,15 +66,12 @@ router.delete('/categories/:id', auth, requireAdmin, async (req, res) => {
   }
 });
 
-// ================= รายจ่าย (Expense) =================
-
-// ดึงรายจ่ายทั้งหมด (กรองตามเดือน/ปีได้ ใช้ตรงกับ Dashboard)
 router.get('/', auth, requireAdmin, async (req, res) => {
   try {
     const { month, year } = req.query;
 
     let sql = `
-      SELECT e.exp_id, e.exp_title, e.exp_amount, e.exp_date, 
+      SELECT e.exp_id, e.exp_title, e.exp_amount, e.exp_date,
              c.category_id, c.category_name, u.username AS created_by
       FROM tb_expense e
       LEFT JOIN tb_category c ON e.category_id = c.category_id
@@ -86,7 +80,7 @@ router.get('/', auth, requireAdmin, async (req, res) => {
     const params = [];
 
     if (month && year) {
-      sql += ` WHERE EXTRACT(MONTH FROM e.exp_date) = $1 AND EXTRACT(YEAR FROM e.exp_date) = $2`;
+      sql += ' WHERE EXTRACT(MONTH FROM e.exp_date) = $1 AND EXTRACT(YEAR FROM e.exp_date) = $2';
       params.push(month, year);
     }
     sql += ' ORDER BY e.exp_date DESC';
@@ -99,7 +93,6 @@ router.get('/', auth, requireAdmin, async (req, res) => {
   }
 });
 
-// เพิ่มรายจ่ายใหม่
 router.post('/', auth, requireAdmin, async (req, res) => {
   try {
     const { exp_title, exp_amount, exp_date, category_id } = req.body;
@@ -123,14 +116,13 @@ router.post('/', auth, requireAdmin, async (req, res) => {
   }
 });
 
-// แก้ไขรายจ่าย
 router.put('/:id', auth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { exp_title, exp_amount, exp_date, category_id } = req.body;
 
     await pool.query(
-      `UPDATE tb_expense 
+      `UPDATE tb_expense
        SET exp_title = $1, exp_amount = $2, exp_date = $3, category_id = $4, update_datetime = CURRENT_TIMESTAMP
        WHERE exp_id = $5`,
       [exp_title, exp_amount, exp_date, category_id || null, id]
@@ -143,7 +135,6 @@ router.put('/:id', auth, requireAdmin, async (req, res) => {
   }
 });
 
-// ลบรายจ่าย
 router.delete('/:id', auth, requireAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM tb_expense WHERE exp_id = $1', [req.params.id]);

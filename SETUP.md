@@ -20,7 +20,15 @@ DB_USER=postgres
 DB_PASSWORD=<รหัสผ่าน postgres ของคุณ>
 DB_NAME=<ชื่อฐานข้อมูลที่สร้างไว้>
 JWT_SECRET=petclinic_secret_key
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=<email ที่ใช้ส่งแจ้งเตือน>
+SMTP_PASS=<app password หรือ smtp password>
+SMTP_SECURE=false
+MAIL_FROM=Pet Clinic <email ที่ใช้ส่งแจ้งเตือน>
 ```
+
+> ถ้ายังไม่ต้องการเปิดใช้งานอีเมลแจ้งเตือน สามารถเว้นค่า SMTP ไว้ได้ ระบบจะยังบันทึกนัดหมายได้ตามปกติ แต่จะข้ามการส่งอีเมล
 
 รันเซิร์ฟเวอร์ (ถ้ายังไม่มี `node_modules` ให้ `npm install` ก่อน):
 ```bash

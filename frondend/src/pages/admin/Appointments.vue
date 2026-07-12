@@ -44,7 +44,10 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="apt in filteredAppointments" :key="apt.appt_id">
+            <tr
+              v-for="apt in filteredAppointments"
+              :key="`${apt.appt_id}-${apt.appt_date}-${apt.appt_time}-${apt.appt_status}-${apt.cancel_reason || ''}`"
+            >
               <td>
                 <div class="datetime-info">
                   <div class="date-badge">
@@ -200,7 +203,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import axios from 'axios'
 
 const APPT_STATUS_CONFIRMED = 'ยืนยัน'
@@ -215,6 +218,58 @@ const form = ref({})
 const isSubmitting = ref(false)
 const searchPetQuery = ref('')
 const showPetDropdown = ref(false)
+
+const formatDateParts = (value) => {
+  const raw = String(value || '').trim()
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (match) {
+    return {
+      year: Number(match[1]),
+      month: Number(match[2]),
+      day: Number(match[3])
+    }
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date).map((part) => [part.type, part.value])
+  )
+
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day)
+  }
+}
+
+const formatInputDate = (value) => {
+  const parts = formatDateParts(value)
+  if (!parts) return ''
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+}
+
+const normalizeAppointmentStatus = (status) => {
+  const text = String(status || '').trim()
+  return text === APPT_STATUS_CANCELED ? APPT_STATUS_CANCELED : APPT_STATUS_CONFIRMED
+}
+
+const normalizeAppointmentRecord = (appointment) => ({
+  ...appointment,
+  appt_date: formatInputDate(appointment.appt_date),
+  appt_time: String(appointment.appt_time || '').slice(0, 5),
+  appt_status: normalizeAppointmentStatus(appointment.appt_status),
+  cancel_reason: appointment.cancel_reason || ''
+})
+
+const waitForRender = () => new Promise((resolve) => setTimeout(resolve, 50))
 
 const filters = computed(() => [
   { label: 'ทั้งหมด', value: 'all', icon: 'ALL' },
@@ -231,11 +286,9 @@ const todayInputValue = () => {
 }
 
 const parseDateOnly = (dateStr) => {
-  if (!dateStr) return null
-  const raw = String(dateStr).slice(0, 10)
-  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!match) return null
-  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  const parts = formatDateParts(dateStr)
+  if (!parts) return null
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
 }
 
 const filteredPets = computed(() => {
@@ -267,20 +320,27 @@ const clearPetSelection = () => {
 
 const getDay = (dateStr) => {
   const date = parseDateOnly(dateStr)
-  return date ? String(date.getDate()).padStart(2, '0') : '-'
+  return date ? String(date.getUTCDate()).padStart(2, '0') : '-'
 }
 
 const getShortMonth = (dateStr) => {
   const date = parseDateOnly(dateStr)
-  return date ? date.toLocaleDateString('th-TH', { month: 'short' }) : '-'
+  return date ? date.toLocaleDateString('th-TH', { month: 'short', timeZone: 'UTC' }) : '-'
 }
 
 const formatFullDate = (dateStr) => {
   const date = parseDateOnly(dateStr)
-  return date ? date.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'
+  return date
+    ? date.toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC'
+      })
+    : '-'
 }
 
-const formatTime = (timeStr) => (timeStr ? String(timeStr).substring(0, 5) : '-')
+const formatTime = (timeStr) => (timeStr ? String(timeStr).slice(0, 5) : '-')
 
 const getInitial = (name) => (name ? String(name).charAt(0).toUpperCase() : '?')
 
@@ -296,7 +356,7 @@ const fetchAppointments = async () => {
     const res = await axios.get('http://localhost:3000/api/appointments', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    appointments.value = res.data
+    appointments.value = res.data.map(normalizeAppointmentRecord)
   } catch (err) {
     console.error('Fetch appointments error:', err)
   }
@@ -330,15 +390,16 @@ const openAddModal = () => {
 }
 
 const openEditModal = (apt) => {
+  const normalizedAppointment = normalizeAppointmentRecord(apt)
   modalMode.value = 'edit'
   form.value = {
-    appt_id: apt.appt_id,
-    appt_status: apt.appt_status || APPT_STATUS_CONFIRMED,
-    appt_date: String(apt.appt_date || '').slice(0, 10),
-    appt_time: apt.appt_time || '',
-    appt_reason: apt.appt_reason || '',
-    cancel_reason: apt.cancel_reason || '',
-    pet_id: apt.pet_id,
+    appt_id: normalizedAppointment.appt_id,
+    appt_status: normalizedAppointment.appt_status,
+    appt_date: normalizedAppointment.appt_date,
+    appt_time: normalizedAppointment.appt_time,
+    appt_reason: normalizedAppointment.appt_reason || '',
+    cancel_reason: normalizedAppointment.cancel_reason || '',
+    pet_id: normalizedAppointment.pet_id,
     pet_display: `${apt.pet_name || 'ไม่ทราบชื่อ'} (เจ้าของ: ${apt.owner_name || 'ไม่ระบุ'})`
   }
   isModalOpen.value = true
@@ -353,6 +414,20 @@ const validateAppointmentDate = () => {
   const year = Number(String(form.value.appt_date || '').slice(0, 4))
   const currentYear = new Date().getFullYear()
   return year >= currentYear - 1 && year <= currentYear + 5
+}
+
+const buildEmailNotificationMessage = (result, mode) => {
+  const actionLabel = mode === 'add' ? 'บันทึกนัดหมายสำเร็จ' : 'อัปเดตนัดหมายสำเร็จ'
+
+  if (!result) return actionLabel
+  if (result.sent) return `${actionLabel}\nส่งอีเมลแจ้งเตือนไปยังเจ้าของสัตว์เลี้ยงแล้ว`
+  if (result.skipped && result.reason === 'missing-recipient') {
+    return `${actionLabel}\nแต่ยังไม่ได้ส่งอีเมล เพราะเจ้าของสัตว์เลี้ยงยังไม่ได้ระบุอีเมล`
+  }
+  if (result.skipped && result.reason === 'mail-not-configured') {
+    return `${actionLabel}\nแต่ยังไม่ได้ส่งอีเมล เพราะระบบยังไม่ได้ตั้งค่า SMTP`
+  }
+  return `${actionLabel}\nแต่ส่งอีเมลแจ้งเตือนไม่สำเร็จ`
 }
 
 const handleSubmit = async () => {
@@ -370,17 +445,42 @@ const handleSubmit = async () => {
   isSubmitting.value = true
   try {
     const token = localStorage.getItem('token')
+    let response
+
     if (modalMode.value === 'add') {
-      await axios.post('http://localhost:3000/api/appointments', form.value, {
+      response = await axios.post('http://localhost:3000/api/appointments', form.value, {
         headers: { Authorization: `Bearer ${token}` }
       })
     } else {
-      await axios.put(`http://localhost:3000/api/appointments/${form.value.appt_id}`, form.value, {
+      response = await axios.put(`http://localhost:3000/api/appointments/${form.value.appt_id}`, form.value, {
         headers: { Authorization: `Bearer ${token}` }
       })
+
+      appointments.value = appointments.value.map((item) =>
+        item.appt_id === form.value.appt_id
+          ? normalizeAppointmentRecord({
+              ...item,
+              appt_date: form.value.appt_date,
+              appt_time: form.value.appt_time,
+              appt_status: form.value.appt_status,
+              cancel_reason: form.value.cancel_reason
+            })
+          : item
+      )
     }
+
     closeModal()
-    await fetchAppointments()
+    await nextTick()
+    await waitForRender()
+
+    if (modalMode.value === 'add') {
+      await fetchAppointments()
+      alert(buildEmailNotificationMessage(response?.data?.email_notification, modalMode.value))
+      return
+    }
+
+    alert(buildEmailNotificationMessage(response?.data?.email_notification, modalMode.value))
+    window.location.reload()
   } catch (err) {
     alert(err.response?.data?.message || 'บันทึกข้อมูลนัดหมายไม่สำเร็จ')
     console.error(err)
