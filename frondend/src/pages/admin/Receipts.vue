@@ -1,15 +1,15 @@
 <template>
-  <div class="receipt-page">
+  <div class="admin-page receipts-admin-page">
     <section class="page-header">
       <div>
-        <p class="eyebrow">การเงิน</p>
+        <p class="eyebrow">Finance</p>
         <h1>ใบเสร็จรับเงิน</h1>
-        <p class="subtitle">ตรวจสอบสถานะการชำระเงิน ดูรายละเอียด และพิมพ์ใบเสร็จให้ลูกค้า</p>
+        <p class="subtitle">ตรวจสอบสถานะการชำระ ดูรายละเอียด และพิมพ์ใบเสร็จให้ลูกค้า</p>
       </div>
       <button class="ghost-btn" @click="fetchReceipts">รีเฟรช</button>
     </section>
 
-    <section class="create-panel">
+    <section class="panel-card create-panel">
       <div>
         <h2>สร้างใบเสร็จจากการรักษา</h2>
         <p>กรอกรหัสการรักษา เช่น TR001 เพื่อออกใบเสร็จจากยอดค่ารักษาที่บันทึกไว้</p>
@@ -27,7 +27,7 @@
 
     <section class="toolbar">
       <input v-model="searchQuery" class="search-input" placeholder="ค้นหาเลขที่ใบเสร็จ เจ้าของ หรือสัตว์เลี้ยง" />
-      <select v-model="statusFilter" class="filter-select">
+      <select v-model="statusFilter">
         <option value="">ทุกสถานะ</option>
         <option :value="unpaidStatus">ยังไม่ได้ชำระ</option>
         <option :value="paidStatus">ชำระเสร็จสิ้น</option>
@@ -42,7 +42,7 @@
           <thead>
             <tr>
               <th>เลขที่ใบเสร็จ</th>
-              <th>วันที่ออกบิล</th>
+              <th>วันออกบิล</th>
               <th>ลูกค้า</th>
               <th>สัตว์เลี้ยง</th>
               <th class="right">ยอดเงิน</th>
@@ -85,7 +85,7 @@
     </section>
 
     <div v-if="selectedReceipt" class="modal-overlay" @click.self="closeReceipt">
-      <div class="modal">
+      <div class="modal receipt-modal">
         <div class="modal-actions no-print">
           <button class="ghost-btn" @click="closeReceipt">ปิด</button>
           <button class="primary-btn" @click="printReceipt">พิมพ์ใบเสร็จ</button>
@@ -94,7 +94,7 @@
         <section id="printable-receipt" class="print-sheet">
           <header class="receipt-head">
             <div>
-              <h2>Petclinic</h2>
+              <h2>Pet Clinic</h2>
               <p>ระบบจัดการข้อมูลการรักษาและบริการสัตว์เลี้ยง</p>
             </div>
             <div class="receipt-title">
@@ -177,15 +177,7 @@ const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}
 
 const normalizeStatus = (value) => {
   const text = String(value || '').trim()
-  if (
-    text === paidStatus ||
-    text.includes('เสร็จ') ||
-    text.includes('ชำระแล้ว') ||
-    text.includes('à¹€à¸ªà¸£à¹‡à¸ˆ') ||
-    text.includes('à¸Šà¸³à¸£à¸°à¹à¸¥à¹‰à¸§')
-  ) {
-    return paidStatus
-  }
+  if (text === paidStatus || text.includes('เสร็จ') || text.includes('ชำระแล้ว')) return paidStatus
   return unpaidStatus
 }
 
@@ -215,8 +207,11 @@ const fetchReceipts = async () => {
 const filteredReceipts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   return receipts.value.filter((receipt) => {
-    const matchesSearch = !q || [receipt.receipt_id, receipt.treatment_id, receipt.owner_name, receipt.pet_name]
-      .some((value) => String(value || '').toLowerCase().includes(q))
+    const matchesSearch =
+      !q ||
+      [receipt.receipt_id, receipt.treatment_id, receipt.owner_name, receipt.pet_name].some((value) =>
+        String(value || '').toLowerCase().includes(q)
+      )
     const matchesStatus = !statusFilter.value || normalizeStatus(receipt.payment_status) === statusFilter.value
     return matchesSearch && matchesStatus
   })
@@ -317,71 +312,225 @@ onMounted(fetchReceipts)
 </script>
 
 <style scoped>
-.receipt-page { color: #1f2937; }
-.page-header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 18px; }
-.eyebrow { margin: 0 0 4px; color: #7c3aed; font-size: 13px; font-weight: 700; }
-h1 { margin: 0; font-size: 28px; font-weight: 800; }
-.subtitle { margin: 6px 0 0; color: #64748b; }
-.toolbar { display: flex; gap: 12px; margin-bottom: 18px; }
-.create-panel { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin-bottom: 18px; padding: 18px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
-.create-panel h2 { margin: 0; font-size: 18px; font-weight: 800; }
-.create-panel p { margin: 5px 0 0; color: #64748b; }
-.create-form { display: flex; gap: 10px; align-items: center; }
-.create-form input, .create-form select { padding: 12px 14px; border: 1px solid #dbe3ec; border-radius: 8px; background: #fff; }
-.search-input, .filter-select { padding: 12px 14px; border: 1px solid #dbe3ec; border-radius: 8px; background: #fff; }
-.search-input { flex: 1; min-width: 220px; }
-.primary-btn, .ghost-btn, .action { border: 0; border-radius: 8px; font-weight: 700; cursor: pointer; }
-.primary-btn { background: #7c3aed; color: #fff; padding: 12px 18px; }
-.ghost-btn { background: #eef2f7; color: #334155; padding: 12px 16px; }
-.table-panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
-.table-wrap { overflow-x: auto; }
-table { width: 100%; min-width: 920px; border-collapse: collapse; }
-th, td { padding: 14px 16px; border-bottom: 1px solid #edf2f7; text-align: left; vertical-align: top; }
-th { background: #f8fafc; color: #475569; font-size: 13px; }
-strong, .muted { display: block; }
-.muted { color: #64748b; font-size: 13px; margin-top: 3px; }
-.right { text-align: right; }
-.center { text-align: center; }
-.money { font-weight: 800; color: #047857; }
-.status { display: inline-flex; padding: 5px 9px; border-radius: 999px; font-size: 13px; font-weight: 800; }
-.status.paid { background: #dcfce7; color: #166534; }
-.status.unpaid { background: #fee2e2; color: #991b1b; }
-.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.action { padding: 8px 10px; }
-.action.view { background: #ede9fe; color: #6d28d9; }
-.action.paid { background: #dcfce7; color: #166534; }
-.action.unpaid { background: #fee2e2; color: #991b1b; }
-.state { padding: 28px; text-align: center; color: #64748b; }
-.state.error { color: #b91c1c; }
-.modal-overlay { position: fixed; inset: 0; z-index: 60; overflow-y: auto; padding: 24px; background: rgba(15, 23, 42, 0.55); }
-.modal { width: min(900px, 100%); margin: 0 auto; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 12px; }
-.print-sheet { background: #fff; border-radius: 8px; padding: 32px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25); }
-.receipt-head { display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #111827; padding-bottom: 18px; margin-bottom: 20px; }
-.receipt-head h2, .receipt-title h1 { margin: 0; }
-.receipt-head p, .receipt-title p { margin: 4px 0 0; color: #475569; }
-.receipt-title { text-align: right; }
-.info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 22px; }
-.info-grid h3 { margin: 0 0 8px; font-size: 16px; }
-.info-grid p { margin: 5px 0; }
-.print-table { min-width: 0; margin-top: 10px; }
-.print-table th, .print-table td { border: 1px solid #d1d5db; }
-.print-table th { background: #f3f4f6; }
-.total-label { font-weight: 800; }
-.total-value { font-size: 18px; font-weight: 900; }
-.receipt-footer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; border-top: 1px solid #d1d5db; padding-top: 14px; }
-.receipt-footer p { margin: 0; }
-@media (max-width: 760px) {
-  .page-header, .toolbar, .create-panel, .create-form { flex-direction: column; align-items: stretch; }
-  .search-input, .filter-select, .primary-btn, .ghost-btn, .create-form input, .create-form select { width: 100%; }
-  .info-grid, .receipt-footer { grid-template-columns: 1fr; }
-  .receipt-head { flex-direction: column; }
-  .receipt-title { text-align: left; }
+.receipts-admin-page {
+  display: grid;
+  gap: 20px;
 }
+
+.create-panel {
+  padding: 20px 22px;
+}
+
+.create-panel h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.create-panel p {
+  margin: 8px 0 0;
+  color: #64748b;
+}
+
+.create-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.toolbar select {
+  min-width: 180px;
+}
+
+.money {
+  font-weight: 800;
+  color: #047857;
+}
+
+.status {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.status.paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.unpaid {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.action {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action.view {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.action.paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.action.unpaid {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.receipt-modal {
+  width: min(900px, 100%);
+}
+
+.print-sheet {
+  background: #fff;
+  border-radius: 18px;
+  padding: 32px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+}
+
+.receipt-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 2px solid #111827;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+}
+
+.receipt-head h2,
+.receipt-title h1 {
+  margin: 0;
+}
+
+.receipt-head p,
+.receipt-title p {
+  margin: 4px 0 0;
+  color: #475569;
+}
+
+.receipt-title {
+  text-align: right;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.info-grid h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.info-grid p {
+  margin: 5px 0;
+}
+
+.print-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.print-table th,
+.print-table td {
+  border: 1px solid #d1d5db;
+  padding: 10px 12px;
+}
+
+.print-table th {
+  background: #f3f4f6;
+}
+
+.total-label {
+  font-weight: 800;
+}
+
+.total-value {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.receipt-footer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+  border-top: 1px solid #d1d5db;
+  padding-top: 14px;
+}
+
+.receipt-footer p {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .create-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .create-form input,
+  .create-form select,
+  .create-form button {
+    width: 100%;
+  }
+
+  .info-grid,
+  .receipt-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .receipt-head {
+    flex-direction: column;
+  }
+
+  .receipt-title {
+    text-align: left;
+  }
+}
+
 @media print {
-  body * { visibility: hidden !important; }
-  #printable-receipt, #printable-receipt * { visibility: visible !important; }
-  #printable-receipt { position: fixed; left: 0; top: 0; width: 100%; box-shadow: none; border-radius: 0; }
-  .no-print { display: none !important; }
+  body * {
+    visibility: hidden !important;
+  }
+  #printable-receipt,
+  #printable-receipt * {
+    visibility: visible !important;
+  }
+  #printable-receipt {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
 }
 </style>

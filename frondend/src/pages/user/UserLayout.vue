@@ -1,64 +1,81 @@
 <template>
-  <div class="portal-shell">
-    <aside class="portal-sidebar">
-      <div class="brand-panel">
-        <div class="brand-mark-wrap">
-          <div class="brand-mark">🐾</div>
+  <div class="workspace-shell user-theme">
+    <aside class="workspace-sidebar user-sidebar">
+      <div class="workspace-brand user-brand">
+        <div class="brand-badge user-brand-badge">
+          <AppIcon name="paw" :size="28" />
         </div>
         <div class="brand-copy">
-          <span class="brand-kicker">Pet care</span>
+          <span class="brand-kicker">Owner Portal</span>
           <h1>Pet Clinic</h1>
-          <p>พื้นที่สำหรับเจ้าของสัตว์เลี้ยง</p>
+          <p>พื้นที่สำหรับเจ้าของสัตว์เลี้ยงเพื่อติดตามข้อมูลส่วนตัว สัตว์เลี้ยง นัดหมาย และใบเสร็จ</p>
         </div>
       </div>
 
-      <nav class="nav-list">
-        <router-link to="/user/profile" class="nav-item" active-class="active">
-          <span class="nav-icon">👤</span>
-          <span>ข้อมูลส่วนตัว</span>
+      <nav class="workspace-nav">
+        <router-link to="/user/profile" class="nav-link" active-class="active">
+          <span class="nav-icon-wrap"><AppIcon name="user" :size="18" /></span>
+          <span class="nav-text">
+            <strong>ข้อมูลส่วนตัว</strong>
+            <small>รายละเอียดเจ้าของสัตว์และข้อมูลติดต่อ</small>
+          </span>
         </router-link>
 
-        <router-link to="/user/pets" class="nav-item" :class="{ active: $route.path.startsWith('/user/pets') || $route.path.startsWith('/user/history/') }">
-          <span class="nav-icon">🐶</span>
-          <span>สัตว์เลี้ยงของฉัน</span>
+        <router-link
+          to="/user/pets"
+          class="nav-link"
+          :class="{ active: $route.path.startsWith('/user/pets') || $route.path.startsWith('/user/history/') }"
+        >
+          <span class="nav-icon-wrap"><AppIcon name="paw" :size="18" /></span>
+          <span class="nav-text">
+            <strong>สัตว์เลี้ยงของฉัน</strong>
+            <small>ข้อมูลสัตว์เลี้ยง ประวัติรักษา และข้อมูลแพ้ยา</small>
+          </span>
         </router-link>
 
-        <router-link to="/user/receipts" class="nav-item" :class="{ active: $route.path.startsWith('/user/receipts') }">
-          <span class="nav-icon">🧾</span>
-          <span>การชำระเงิน</span>
+        <router-link to="/user/appointments" class="nav-link" :class="{ active: $route.path.startsWith('/user/appointments') }">
+          <span class="nav-icon-wrap"><AppIcon name="calendar" :size="18" /></span>
+          <span class="nav-text">
+            <strong>การนัดหมาย</strong>
+            <small>ติดตามคิวที่จองไว้และสถานะการนัดหมาย</small>
+          </span>
         </router-link>
 
-        <router-link to="/user/appointments" class="nav-item" :class="{ active: $route.path.startsWith('/user/appointments') }">
-          <span class="nav-icon">📅</span>
-          <span>การนัดหมาย</span>
+        <router-link to="/user/receipts" class="nav-link" :class="{ active: $route.path.startsWith('/user/receipts') }">
+          <span class="nav-icon-wrap"><AppIcon name="receipt" :size="18" /></span>
+          <span class="nav-text">
+            <strong>การชำระเงิน</strong>
+            <small>ดูใบเสร็จ ยอดชำระ และสถานะการชำระเงิน</small>
+          </span>
         </router-link>
       </nav>
 
-      <div class="sidebar-footer">
-        <div class="footer-note">
-          <span class="footer-dot"></span>
-          <p>ดูแลข้อมูลสัตว์เลี้ยง นัดหมาย และการชำระเงินได้จากที่เดียว</p>
+      <div class="workspace-footer">
+        <div class="workspace-note">
+          <span class="note-dot"></span>
+          <p>ดูข้อมูลสัตว์เลี้ยง นัดหมาย และการชำระเงินได้จากเมนูหลักเดียวกัน</p>
         </div>
-        <button type="button" class="logout-btn" @click="logout">
-          <span class="nav-icon">↩</span>
+        <button type="button" class="logout-button" @click="logout">
+          <AppIcon name="logout" :size="18" />
           <span>ออกจากระบบ</span>
         </button>
       </div>
     </aside>
 
-    <main class="portal-content">
-      <header class="content-header">
+    <main class="workspace-main">
+      <header class="workspace-header">
         <div>
-          <p class="header-label">Owner portal</p>
+          <p class="workspace-label">Pet Owner Space</p>
           <h2>{{ pageTitle }}</h2>
+          <p class="workspace-subtitle">{{ pageSubtitle }}</p>
         </div>
-        <div class="header-chip">
-          <span class="chip-dot"></span>
+        <div class="workspace-user">
+          <span class="user-dot"></span>
           <span>{{ currentUserName }}</span>
         </div>
       </header>
 
-      <div class="content-shell">
+      <div class="workspace-content user-content">
         <router-view v-slot="{ Component }">
           <transition name="fade-page" mode="out-in">
             <component :is="Component" />
@@ -72,16 +89,17 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AppIcon from '../../components/AppIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
 
 const titleMap = {
-  '/user/profile': 'ข้อมูลส่วนตัว',
-  '/user/pets': 'สัตว์เลี้ยงของฉัน',
-  '/user/pets/add': 'เพิ่มสัตว์เลี้ยง',
-  '/user/receipts': 'การชำระเงิน',
-  '/user/appointments': 'การนัดหมาย'
+  '/user/profile': ['ข้อมูลส่วนตัว', 'จัดการรูปโปรไฟล์ ข้อมูลติดต่อ และรายละเอียดเจ้าของสัตว์เลี้ยง'],
+  '/user/pets': ['สัตว์เลี้ยงของฉัน', 'ดูข้อมูลสัตว์เลี้ยงแต่ละตัวและเปิดดูประวัติการรักษา'],
+  '/user/pets/add': ['เพิ่มสัตว์เลี้ยง', 'กรอกข้อมูลสัตว์เลี้ยงตัวใหม่เพื่อเริ่มต้นใช้งานระบบ'],
+  '/user/receipts': ['การชำระเงิน', 'ติดตามใบเสร็จ ยอดค่าใช้จ่าย และสถานะการชำระเงิน'],
+  '/user/appointments': ['การนัดหมาย', 'ตรวจสอบวันเวลาและสถานะของคิวที่จองไว้']
 }
 
 const currentUserName = computed(() => {
@@ -95,7 +113,14 @@ const currentUserName = computed(() => {
 
 const pageTitle = computed(() => {
   if (route.path.startsWith('/user/history/')) return 'ประวัติการรักษา'
-  return titleMap[route.path] || 'Owner Portal'
+  return titleMap[route.path]?.[0] || 'Owner Portal'
+})
+
+const pageSubtitle = computed(() => {
+  if (route.path.startsWith('/user/history/')) {
+    return 'ดูข้อมูลการรักษาแบบเรียงตามเวลาเพื่อทบทวนการดูแลสัตว์เลี้ยง'
+  }
+  return titleMap[route.path]?.[1] || 'พื้นที่สำหรับเจ้าของสัตว์เลี้ยง'
 })
 
 const logout = () => {
@@ -107,216 +132,245 @@ const logout = () => {
 </script>
 
 <style scoped>
-.portal-shell {
+.workspace-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 310px minmax(0, 1fr);
   background:
-    radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 26%),
-    linear-gradient(180deg, #f8f8fc 0%, #f3f6fb 100%);
-  font-family: Inter, sans-serif;
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.12), transparent 30%),
+    linear-gradient(180deg, #f5f8fb 0%, #eff6f9 100%);
 }
 
-.portal-sidebar {
+.workspace-sidebar {
   padding: 22px 18px;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.96) 100%);
+  gap: 16px;
+  background: #f9fcfe;
 }
 
-.brand-panel,
-.nav-list,
-.sidebar-footer,
-.content-header {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(229, 231, 235, 0.92);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+.workspace-brand,
+.workspace-nav,
+.workspace-footer,
+.workspace-header {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(217, 226, 236, 0.88);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
 }
 
-.brand-panel {
+.workspace-brand {
   display: grid;
   grid-template-columns: auto 1fr;
-  align-items: center;
   gap: 14px;
-  padding: 18px 18px 20px;
+  padding: 18px;
+  align-items: center;
 }
 
-.brand-mark-wrap {
+.brand-badge {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
-}
-
-.brand-mark {
-  width: 50px;
-  height: 50px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: #ffffff;
-  font-size: 24px;
+}
+
+.user-brand-badge {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+}
+
+.brand-kicker,
+.workspace-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .brand-kicker {
   display: block;
   margin-bottom: 6px;
-  color: #6b7280;
+  color: #64748b;
   font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
-.brand-panel h1 {
+.brand-copy h1 {
   margin: 0;
+  color: #0f172a;
   font-size: 24px;
-  color: #111827;
   line-height: 1.1;
 }
 
 .brand-copy p {
-  margin: 7px 0 0;
-  color: #4b5563;
+  margin: 8px 0 0;
+  color: #64748b;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
-.nav-list {
+.workspace-nav {
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.nav-item,
-.logout-btn {
+.nav-link,
+.logout-button {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 13px 14px;
-  border-radius: 12px;
+  padding: 12px 13px;
+  border-radius: 14px;
+  color: #334155;
   text-decoration: none;
-  color: #475569;
-  font-size: 15px;
-  font-weight: 600;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
-.nav-item:hover,
-.logout-btn:hover {
+.nav-link:hover,
+.logout-button:hover {
+  background: #f3faf9;
+  color: #0f172a;
+}
+
+.nav-link.active {
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+  color: #0f766e;
+  box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0.15);
+}
+
+.nav-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #f8fafc;
-  color: #111827;
+  flex: none;
 }
 
-.nav-item.active {
-  background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
-  color: #4338ca;
-  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.22);
+.nav-link.active .nav-icon-wrap {
+  background: #ffffff;
 }
 
-.nav-icon {
-  width: 20px;
-  text-align: center;
-  line-height: 1;
+.nav-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.sidebar-footer {
+.nav-text strong {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.nav-text small {
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.workspace-footer {
   padding: 14px;
   margin-top: auto;
 }
 
-.footer-note {
+.workspace-note {
   display: flex;
   gap: 10px;
-  align-items: start;
-  padding: 0 2px 14px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #eef2f7;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #edf2f7;
 }
 
-.footer-dot {
+.note-dot,
+.user-dot {
   width: 10px;
   height: 10px;
-  margin-top: 4px;
   border-radius: 999px;
-  background: #c4b5fd;
   flex: none;
 }
 
-.footer-note p {
+.note-dot {
+  margin-top: 5px;
+  background: #14b8a6;
+}
+
+.workspace-note p {
   margin: 0;
-  color: #6b7280;
+  color: #64748b;
   font-size: 13px;
   line-height: 1.55;
 }
 
-.logout-btn {
+.logout-button {
   justify-content: center;
-  border: 1px solid #ebeef3;
-  background: #fafafa;
-  cursor: pointer;
+  border: 1px solid #d9e2ec;
+  background: #f8fafc;
   color: #475569;
+  font: inherit;
+  font-weight: 700;
 }
 
-.portal-content {
+.workspace-main {
   min-width: 0;
-  padding: 24px 26px;
+  padding: 24px 28px;
 }
 
-.content-header {
+.workspace-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   padding: 18px 22px;
   margin-bottom: 20px;
 }
 
-.header-label {
+.workspace-label {
   margin: 0 0 4px;
-  color: #6b7280;
-  font-size: 13px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.content-header h2 {
+.workspace-header h2 {
   margin: 0;
-  font-size: 26px;
-  color: #111827;
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1.1;
 }
 
-.header-chip {
+.workspace-subtitle {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.workspace-user {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
+  padding: 10px 14px;
   border-radius: 999px;
   background: #f8fafc;
-  color: #475569;
+  color: #334155;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.chip-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
+.user-dot {
   background: #22c55e;
 }
 
-.content-shell {
-  max-width: 1180px;
+.user-content {
+  max-width: 1240px;
   margin: 0 auto;
 }
 
@@ -331,22 +385,18 @@ const logout = () => {
   transform: translateY(8px);
 }
 
-@media (max-width: 980px) {
-  .portal-shell {
+@media (max-width: 1024px) {
+  .workspace-shell {
     grid-template-columns: 1fr;
-  }
-
-  .portal-sidebar {
-    padding-bottom: 0;
-  }
-
-  .portal-content {
-    padding-top: 16px;
   }
 }
 
-@media (max-width: 720px) {
-  .content-header {
+@media (max-width: 760px) {
+  .workspace-main {
+    padding: 16px;
+  }
+
+  .workspace-header {
     flex-direction: column;
     align-items: stretch;
   }

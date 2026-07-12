@@ -1,19 +1,17 @@
 <template>
-  <div class="treatment-page">
-    <div class="clinic-card header-card">
-      <div class="header-content">
-        <div class="icon-box">TX</div>
-        <div class="title-box">
-          <h1>บันทึกการรักษา</h1>
-          <p>บันทึกอาการ วินิจฉัยโรค และจัดการรายการค่ารักษา</p>
-        </div>
+  <div class="admin-page treatments-admin-page">
+    <section class="page-header">
+      <div>
+        <p class="eyebrow">Treatment records</p>
+        <h1>บันทึกการรักษา</h1>
+        <p class="subtitle">บันทึกอาการ วินิจฉัยโรค และจัดการรายการค่ารักษา</p>
       </div>
-      <button @click="openAddModal" class="btn-primary">เพิ่มการรักษาใหม่</button>
-    </div>
+      <button @click="openAddModal" class="primary-btn">เพิ่มการรักษาใหม่</button>
+    </section>
 
-    <div class="clinic-card table-card">
-      <div class="table-responsive">
-        <table class="clinic-table">
+    <section class="table-panel">
+      <div class="table-wrap">
+        <table>
           <thead>
             <tr>
               <th>รหัสการรักษา</th>
@@ -21,87 +19,92 @@
               <th>สัตว์เลี้ยง</th>
               <th>สัตวแพทย์</th>
               <th>การวินิจฉัย</th>
-              <th class="text-right">ยอดรวม</th>
-              <th class="text-center">จัดการ</th>
+              <th class="right">ยอดรวม</th>
+              <th class="center">จัดการ</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="t in treatments" :key="t.treatment_id">
-              <td><span class="badge">{{ t.treatment_id }}</span></td>
+              <td>
+                <strong>{{ t.treatment_id }}</strong>
+              </td>
               <td>{{ formatDateTime(t.treatment_date) }}</td>
               <td>
                 {{ t.pet_name }}
-                <br>
-                <span class="subtext">คุณ{{ t.owner_name }}</span>
+                <br />
+                <span class="muted">คุณ{{ t.owner_name }}</span>
               </td>
               <td>{{ t.vet_name || t.doctor_name || '-' }}</td>
               <td>{{ t.diagnosis || '-' }}</td>
-              <td class="text-right amount">{{ formatPrice(t.total_amount) }}</td>
-              <td class="text-center">
+              <td class="right amount">{{ formatPrice(t.total_amount) }}</td>
+              <td class="center">
                 <div class="row-actions">
-                  <button class="btn-row edit" @click="openEditModal(t.treatment_id)">แก้ไข</button>
-                  <button class="btn-row delete" @click="deleteTreatment(t)">ลบ</button>
+                  <button class="ghost-btn mini-btn" @click="openEditModal(t.treatment_id)">แก้ไข</button>
+                  <button class="danger-btn mini-btn" @click="deleteTreatment(t)">ลบ</button>
                 </div>
               </td>
             </tr>
             <tr v-if="treatments.length === 0">
-              <td colspan="7" class="empty">ยังไม่มีประวัติการรักษา</td>
+              <td colspan="7" class="state">ยังไม่มีประวัติการรักษา</td>
             </tr>
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
 
-    <div v-if="isModalOpen" class="custom-modal-overlay" @click.self="closeModal">
-      <div class="custom-modal-box modal-xl">
-        <div class="modal-header">
-          <h3>{{ isEditing ? 'แก้ไขการรักษา' : 'บันทึกการรักษาใหม่' }}</h3>
-          <button @click="closeModal" class="close-btn">X</button>
+    <div v-if="isModalOpen" class="modal-overlay" @click.self="closeModal">
+      <div class="modal treatment-modal">
+        <div class="modal-head">
+          <div>
+            <h2>{{ isEditing ? 'แก้ไขการรักษา' : 'บันทึกการรักษาใหม่' }}</h2>
+            <p>บันทึกข้อมูลสัตว์เลี้ยง อาการ วินิจฉัย และรายการค่ารักษา</p>
+          </div>
+          <button @click="closeModal" class="close-btn">ปิด</button>
         </div>
 
-        <div class="form-grid">
-          <div class="left-panel">
-            <div class="form-group">
-              <label>เลือกสัตว์เลี้ยง <span class="required">*</span></label>
-              <select v-model="form.pet_id" class="custom-input" required>
+        <div class="form-layout">
+          <div class="form-grid left-panel">
+            <label class="full-width">
+              <span>เลือกสัตว์เลี้ยง *</span>
+              <select v-model="form.pet_id" required>
                 <option value="" disabled>-- กรุณาเลือกสัตว์เลี้ยง --</option>
                 <option v-for="p in petsList" :key="p.pet_id" :value="p.pet_id">
                   {{ p.pet_name }} (คุณ{{ p.owner_name }})
                 </option>
               </select>
-            </div>
+            </label>
 
-            <div class="form-group">
-              <label>สัตวแพทย์</label>
-              <select v-model="form.vet_id" class="custom-input">
+            <label class="full-width">
+              <span>สัตวแพทย์</span>
+              <select v-model="form.vet_id">
                 <option value="">-- เลือกสัตวแพทย์ --</option>
                 <option v-for="vet in vetsList" :key="vet.vet_id" :value="vet.vet_id">
                   {{ vet.vet_name }}
                 </option>
               </select>
-            </div>
+            </label>
 
-            <div class="form-group">
-              <label>อาการเบื้องต้น</label>
-              <textarea v-model="form.symptom" rows="3" class="custom-input"></textarea>
-            </div>
+            <label class="full-width">
+              <span>อาการเบื้องต้น</span>
+              <textarea v-model="form.symptom" rows="3"></textarea>
+            </label>
 
-            <div class="form-group">
-              <label>การวินิจฉัยโรค</label>
-              <textarea v-model="form.diagnosis" rows="3" class="custom-input"></textarea>
-            </div>
+            <label class="full-width">
+              <span>การวินิจฉัยโรค</span>
+              <textarea v-model="form.diagnosis" rows="3"></textarea>
+            </label>
           </div>
 
-          <div class="right-panel">
-            <label class="panel-label">รายการบริการ / ค่ารักษา</label>
+          <div class="service-panel">
+            <label class="service-label">รายการบริการ / ค่ารักษา</label>
             <div class="service-add">
-              <select v-model="selectedServiceId" class="custom-input flex-1">
+              <select v-model="selectedServiceId" class="service-select">
                 <option value="" disabled>-- เลือกบริการ --</option>
                 <option v-for="s in servicesList" :key="s.service_id" :value="s.service_id">
                   {{ s.service_name }} ({{ formatPrice(s.service_price) }} บาท)
                 </option>
               </select>
-              <button type="button" @click="addServiceItem" class="btn-add">เพิ่ม</button>
+              <button type="button" @click="addServiceItem" class="primary-btn small-btn">เพิ่ม</button>
             </div>
 
             <div class="selected-items-box">
@@ -110,17 +113,15 @@
                   <div class="item-name">{{ item.service_name }}</div>
                   <div class="item-price-row">
                     <span>ราคา</span>
-                    <input type="number" v-model.number="item.price" min="0" step="0.5" class="price-edit-input">
+                    <input type="number" v-model.number="item.price" min="0" step="0.5" class="price-edit-input" />
                     <span>บาท</span>
                   </div>
                 </div>
-                <input type="number" v-model.number="item.quantity" min="1" class="qty-input">
+                <input type="number" v-model.number="item.quantity" min="1" class="qty-input" />
                 <div class="item-total">{{ formatPrice(item.price * item.quantity) }}</div>
-                <button @click="removeServiceItem(index)" class="btn-remove" type="button">X</button>
+                <button @click="removeServiceItem(index)" class="danger-btn remove-btn" type="button">ลบ</button>
               </div>
-              <div v-if="form.services.length === 0" class="empty-services">
-                ยังไม่มีรายการค่ารักษา
-              </div>
+              <div v-if="form.services.length === 0" class="empty-services">ยังไม่มีรายการค่ารักษา</div>
             </div>
 
             <div class="total-box">
@@ -131,8 +132,8 @@
         </div>
 
         <div class="modal-actions">
-          <button @click="closeModal" class="btn-cancel" type="button">ยกเลิก</button>
-          <button @click="submitTreatment" :disabled="isSubmitting || !form.pet_id" class="btn-submit" type="button">
+          <button @click="closeModal" class="ghost-btn" type="button">ยกเลิก</button>
+          <button @click="submitTreatment" :disabled="isSubmitting || !form.pet_id" class="primary-btn" type="button">
             {{ isSubmitting ? 'กำลังบันทึก...' : isEditing ? 'บันทึกการแก้ไข' : 'บันทึกการรักษา' }}
           </button>
         </div>
@@ -247,7 +248,7 @@ const removeServiceItem = (index) => {
 }
 
 const totalAmount = computed(() =>
-  form.value.services.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0)
+  form.value.services.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0)
 )
 
 const submitTreatment = async () => {
@@ -297,59 +298,172 @@ onMounted(fetchAllData)
 </script>
 
 <style scoped>
-.treatment-page { background-color: #f8fafc; min-height: 100vh; padding: 24px; color: #1e293b; }
-.clinic-card { background: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 24px; margin-bottom: 24px; border: 1px solid #f1f5f9; }
-.header-card { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.header-content { display: flex; align-items: center; gap: 16px; }
-.icon-box { width: 56px; height: 56px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; color: white; }
-.title-box h1 { margin: 0; font-size: 24px; font-weight: 800; }
-.title-box p { margin: 6px 0 0; color: #64748b; }
-.btn-primary { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; }
-.table-responsive { overflow-x: auto; }
-.clinic-table { width: 100%; border-collapse: collapse; min-width: 860px; }
-.clinic-table th { background: #f8fafc; padding: 16px; text-align: left; font-size: 13px; font-weight: 700; color: #64748b; border-bottom: 2px solid #e2e8f0; }
-.clinic-table td { padding: 16px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
-.badge { background: #f1f5f9; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 13px; color: #475569; }
-.subtext { color: #64748b; font-size: 12px; }
-.amount { font-weight: 800; color: #059669; }
-.text-right { text-align: right; }
-.text-center { text-align: center; }
-.row-actions { display: flex; gap: 8px; justify-content: center; }
-.btn-row { border: 0; border-radius: 8px; padding: 8px 10px; font-weight: 700; cursor: pointer; }
-.btn-row.edit { background: #dbeafe; color: #1d4ed8; }
-.btn-row.delete { background: #fee2e2; color: #b91c1c; }
-.empty { text-align: center; padding: 32px; color: #64748b; }
-.custom-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); display: flex; justify-content: center; align-items: center; z-index: 50; padding: 20px; }
-.modal-xl { background: white; width: 100%; max-width: 1000px; max-height: 90vh; overflow-y: auto; border-radius: 20px; padding: 32px; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px; margin-bottom: 24px; }
-.modal-header h3 { margin: 0; font-size: 22px; font-weight: 800; }
-.close-btn { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-weight: bold; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-.form-group { margin-bottom: 16px; }
-.form-group label, .panel-label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #334155; }
-.required { color: #dc2626; }
-.custom-input { width: 100%; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; outline: none; }
-.custom-input:focus { border-color: #10b981; background: white; }
-.right-panel { background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; }
-.service-add { display: flex; gap: 8px; margin-bottom: 16px; }
-.btn-add { background: #3b82f6; color: white; border: none; border-radius: 12px; padding: 0 20px; font-weight: 700; cursor: pointer; }
-.selected-items-box { flex-grow: 1; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 12px; max-height: 260px; overflow-y: auto; margin-bottom: 16px; }
-.item-row { display: grid; grid-template-columns: minmax(0, 1fr) 70px 110px 32px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
-.item-main { min-width: 0; }
-.item-name { font-weight: 700; font-size: 14px; }
-.item-price-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; margin-top: 4px; }
-.qty-input { width: 70px; text-align: center; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; }
-.btn-remove { background: #fee2e2; color: #ef4444; border: none; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; }
-.item-total { font-weight: 800; color: #059669; text-align: right; }
-.empty-services { text-align: center; color: #94a3b8; padding: 24px 0; font-size: 14px; }
-.total-box { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 2px dashed #cbd5e1; font-weight: 800; }
-.total-amount { font-size: 24px; color: #059669; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
-.btn-cancel { padding: 12px 24px; background: #f1f5f9; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
-.btn-submit { padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
-.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-.price-edit-input { width: 78px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: right; font-size: 12px; background-color: #f8fafc; }
+.treatments-admin-page {
+  display: grid;
+  gap: 20px;
+}
+
+.amount {
+  font-weight: 800;
+  color: #059669;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.mini-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+}
+
+.danger-btn {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.treatment-modal {
+  width: min(1040px, 100%);
+}
+
+.form-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.left-panel {
+  align-content: start;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.service-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.service-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.service-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.service-select {
+  flex: 1;
+}
+
+.small-btn {
+  min-height: 44px;
+}
+
+.selected-items-box {
+  flex-grow: 1;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 110px 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.item-main {
+  min-width: 0;
+}
+
+.item-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.item-price-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.qty-input {
+  width: 70px;
+  text-align: center;
+}
+
+.remove-btn {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+}
+
+.item-total {
+  font-weight: 800;
+  color: #059669;
+  text-align: right;
+}
+
+.empty-services {
+  text-align: center;
+  color: #94a3b8;
+  padding: 24px 0;
+  font-size: 14px;
+}
+
+.total-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+  border-top: 2px dashed #cbd5e1;
+  font-weight: 800;
+}
+
+.total-amount {
+  font-size: 24px;
+  color: #059669;
+}
+
+.price-edit-input {
+  width: 78px;
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  text-align: right;
+  font-size: 12px;
+  background-color: #f8fafc;
+}
+
 @media (max-width: 900px) {
-  .form-grid { grid-template-columns: 1fr; }
+  .form-layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

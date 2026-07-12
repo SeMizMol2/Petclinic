@@ -2,6 +2,7 @@
   <div class="pets-page">
     <section class="hero-section">
       <div>
+        <p class="eyebrow">Pet records</p>
         <h1>สัตว์เลี้ยงของฉัน</h1>
         <p class="hero-text">ดูรายละเอียด แก้ไขข้อมูล และเปิดประวัติการรักษาของสัตว์เลี้ยงแต่ละตัวได้จากหน้านี้</p>
       </div>
@@ -20,7 +21,9 @@
       <article v-for="pet in pets" :key="pet.pet_id" class="pet-card">
         <div class="pet-header">
           <div class="pet-identity">
-            <div class="pet-avatar">{{ getPetIcon(pet.pet_type) }}</div>
+            <div class="pet-avatar">
+              <AppIcon :name="getPetIcon(pet.pet_type)" :size="30" />
+            </div>
             <div>
               <h2>{{ pet.pet_name }}</h2>
               <p>{{ pet.pet_breed || 'ไม่ระบุสายพันธุ์' }}</p>
@@ -28,8 +31,12 @@
           </div>
 
           <div class="pet-actions">
-            <button type="button" class="ghost-btn" @click="openEdit(pet)">แก้ไข</button>
-            <button type="button" class="danger-btn" @click="deletePet(pet.pet_id)">ลบ</button>
+            <button type="button" class="ghost-btn" @click="openEdit(pet)">
+              <AppIcon name="edit" :size="16" /> แก้ไข
+            </button>
+            <button type="button" class="danger-btn" @click="deletePet(pet.pet_id)">
+              <AppIcon name="trash" :size="16" /> ลบ
+            </button>
           </div>
         </div>
 
@@ -54,7 +61,7 @@
 
         <div class="status-row">
           <span class="status-badge" :class="pet.sterile_status === 'ทำแล้ว' ? 'status-success' : 'status-warn'">
-            {{ pet.sterile_status === 'ทำแล้ว' ? 'ทำหมันแล้ว' : 'ยังไม่ทำหมัน' }}
+            {{ pet.sterile_status === 'ทำแล้ว' ? 'ทำหมันแล้ว' : 'ยังไม่ได้ทำหมัน' }}
           </span>
           <span class="age-chip">อายุ {{ calculateAge(pet.pet_birthdate) }}</span>
         </div>
@@ -67,7 +74,9 @@
         <div class="history-panel">
           <div class="history-header">
             <h3>ประวัติการรักษาล่าสุด</h3>
-            <router-link :to="`/user/history/${pet.pet_id}`" class="history-link">ดูทั้งหมด</router-link>
+            <router-link :to="`/user/history/${pet.pet_id}`" class="history-link">
+              <AppIcon name="history" :size="15" /> ดูทั้งหมด
+            </router-link>
           </div>
 
           <div v-if="getRecentHistory(pet.pet_id).length === 0" class="history-empty">
@@ -94,8 +103,9 @@
           <div class="modal-header">
             <div>
               <h2>ข้อมูลสัตว์เลี้ยง</h2>
+              <p>ปรับข้อมูลพื้นฐานของสัตว์เลี้ยงและรายละเอียดที่จำเป็นต่อการดูแล</p>
             </div>
-            <button type="button" class="close-btn" @click="showEdit = false">x</button>
+            <button type="button" class="close-btn" @click="showEdit = false">ปิด</button>
           </div>
 
           <div class="modal-body">
@@ -164,6 +174,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import axios from 'axios'
+import AppIcon from '../../components/AppIcon.vue'
 
 const pets = ref([])
 const loading = ref(false)
@@ -204,12 +215,12 @@ const calculateAge = (birthdate) => {
 
 const getPetIcon = (type) => {
   const petType = (type || '').toLowerCase()
-  if (petType.includes('หมา') || petType.includes('สุนัข')) return '🐶'
-  if (petType.includes('แมว')) return '🐱'
-  if (petType.includes('กระต่าย')) return '🐰'
-  if (petType.includes('นก')) return '🐦'
-  if (petType.includes('ปลา')) return '🐠'
-  return '🐾'
+  if (petType.includes('หมา') || petType.includes('สุนัข') || petType.includes('dog')) return 'dog'
+  if (petType.includes('แมว') || petType.includes('cat')) return 'cat'
+  if (petType.includes('กระต่าย') || petType.includes('rabbit')) return 'rabbit'
+  if (petType.includes('นก') || petType.includes('bird')) return 'bird'
+  if (petType.includes('ปลา') || petType.includes('fish')) return 'fish'
+  return 'paw'
 }
 
 const getRecentHistory = (petId) => (historyByPet.value[petId] || []).slice(0, 2)
@@ -284,14 +295,6 @@ onMounted(loadPets)
   gap: 20px;
 }
 
-.hero-section,
-.state-section,
-.pet-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-
 .hero-section {
   display: flex;
   justify-content: space-between;
@@ -300,19 +303,28 @@ onMounted(loadPets)
   padding: 28px;
 }
 
+.eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .hero-section h1,
 .pet-card h2,
 .history-header h3,
 .modal-header h2,
 .empty-state h2 {
   margin: 0;
-  color: #111827;
+  color: #0f172a;
 }
 
 .hero-text {
   margin: 8px 0 0;
   max-width: 620px;
-  color: #4b5563;
+  color: #64748b;
   line-height: 1.65;
 }
 
@@ -324,25 +336,14 @@ onMounted(loadPets)
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 14px;
-  font-weight: 700;
+  gap: 8px;
   text-decoration: none;
-  cursor: pointer;
-}
-
-.primary-link,
-.primary-btn {
-  background: #4f46e5;
-  color: #ffffff;
-  border: none;
 }
 
 .state-section {
   padding: 36px 24px;
   text-align: center;
-  color: #4b5563;
+  color: #475569;
 }
 
 .empty-state {
@@ -364,7 +365,6 @@ onMounted(loadPets)
 }
 
 .pet-card {
-  background: rgba(255, 255, 255, 0.96);
   padding: 22px;
 }
 
@@ -385,17 +385,18 @@ onMounted(loadPets)
 .pet-avatar {
   width: 58px;
   height: 58px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
+  color: #0f766e;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0.12);
 }
 
 .pet-identity p {
   margin: 6px 0 0;
-  color: #6b7280;
+  color: #64748b;
 }
 
 .pet-actions {
@@ -404,15 +405,15 @@ onMounted(loadPets)
 }
 
 .ghost-btn {
-  background: #eef2ff;
-  color: #4338ca;
-  border: none;
+  background: #f0fdfa;
+  color: #0f766e;
+  border: 1px solid rgba(20, 184, 166, 0.15);
 }
 
 .danger-btn {
   background: #fef2f2;
   color: #b91c1c;
-  border: none;
+  border: 1px solid rgba(220, 38, 38, 0.12);
 }
 
 .metric-grid {
@@ -426,7 +427,8 @@ onMounted(loadPets)
 .note-box,
 .history-item {
   background: #f8fafc;
-  border-radius: 8px;
+  border-radius: 16px;
+  border: 1px solid #e8eef5;
 }
 
 .metric-item {
@@ -440,12 +442,14 @@ onMounted(loadPets)
   margin-bottom: 6px;
   font-size: 12px;
   font-weight: 700;
-  color: #6b7280;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .metric-item strong,
 .note-box p {
-  color: #111827;
+  color: #0f172a;
 }
 
 .status-row {
@@ -477,8 +481,8 @@ onMounted(loadPets)
 }
 
 .age-chip {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .note-box {
@@ -492,7 +496,7 @@ onMounted(loadPets)
 }
 
 .history-panel {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #e5edf5;
   padding-top: 16px;
 }
 
@@ -507,13 +511,16 @@ onMounted(loadPets)
 }
 
 .history-link {
-  color: #4338ca;
+  color: #0f766e;
   font-weight: 700;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .history-empty {
-  color: #6b7280;
+  color: #64748b;
 }
 
 .history-list {
@@ -523,41 +530,27 @@ onMounted(loadPets)
 }
 
 .history-item {
-  padding: 12px;
+  padding: 14px;
 }
 
 .history-meta {
   margin-bottom: 8px;
   font-size: 12px;
-  color: #6b7280;
+  color: #64748b;
 }
 
 .history-item strong {
   display: block;
   margin-bottom: 6px;
-  color: #111827;
+  color: #0f172a;
 }
 
 .history-item p {
   margin: 0;
-  color: #4b5563;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 9999;
+  color: #475569;
 }
 
 .modal-card {
-  width: min(720px, 100%);
-  background: #ffffff;
-  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -567,11 +560,18 @@ onMounted(loadPets)
 }
 
 .modal-header {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5edf5;
+  align-items: flex-start;
+}
+
+.modal-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+  line-height: 1.55;
 }
 
 .modal-footer {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #e5edf5;
   justify-content: flex-end;
 }
 
@@ -589,23 +589,6 @@ onMounted(loadPets)
 .form-grid.single,
 .textarea-wrap {
   display: block;
-}
-
-.input-field {
-  width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-  color: #111827;
-  box-sizing: border-box;
-}
-
-.secondary-btn,
-.close-btn {
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #374151;
 }
 
 @media (max-width: 720px) {
@@ -626,6 +609,7 @@ onMounted(loadPets)
 
   .pet-actions {
     width: 100%;
+    flex-direction: column;
   }
 }
 </style>
