@@ -1,176 +1,160 @@
 <template>
-  <div class="auth-container">
-    <div class="bg-overlay"></div>
-
+  <div class="auth-page">
     <div class="auth-card">
       <div class="card-header">
-        <h2 class="title">สมัครสมาชิก</h2>
+        <p class="eyebrow">Create account</p>
+        <h1>สมัครสมาชิก</h1>
         <p class="subtitle">เริ่มต้นใช้งานระบบคลินิกสัตว์เลี้ยงด้วยบัญชีของคุณ</p>
       </div>
 
       <form class="auth-form" @submit.prevent="register">
-        <div class="form-group">
-          <label class="label">ชื่อผู้ใช้</label>
-          <input v-model.trim="username" type="text" class="input-field" placeholder="ตั้งชื่อผู้ใช้" required />
-        </div>
+        <label class="field">
+          <span>ชื่อผู้ใช้</span>
+          <input v-model.trim="username" type="text" placeholder="ตั้งชื่อผู้ใช้" required />
+        </label>
 
-        <div class="form-group">
-          <label class="label">รหัสผ่าน</label>
-          <input v-model="password" type="password" class="input-field" placeholder="ตั้งรหัสผ่านที่ปลอดภัย" required />
-        </div>
+        <label class="field">
+          <span>รหัสผ่าน</span>
+          <input v-model="password" type="password" placeholder="ตั้งรหัสผ่านที่ปลอดภัย" required />
+        </label>
 
-        <button type="submit" class="btn-submit">ลงทะเบียน</button>
+        <button type="submit" class="submit-btn">ลงทะเบียน</button>
       </form>
 
       <div class="auth-footer">
-        <p>มีบัญชีอยู่แล้ว? <router-link to="/login" class="link">เข้าสู่ระบบ</router-link></p>
+        <p>มีบัญชีอยู่แล้ว? <router-link to="/login">เข้าสู่ระบบ</router-link></p>
         <router-link to="/" class="back-link">กลับหน้าแรก</router-link>
       </div>
     </div>
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue'
 import axios from 'axios'
+import { useRouter } from 'vue-router'
 
-export default {
-  data() {
-    return {
-      username: '',
-      password: ''
-    }
-  },
-  methods: {
-    async register() {
-      try {
-        await axios.post('http://localhost:3000/api/auth/register', {
-          username: this.username,
-          password: this.password
-        })
+const router = useRouter()
+const username = ref('')
+const password = ref('')
 
-        alert('สมัครสมาชิกสำเร็จ')
-        this.$router.push('/login')
-      } catch (err) {
-        alert(err.response?.data?.message || 'สมัครสมาชิกไม่สำเร็จ')
-      }
-    }
+const register = async () => {
+  try {
+    await axios.post('http://localhost:3000/api/auth/register', {
+      username: username.value,
+      password: password.value
+    })
+
+    alert('สมัครสมาชิกสำเร็จ')
+    router.push('/login')
+  } catch (err) {
+    alert(err.response?.data?.message || 'สมัครสมาชิกไม่สำเร็จ')
   }
 }
 </script>
 
 <style scoped>
-.auth-container {
+.auth-page {
   min-height: 100vh;
-  width: 100%;
-  background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #db2777 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  position: relative;
-  font-family: Inter, sans-serif;
-}
-
-.bg-overlay {
-  position: absolute;
-  inset: 0;
-  background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
-  opacity: 0.1;
-  pointer-events: none;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 28%),
+    linear-gradient(180deg, #f4f7fb 0%, #eef4f8 100%);
 }
 
 .auth-card {
-  background: #ffffff;
   width: 100%;
-  max-width: 450px;
-  padding: 40px;
+  max-width: 460px;
+  padding: 36px;
   border-radius: 24px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
-  position: relative;
-  z-index: 1;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(217, 226, 236, 0.92);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
 }
 
-.card-header {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.title {
+.eyebrow {
   margin: 0 0 10px;
-  font-size: 2rem;
-  font-weight: 800;
-  background: linear-gradient(to right, #7c3aed, #db2777);
-  -webkit-background-clip: text;
-  color: transparent;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card-header h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 36px;
 }
 
 .subtitle {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.95rem;
-  line-height: 1.6;
+  margin: 12px 0 0;
+  color: #64748b;
+  line-height: 1.7;
 }
 
-.form-group {
-  margin-bottom: 20px;
+.auth-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 26px;
 }
 
-.label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #374151;
+.field {
+  display: grid;
+  gap: 8px;
 }
 
-.input-field {
+.field span {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.field input {
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  font-size: 1rem;
-  outline: none;
-  background: #f9fafb;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid #d9e2ec;
+  background: #ffffff;
+  color: #0f172a;
   box-sizing: border-box;
 }
 
-.input-field:focus {
-  border-color: #7c3aed;
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
+.field input:focus {
+  outline: none;
+  border-color: rgba(15, 118, 110, 0.45);
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
 }
 
-.btn-submit {
-  width: 100%;
-  padding: 14px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(to right, #7c3aed, #6d28d9);
+.submit-btn {
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   color: #ffffff;
-  font-size: 1rem;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  margin-top: 10px;
 }
 
 .auth-footer {
   text-align: center;
-  margin-top: 25px;
-  font-size: 0.9rem;
-  color: #6b7280;
+  margin-top: 24px;
+  color: #64748b;
 }
 
-.link {
-  color: #7c3aed;
+.auth-footer a {
+  color: #0f766e;
   font-weight: 700;
   text-decoration: none;
 }
 
 .back-link {
-  display: block;
-  margin-top: 15px;
-  color: #9ca3af;
-  font-size: 0.85rem;
-  text-decoration: none;
+  display: inline-block;
+  margin-top: 12px;
 }
 </style>

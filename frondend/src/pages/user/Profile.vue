@@ -2,6 +2,7 @@
   <div class="profile-page">
     <section class="hero-section">
       <div>
+        <p class="eyebrow">Owner profile</p>
         <h1>ข้อมูลส่วนตัว</h1>
         <p class="hero-text">จัดการรูปโปรไฟล์ ข้อมูลติดต่อ และรายละเอียดเจ้าของสัตว์เลี้ยงได้จากหน้าจอนี้</p>
       </div>
@@ -15,14 +16,17 @@
         <div class="avatar-panel" @click="triggerFileInput">
           <img v-if="previewImage || user.profile_pic" :src="previewImage || user.profile_pic" class="avatar-img" />
           <div v-else class="avatar-text">{{ user.username?.charAt(0).toUpperCase() || 'U' }}</div>
-          <div class="avatar-overlay">อัปโหลดรูป</div>
+          <div class="avatar-overlay">
+            <AppIcon name="upload" :size="18" />
+            <span>อัปโหลดรูป</span>
+          </div>
           <input ref="fileInput" type="file" accept="image/*" class="hidden-input" @change="onFileSelected" />
         </div>
 
         <div class="summary-copy">
           <h2>{{ user.owner_name || user.username || 'เจ้าของสัตว์เลี้ยง' }}</h2>
-          <p>{{ user.email || 'ยังไม่ได้ระบุอีเมล' }}</p>
-          <span class="summary-tag">{{ user.tel || 'ยังไม่ได้ระบุเบอร์โทรศัพท์' }}</span>
+          <p class="summary-inline"><AppIcon name="mail" :size="16" /> {{ user.email || 'ยังไม่ได้ระบุอีเมล' }}</p>
+          <span class="summary-tag"><AppIcon name="phone" :size="14" /> {{ user.tel || 'ยังไม่ได้ระบุเบอร์โทรศัพท์' }}</span>
         </div>
       </div>
 
@@ -55,8 +59,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import axios from 'axios'
+import AppIcon from '../../components/AppIcon.vue'
 
 const user = ref({})
 const fileInput = ref(null)
@@ -147,14 +152,6 @@ const saveProfile = async () => {
   gap: 20px;
 }
 
-.hero-section,
-.profile-summary,
-.profile-details {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-
 .hero-section {
   display: flex;
   justify-content: space-between;
@@ -163,39 +160,32 @@ const saveProfile = async () => {
   padding: 28px;
 }
 
+.eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .hero-section h1 {
   margin: 0;
   font-size: 30px;
-  color: #111827;
+  color: #0f172a;
 }
 
 .hero-text {
   margin: 8px 0 0;
   max-width: 580px;
-  color: #4b5563;
+  color: #64748b;
   line-height: 1.65;
-}
-
-.action-btn {
-  border: none;
-  border-radius: 8px;
-  background: #4f46e5;
-  color: #ffffff;
-  padding: 11px 16px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 .profile-grid {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 20px;
-}
-
-.profile-summary,
-.profile-details {
-  background: rgba(255, 255, 255, 0.92);
 }
 
 .profile-summary {
@@ -210,11 +200,12 @@ const saveProfile = async () => {
   position: relative;
   width: 132px;
   height: 132px;
-  border-radius: 18px;
+  border-radius: 22px;
   overflow: hidden;
   cursor: pointer;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
   margin-bottom: 18px;
+  box-shadow: 0 18px 32px rgba(15, 118, 110, 0.2);
 }
 
 .avatar-img,
@@ -242,6 +233,8 @@ const saveProfile = async () => {
   background: rgba(17, 24, 39, 0.45);
   color: #ffffff;
   display: flex;
+  flex-direction: column;
+  gap: 6px;
   align-items: center;
   justify-content: center;
   font-size: 14px;
@@ -260,21 +253,26 @@ const saveProfile = async () => {
 
 .summary-copy h2 {
   margin: 0;
-  font-size: 22px;
-  color: #111827;
+  font-size: 24px;
+  color: #0f172a;
 }
 
-.summary-copy p {
-  margin: 8px 0 12px;
-  color: #6b7280;
+.summary-inline {
+  margin: 10px 0 14px;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .summary-tag {
   display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border-radius: 999px;
-  padding: 7px 12px;
-  background: #eef2ff;
-  color: #4338ca;
+  padding: 9px 13px;
+  background: #ecfdf5;
+  color: #0f766e;
   font-size: 13px;
   font-weight: 700;
 }
@@ -288,7 +286,8 @@ const saveProfile = async () => {
 
 .detail-card {
   background: #f8fafc;
-  border-radius: 8px;
+  border-radius: 16px;
+  border: 1px solid #e8eef5;
   padding: 18px;
 }
 
@@ -301,29 +300,20 @@ const saveProfile = async () => {
   margin-bottom: 8px;
   font-size: 12px;
   font-weight: 700;
-  color: #6b7280;
+  color: #64748b;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .detail-value {
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: #0f172a;
   line-height: 1.6;
 }
 
-.detail-input {
-  width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-  color: #111827;
-  box-sizing: border-box;
-}
-
 .muted {
-  color: #4b5563;
+  color: #475569;
   font-weight: 500;
 }
 

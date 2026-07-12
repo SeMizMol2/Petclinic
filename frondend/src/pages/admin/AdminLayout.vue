@@ -1,155 +1,76 @@
 <template>
-  <div class="admin-shell">
-    <aside class="admin-sidebar">
-      <div class="brand-panel">
-        <div class="brand-mark-wrap">
-          <div class="brand-mark">PC</div>
-        </div>
+  <div class="workspace-shell admin-theme">
+    <aside class="workspace-sidebar">
+      <div class="workspace-brand">
+        <div class="brand-badge">PC</div>
         <div class="brand-copy">
-          <span class="brand-kicker">Clinic admin</span>
+          <span class="brand-kicker">Clinic Admin</span>
           <h1>Pet Clinic</h1>
-          <p>พื้นที่จัดการลูกค้า สัตว์เลี้ยง การรักษา รายรับรายจ่าย และงานหน้าคลินิกในหน้าจอเดียว</p>
+          <p>พื้นที่จัดการข้อมูลลูกค้า สัตว์เลี้ยง การรักษา การเงิน และงานประจำของคลินิกในมุมมองเดียว</p>
         </div>
       </div>
 
-      <nav class="nav-stack">
-        <section class="nav-section">
-          <p class="nav-caption">ภาพรวม</p>
-          <router-link to="/admin/dashboard" class="nav-item" active-class="active">
-            <span class="nav-code">DB</span>
-            <span class="nav-copy">
-              <strong>Dashboard</strong>
-              <small>ดูภาพรวมคลินิกแบบรายเดือน</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/reports" class="nav-item" active-class="active">
-            <span class="nav-code">RP</span>
-            <span class="nav-copy">
-              <strong>รายงาน</strong>
-              <small>สรุปผลการดำเนินงานและตัวเลขสำคัญ</small>
+      <nav class="workspace-nav">
+        <section class="nav-group">
+          <p class="nav-title">Overview</p>
+          <router-link v-for="item in overviewItems" :key="item.to" :to="item.to" class="nav-link" active-class="active">
+            <span class="nav-icon-wrap"><AppIcon :name="item.icon" :size="18" /></span>
+            <span class="nav-text">
+              <strong>{{ item.label }}</strong>
+              <small>{{ item.description }}</small>
             </span>
           </router-link>
         </section>
 
-        <section class="nav-section">
-          <p class="nav-caption">ข้อมูลหลัก</p>
-          <router-link to="/admin/users" class="nav-item" active-class="active">
-            <span class="nav-code">US</span>
-            <span class="nav-copy">
-              <strong>สมาชิก</strong>
-              <small>ดูแลสิทธิ์การใช้งานของผู้ใช้</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/owners" class="nav-item" active-class="active">
-            <span class="nav-code">OW</span>
-            <span class="nav-copy">
-              <strong>เจ้าของสัตว์</strong>
-              <small>ข้อมูลลูกค้าและช่องทางติดต่อ</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/pets" class="nav-item" active-class="active">
-            <span class="nav-code">PT</span>
-            <span class="nav-copy">
-              <strong>สัตว์เลี้ยง</strong>
-              <small>ข้อมูลสัตว์เลี้ยงทั้งหมดในระบบ</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/veterinarians" class="nav-item" active-class="active">
-            <span class="nav-code">VT</span>
-            <span class="nav-copy">
-              <strong>สัตวแพทย์</strong>
-              <small>รายชื่อและข้อมูลทีมแพทย์</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/clinic" class="nav-item" active-class="active">
-            <span class="nav-code">CL</span>
-            <span class="nav-copy">
-              <strong>ข้อมูลคลินิก</strong>
-              <small>โทรศัพท์ อีเมล และที่อยู่คลินิก</small>
+        <section class="nav-group">
+          <p class="nav-title">Master Data</p>
+          <router-link v-for="item in masterItems" :key="item.to" :to="item.to" class="nav-link" active-class="active">
+            <span class="nav-icon-wrap"><AppIcon :name="item.icon" :size="18" /></span>
+            <span class="nav-text">
+              <strong>{{ item.label }}</strong>
+              <small>{{ item.description }}</small>
             </span>
           </router-link>
         </section>
 
-        <section class="nav-section">
-          <p class="nav-caption">งานบริการ</p>
-          <router-link to="/admin/appointments" class="nav-item" active-class="active">
-            <span class="nav-code">AP</span>
-            <span class="nav-copy">
-              <strong>การนัดหมาย</strong>
-              <small>จัดคิวเข้ารับบริการและติดตามสถานะ</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/services" class="nav-item" active-class="active">
-            <span class="nav-code">SV</span>
-            <span class="nav-copy">
-              <strong>บริการและราคา</strong>
-              <small>จัดการรายการรักษาและค่าบริการ</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/treatments" class="nav-item" active-class="active">
-            <span class="nav-code">TR</span>
-            <span class="nav-copy">
-              <strong>การรักษา</strong>
-              <small>บันทึกอาการ การวินิจฉัย และค่าใช้จ่าย</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/surgeries" class="nav-item" active-class="active">
-            <span class="nav-code">SG</span>
-            <span class="nav-copy">
-              <strong>การผ่าตัด</strong>
-              <small>ติดตามเคสผ่าตัดและสัตวแพทย์ผู้ดูแล</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/vaccines" class="nav-item" active-class="active">
-            <span class="nav-code">VC</span>
-            <span class="nav-copy">
-              <strong>วัคซีน</strong>
-              <small>ประวัติการฉีดวัคซีนและการติดตาม</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/receipts" class="nav-item" active-class="active">
-            <span class="nav-code">RC</span>
-            <span class="nav-copy">
-              <strong>ใบเสร็จรับเงิน</strong>
-              <small>ออกบิลและติดตามสถานะการชำระเงิน</small>
-            </span>
-          </router-link>
-          <router-link to="/admin/expenses" class="nav-item" active-class="active">
-            <span class="nav-code">EX</span>
-            <span class="nav-copy">
-              <strong>รายจ่ายคลินิก</strong>
-              <small>ติดตามต้นทุนและค่าใช้จ่ายทั้งหมด</small>
+        <section class="nav-group">
+          <p class="nav-title">Operations</p>
+          <router-link v-for="item in operationsItems" :key="item.to" :to="item.to" class="nav-link" active-class="active">
+            <span class="nav-icon-wrap"><AppIcon :name="item.icon" :size="18" /></span>
+            <span class="nav-text">
+              <strong>{{ item.label }}</strong>
+              <small>{{ item.description }}</small>
             </span>
           </router-link>
         </section>
       </nav>
 
-      <div class="sidebar-footer">
-        <div class="footer-note">
-          <span class="footer-dot"></span>
-          <p>ตรวจสอบงานหน้าร้าน รายการรักษา รายงานการเงิน และข้อมูลลูกค้าได้จากที่เดียว</p>
+      <div class="workspace-footer">
+        <div class="workspace-note">
+          <span class="note-dot"></span>
+          <p>ตรวจสอบคิวนัด งานรักษา การเงิน และฐานข้อมูลเจ้าของสัตว์ได้จากพื้นที่เดียว</p>
         </div>
-        <button @click="logout" type="button" class="logout-btn">
-          <span class="logout-icon">↩</span>
+        <button @click="logout" type="button" class="logout-button">
+          <AppIcon name="logout" :size="18" />
           <span>ออกจากระบบ</span>
         </button>
       </div>
     </aside>
 
-    <main class="admin-content">
-      <header class="content-header">
+    <main class="workspace-main">
+      <header class="workspace-header">
         <div>
-          <p class="header-label">Clinic workspace</p>
+          <p class="workspace-label">Clinic Workspace</p>
           <h2>{{ pageTitle }}</h2>
-          <p class="header-subtitle">{{ pageSubtitle }}</p>
+          <p class="workspace-subtitle">{{ pageSubtitle }}</p>
         </div>
-        <div class="header-chip">
-          <span class="chip-dot"></span>
+        <div class="workspace-user">
+          <span class="user-dot"></span>
           <span>{{ currentUserName }}</span>
         </div>
       </header>
 
-      <div class="content-shell">
+      <div class="workspace-content">
         <router-view v-slot="{ Component }">
           <transition name="fade-page" mode="out-in">
             <component :is="Component" />
@@ -163,25 +84,49 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AppIcon from '../../components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
 
+const overviewItems = [
+  { to: '/admin/dashboard', icon: 'dashboard', label: 'Dashboard', description: 'ภาพรวมรายได้ รายจ่าย และปริมาณงาน' },
+  { to: '/admin/reports', icon: 'reports', label: 'Reports', description: 'สรุปผลการดำเนินงานและตัวเลขสำคัญ' }
+]
+
+const masterItems = [
+  { to: '/admin/users', icon: 'users', label: 'สมาชิก', description: 'จัดการบัญชีผู้ใช้งานและสิทธิ์' },
+  { to: '/admin/owners', icon: 'user', label: 'เจ้าของสัตว์', description: 'ข้อมูลลูกค้าและช่องทางติดต่อ' },
+  { to: '/admin/pets', icon: 'paw', label: 'สัตว์เลี้ยง', description: 'ข้อมูลสัตว์เลี้ยงทั้งหมดในระบบ' },
+  { to: '/admin/veterinarians', icon: 'stethoscope', label: 'สัตวแพทย์', description: 'ทีมแพทย์และผู้ดูแลการรักษา' },
+  { to: '/admin/clinic', icon: 'clinic', label: 'ข้อมูลคลินิก', description: 'เบอร์ติดต่อ อีเมล และรายละเอียดคลินิก' }
+]
+
+const operationsItems = [
+  { to: '/admin/appointments', icon: 'calendar', label: 'การนัดหมาย', description: 'จัดคิวเข้ารับบริการและติดตามสถานะ' },
+  { to: '/admin/services', icon: 'services', label: 'บริการและราคา', description: 'รายการรักษาและค่าบริการมาตรฐาน' },
+  { to: '/admin/treatments', icon: 'treatment', label: 'การรักษา', description: 'บันทึกอาการ วินิจฉัย และค่ารักษา' },
+  { to: '/admin/surgeries', icon: 'surgery', label: 'การผ่าตัด', description: 'ติดตามเคสผ่าตัดและสัตวแพทย์ผู้ดูแล' },
+  { to: '/admin/vaccines', icon: 'vaccine', label: 'วัคซีน', description: 'ประวัติการฉีดและการติดตามครั้งถัดไป' },
+  { to: '/admin/receipts', icon: 'receipt', label: 'ใบเสร็จรับเงิน', description: 'ออกบิล ติดตามการชำระ และพิมพ์เอกสาร' },
+  { to: '/admin/expenses', icon: 'expense', label: 'รายจ่ายคลินิก', description: 'ต้นทุนและค่าใช้จ่ายในแต่ละวัน' }
+]
+
 const pageMeta = {
-  '/admin/dashboard': ['Dashboard', 'ภาพรวมคลินิก รายได้ รายจ่าย และจำนวนงานที่เกิดขึ้นในช่วงเวลาที่เลือก'],
-  '/admin/users': ['จัดการสมาชิก', 'กำหนดสิทธิ์ผู้ใช้งานและดูสถานะบัญชีในระบบ'],
-  '/admin/owners': ['เจ้าของสัตว์', 'จัดการข้อมูลลูกค้าเพื่อเชื่อมกับสัตว์เลี้ยงและการรักษา'],
+  '/admin/dashboard': ['Dashboard', 'ภาพรวมของคลินิก รายรับ รายจ่าย และจำนวนงานในช่วงเวลาที่เลือก'],
+  '/admin/users': ['จัดการสมาชิก', 'กำหนดสิทธิ์ผู้ใช้งานและดูสถานะบัญชีภายในระบบ'],
+  '/admin/owners': ['เจ้าของสัตว์', 'จัดการข้อมูลลูกค้าเพื่อเชื่อมกับสัตว์เลี้ยงและประวัติรักษา'],
   '/admin/pets': ['สัตว์เลี้ยง', 'ดูข้อมูลสัตว์เลี้ยงแต่ละตัวและเจ้าของที่เกี่ยวข้อง'],
-  '/admin/veterinarians': ['สัตวแพทย์', 'ดูแลข้อมูลทีมสัตวแพทย์และบทบาทในคลินิก'],
-  '/admin/clinic': ['ข้อมูลคลินิก', 'แก้ไขข้อมูลติดต่อและรายละเอียดพื้นฐานของคลินิก'],
-  '/admin/appointments': ['การนัดหมาย', 'จัดคิวนัดหมาย ตรวจสอบวันเวลา และสถานะการเข้ารับบริการ'],
-  '/admin/services': ['บริการและราคา', 'ปรับรายการบริการให้พร้อมใช้กับใบเสร็จและการรักษา'],
+  '/admin/veterinarians': ['สัตวแพทย์', 'ข้อมูลทีมสัตวแพทย์และบทบาทภายในคลินิก'],
+  '/admin/clinic': ['ข้อมูลคลินิก', 'แก้ไขรายละเอียดพื้นฐานและช่องทางติดต่อของคลินิก'],
+  '/admin/appointments': ['การนัดหมาย', 'จัดคิว ตรวจสอบเวลา และติดตามสถานะการเข้ารับบริการ'],
+  '/admin/services': ['บริการและราคา', 'ปรับรายการบริการมาตรฐานให้พร้อมใช้กับการรักษาและใบเสร็จ'],
   '/admin/treatments': ['การรักษา', 'บันทึกอาการ วินิจฉัย รายการรักษา และยอดค่าใช้จ่าย'],
   '/admin/surgeries': ['การผ่าตัด', 'ติดตามเคสผ่าตัด แพทย์ผู้รับผิดชอบ และหมายเหตุสำคัญ'],
-  '/admin/vaccines': ['วัคซีน', 'บันทึกประวัติการฉีดวัคซีนและการนัดติดตามครั้งถัดไป'],
+  '/admin/vaccines': ['วัคซีน', 'บันทึกประวัติการฉีดวัคซีนและนัดติดตามครั้งถัดไป'],
   '/admin/receipts': ['ใบเสร็จรับเงิน', 'จัดการการออกใบเสร็จ การชำระเงิน และการพิมพ์เอกสาร'],
   '/admin/expenses': ['รายจ่ายคลินิก', 'ดูแลต้นทุนและบันทึกรายจ่ายที่เกิดขึ้นในแต่ละวัน'],
-  '/admin/reports': ['รายงาน', 'สรุปภาพรวมเชิงบริหารเพื่อใช้ตรวจสอบแนวโน้มของคลินิก']
+  '/admin/reports': ['รายงาน', 'สรุปภาพรวมเชิงบริหารเพื่อดูแนวโน้มและสถานะของคลินิก']
 }
 
 const currentUserName = computed(() => {
@@ -204,70 +149,59 @@ const logout = () => {
 </script>
 
 <style scoped>
-.admin-shell {
+.workspace-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 310px minmax(0, 1fr);
   background:
-    radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 26%),
-    linear-gradient(180deg, #f8f8fc 0%, #f3f6fb 100%);
-  font-family: Inter, sans-serif;
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 28%),
+    linear-gradient(180deg, #f4f7fb 0%, #eef4f8 100%);
 }
 
-.admin-sidebar {
+.workspace-sidebar {
   padding: 22px 18px;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.96) 100%);
+  gap: 16px;
+  background: #fbfdff;
 }
 
-.brand-panel,
-.nav-section,
-.sidebar-footer,
-.content-header {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(229, 231, 235, 0.92);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+.workspace-brand,
+.nav-group,
+.workspace-footer,
+.workspace-header {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(217, 226, 236, 0.88);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
 }
 
-.brand-panel {
+.workspace-brand {
   display: grid;
   grid-template-columns: auto 1fr;
-  align-items: center;
   gap: 14px;
-  padding: 18px 18px 20px;
+  padding: 18px;
+  align-items: center;
 }
 
-.brand-mark-wrap {
+.brand-badge {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
-}
-
-.brand-mark {
-  width: 50px;
-  height: 50px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
   color: #ffffff;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .brand-kicker,
-.nav-caption,
-.header-label {
+.nav-title,
+.workspace-label {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -275,210 +209,199 @@ const logout = () => {
 .brand-kicker {
   display: block;
   margin-bottom: 6px;
-  color: #6b7280;
+  color: #64748b;
   font-size: 12px;
   font-weight: 700;
 }
 
-.brand-panel h1 {
+.brand-copy h1 {
   margin: 0;
+  color: #0f172a;
   font-size: 24px;
-  color: #111827;
   line-height: 1.1;
 }
 
 .brand-copy p {
-  margin: 7px 0 0;
-  color: #4b5563;
+  margin: 8px 0 0;
+  color: #64748b;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
-.nav-stack {
+.workspace-nav {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.nav-section {
+.nav-group {
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.nav-caption {
-  margin: 2px 4px 6px;
+.nav-title {
+  margin: 4px 6px 8px;
   color: #94a3b8;
   font-size: 11px;
   font-weight: 700;
 }
 
-.nav-item,
-.logout-btn {
+.nav-link,
+.logout-button {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 13px 14px;
-  border-radius: 12px;
+  padding: 12px 13px;
+  border-radius: 14px;
+  color: #334155;
   text-decoration: none;
-  color: #475569;
-  font-size: 15px;
-  font-weight: 600;
   transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
-.nav-item:hover,
-.logout-btn:hover {
-  background: #f8fafc;
-  color: #111827;
+.nav-link:hover,
+.logout-button:hover {
+  background: #f5f9fc;
+  color: #0f172a;
 }
 
-.nav-item.active {
-  background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
-  color: #4338ca;
-  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.22);
+.nav-link.active {
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+  color: #0f766e;
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.15);
 }
 
-.nav-code {
-  width: 36px;
-  height: 36px;
-  border-radius: 11px;
+.nav-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #f3f4f6;
-  color: inherit;
-  font-size: 11px;
-  font-weight: 800;
+  background: #f8fafc;
   flex: none;
 }
 
-.nav-item.active .nav-code {
-  background: rgba(255, 255, 255, 0.76);
+.nav-link.active .nav-icon-wrap {
+  background: #ffffff;
 }
 
-.nav-copy {
+.nav-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.nav-copy strong {
+.nav-text strong {
   font-size: 14px;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
-.nav-copy small {
+.nav-text small {
   color: #64748b;
   font-size: 11.5px;
   line-height: 1.45;
 }
 
-.nav-item.active .nav-copy small {
-  color: #5b5fc7;
-}
-
-.sidebar-footer {
+.workspace-footer {
   padding: 14px;
   margin-top: auto;
 }
 
-.footer-note {
+.workspace-note {
   display: flex;
   gap: 10px;
-  align-items: start;
-  padding: 0 2px 14px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #eef2f7;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #edf2f7;
 }
 
-.footer-dot,
-.chip-dot {
+.note-dot,
+.user-dot {
   width: 10px;
   height: 10px;
-  margin-top: 4px;
   border-radius: 999px;
   flex: none;
 }
 
-.footer-dot {
-  background: #c4b5fd;
+.note-dot {
+  margin-top: 5px;
+  background: #14b8a6;
 }
 
-.footer-note p {
+.workspace-note p {
   margin: 0;
-  color: #6b7280;
+  color: #64748b;
   font-size: 13px;
   line-height: 1.55;
 }
 
-.logout-btn {
+.logout-button {
   justify-content: center;
-  border: 1px solid #ebeef3;
-  background: #fafafa;
+  border: 1px solid #d9e2ec;
+  background: #f8fafc;
   color: #475569;
+  font: inherit;
+  font-weight: 700;
 }
 
-.logout-icon {
-  width: 18px;
-  text-align: center;
-}
-
-.admin-content {
+.workspace-main {
   min-width: 0;
-  padding: 24px 26px;
+  padding: 24px 28px;
 }
 
-.content-header {
+.workspace-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   padding: 18px 22px;
   margin-bottom: 20px;
 }
 
-.header-label {
+.workspace-label {
   margin: 0 0 4px;
-  color: #6b7280;
-  font-size: 13px;
+  color: #64748b;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.content-header h2 {
+.workspace-header h2 {
   margin: 0;
-  font-size: 26px;
-  color: #111827;
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1.1;
 }
 
-.header-subtitle {
+.workspace-subtitle {
   margin: 8px 0 0;
   color: #64748b;
   font-size: 14px;
   line-height: 1.6;
 }
 
-.header-chip {
+.workspace-user {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 12px;
+  padding: 10px 14px;
   border-radius: 999px;
   background: #f8fafc;
-  color: #475569;
+  color: #334155;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.chip-dot {
+.user-dot {
   background: #22c55e;
 }
 
-.content-shell {
-  max-width: 1260px;
+.workspace-content {
+  max-width: 1320px;
   margin: 0 auto;
 }
 
@@ -494,17 +417,17 @@ const logout = () => {
 }
 
 @media (max-width: 1120px) {
-  .admin-shell {
+  .workspace-shell {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
-  .admin-content {
+  .workspace-main {
     padding: 16px;
   }
 
-  .content-header {
+  .workspace-header {
     flex-direction: column;
     align-items: stretch;
   }

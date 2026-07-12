@@ -1,14 +1,15 @@
 <template>
-  <div class="appointments-page">
+  <div class="appointments-page user-page">
     <section class="hero-section">
       <div>
+        <p class="eyebrow">My schedule</p>
         <h1>การนัดหมายของฉัน</h1>
         <p class="hero-text">ตรวจสอบวัน เวลา เหตุผลการนัดหมาย และสถานะการยืนยันจากคลินิกได้แบบรวดเร็ว</p>
       </div>
     </section>
 
     <section v-if="appointments.length === 0" class="empty-section">
-      <h2>ยังไม่มีการนัดหมาย</h2>
+      <strong>ยังไม่มีการนัดหมาย</strong>
       <p>เมื่อมีการจองนัดหมาย รายการต่างๆ จะแสดงในหน้านี้</p>
     </section>
 
@@ -24,6 +25,9 @@
           <div class="appointment-meta">
             <span>สัตว์เลี้ยง: {{ item.pet_name || '-' }}</span>
             <span>เวลา: {{ formatTime(item.appt_time) }} น.</span>
+          </div>
+          <div v-if="item.cancel_reason" class="cancel-note">
+            เหตุผลที่ยกเลิก: {{ item.cancel_reason }}
           </div>
         </div>
 
@@ -86,25 +90,34 @@ onMounted(loadAppointments)
 .hero-section,
 .empty-section,
 .appointment-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(217, 226, 236, 0.92);
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
 }
 
 .hero-section {
   padding: 28px;
 }
 
+.eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .hero-section h1,
-.empty-section h2,
 .appointment-main h2 {
   margin: 0;
-  color: #111827;
+  color: #0f172a;
 }
 
 .hero-text {
   margin: 10px 0 0;
-  color: #4b5563;
+  color: #64748b;
   line-height: 1.7;
 }
 
@@ -113,9 +126,15 @@ onMounted(loadAppointments)
   text-align: center;
 }
 
+.empty-section strong {
+  display: block;
+  color: #0f172a;
+  font-size: 20px;
+}
+
 .empty-section p {
   margin: 10px 0 0;
-  color: #6b7280;
+  color: #64748b;
 }
 
 .appointment-list {
@@ -133,11 +152,12 @@ onMounted(loadAppointments)
 }
 
 .date-badge {
-  background: linear-gradient(180deg, #eef2ff 0%, #e9d5ff 100%);
-  color: #4338ca;
-  border-radius: 8px;
+  background: linear-gradient(180deg, #ecfdf5 0%, #f0fdfa 100%);
+  color: #0f766e;
+  border-radius: 16px;
   padding: 15px 10px;
   text-align: center;
+  border: 1px solid rgba(20, 184, 166, 0.14);
 }
 
 .date-badge span {
@@ -157,7 +177,14 @@ onMounted(loadAppointments)
   flex-wrap: wrap;
   gap: 10px 18px;
   margin-top: 8px;
-  color: #4b5563;
+  color: #475569;
+}
+
+.cancel-note {
+  margin-top: 10px;
+  color: #be123c;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .status-area {

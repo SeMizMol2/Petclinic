@@ -1,7 +1,8 @@
 <template>
-  <div class="receipts-page">
+  <div class="receipts-page user-page">
     <section class="hero-section">
       <div>
+        <p class="eyebrow">Payments</p>
         <h1>ประวัติการชำระเงิน</h1>
         <p class="hero-text">ตรวจสอบยอดชำระ สถานะใบเสร็จ และอัปโหลดหลักฐานการโอนเงินได้จากหน้านี้</p>
       </div>
@@ -9,7 +10,7 @@
 
     <section class="summary-grid" v-if="receipts.length">
       <div class="summary-card">
-        <span>จำนวนใบเสร็จทั้งหมด</span>
+        <span>ใบเสร็จทั้งหมด</span>
         <strong>{{ receipts.length }}</strong>
       </div>
       <div class="summary-card">
@@ -91,7 +92,7 @@ const authHeader = () => {
 
 const isPaid = (item) => {
   const status = String(item.payment_status || '').trim()
-  return status === 'ชำระเสร็จสิ้น' || status.includes('เสร็จ') || status.includes('à¹€à¸ªà¸£à¹‡à¸ˆ')
+  return status === 'ชำระเสร็จสิ้น' || status.includes('เสร็จ')
 }
 
 const paidCount = computed(() => receipts.value.filter((item) => isPaid(item)).length)
@@ -108,10 +109,11 @@ const formatDate = (dateString) => {
   })
 }
 
-const formatCurrency = (amount) => `${Number(amount || 0).toLocaleString('th-TH', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})} บาท`
+const formatCurrency = (amount) =>
+  `${Number(amount || 0).toLocaleString('th-TH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })} บาท`
 
 const loadReceipts = async () => {
   try {
@@ -178,9 +180,10 @@ onMounted(loadReceipts)
 .summary-card,
 .content-shell,
 .receipt-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(217, 226, 236, 0.92);
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
 }
 
 .hero-section,
@@ -188,15 +191,24 @@ onMounted(loadReceipts)
   padding: 28px;
 }
 
+.eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .hero-section h1,
 .receipt-card h2 {
   margin: 0;
-  color: #111827;
+  color: #0f172a;
 }
 
 .hero-text {
   margin: 10px 0 0;
-  color: #4b5563;
+  color: #64748b;
   line-height: 1.7;
 }
 
@@ -218,18 +230,19 @@ onMounted(loadReceipts)
   margin-bottom: 8px;
   font-size: 12px;
   font-weight: 700;
-  color: #6b7280;
+  color: #64748b;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .summary-card strong {
   font-size: 28px;
-  color: #111827;
+  color: #0f172a;
 }
 
 .empty-state {
   text-align: center;
-  color: #6b7280;
+  color: #64748b;
   padding: 24px 0;
 }
 
@@ -253,7 +266,7 @@ onMounted(loadReceipts)
 
 .receipt-main p {
   margin: 8px 0 0;
-  color: #6b7280;
+  color: #64748b;
 }
 
 .receipt-amount {
@@ -262,7 +275,7 @@ onMounted(loadReceipts)
 
 .receipt-amount strong {
   font-size: 22px;
-  color: #111827;
+  color: #0f172a;
 }
 
 .receipt-meta {
@@ -274,7 +287,8 @@ onMounted(loadReceipts)
 
 .meta-item {
   background: #f8fafc;
-  border-radius: 8px;
+  border-radius: 16px;
+  border: 1px solid #e8eef5;
   padding: 14px;
 }
 
@@ -328,13 +342,13 @@ onMounted(loadReceipts)
 
 .upload-box button {
   border: none;
-  border-radius: 8px;
-  padding: 10px 14px;
-  background: #4f46e5;
+  border-radius: 14px;
+  min-height: 44px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   color: #ffffff;
   font-size: 14px;
   font-weight: 700;
-  cursor: pointer;
 }
 
 .upload-box button:disabled {
