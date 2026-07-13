@@ -159,3 +159,24 @@ CREATE TABLE tb_receipt (
         REFERENCES tb_treatment(treatment_id)
         ON DELETE RESTRICT
 );
+
+CREATE TABLE tb_receipt_detail (
+    detail_id VARCHAR(15) PRIMARY KEY,
+    receipt_id VARCHAR(15) NOT NULL,
+    t_detail_id INTEGER,
+    ref_type VARCHAR(50),
+    description VARCHAR(255),
+    amount DECIMAL(10,2),
+    create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_datetime TIMESTAMP,
+
+    CONSTRAINT fk_receipt_detail_receipt
+        FOREIGN KEY (receipt_id)
+        REFERENCES tb_receipt(receipt_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_receipt_detail_treatment_detail
+        FOREIGN KEY (t_detail_id)
+        REFERENCES tb_treatment_detail(detail_id)
+        ON DELETE SET NULL
+);

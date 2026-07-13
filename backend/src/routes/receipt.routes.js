@@ -119,7 +119,7 @@ const buildReceiptDetails = async (dbClient, receiptId, treatmentId) => {
 
     const treatmentDetails = await dbClient.query(
         `
-        SELECT d.service_id, d.quantity, d.price, s.service_name
+        SELECT d.detail_id AS t_detail_id, d.service_id, d.quantity, d.price, s.service_name
         FROM tb_treatment_detail d
         LEFT JOIN tb_service s ON d.service_id = s.service_id
         WHERE d.treatment_id = $1
@@ -138,7 +138,7 @@ const buildReceiptDetails = async (dbClient, receiptId, treatmentId) => {
             INSERT INTO tb_receipt_detail (
                 detail_id,
                 receipt_id,
-                ref_id,
+                t_detail_id,
                 ref_type,
                 description,
                 amount,
@@ -146,7 +146,7 @@ const buildReceiptDetails = async (dbClient, receiptId, treatmentId) => {
             )
             VALUES ($1, $2, $3, $4, $5, $6, NOW())
             `,
-            [detailId, receiptId, treatmentId, 'treatment', description, amount]
+            [detailId, receiptId, item.t_detail_id, 'treatment', description, amount]
         );
     }
 };
@@ -239,7 +239,7 @@ router.get('/detail/:id', auth, async (req, res) => {
         let items = [];
         const itemResult = await pool.query(
             `
-            SELECT detail_id, receipt_id, ref_id, ref_type, description, amount
+            SELECT detail_id, receipt_id, t_detail_id, ref_type, description, amount
             FROM tb_receipt_detail
             WHERE receipt_id = $1
             ORDER BY detail_id ASC
@@ -257,6 +257,7 @@ router.get('/detail/:id', auth, async (req, res) => {
                 `
                 SELECT
                     d.detail_id,
+                    d.detail_id AS t_detail_id,
                     '${'\u0e23\u0e31\u0e01\u0e29\u0e32'}' AS income_type,
                     COALESCE(s.service_name, d.service_id, 'service item') AS description,
                     (COALESCE(d.price, 0) * COALESCE(d.quantity, 0)) AS amount
