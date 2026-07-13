@@ -7,7 +7,7 @@
         </div>
         <div class="brand-copy">
           <span class="brand-kicker">Owner Portal</span>
-          <h1>Pet Clinic</h1>
+          <h1>โรงพยาบาลสัตว์เมืองเลย</h1>
           <p>พื้นที่สำหรับเจ้าของสัตว์เลี้ยงเพื่อติดตามข้อมูลส่วนตัว สัตว์เลี้ยง นัดหมาย และใบเสร็จ</p>
         </div>
       </div>

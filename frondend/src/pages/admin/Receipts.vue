@@ -94,7 +94,7 @@
         <section id="printable-receipt" class="print-sheet">
           <header class="receipt-head">
             <div>
-              <h2>Pet Clinic</h2>
+              <h2>โรงพยาบาลสัตว์เมืองเลย</h2>
               <p>ระบบจัดการข้อมูลการรักษาและบริการสัตว์เลี้ยง</p>
             </div>
             <div class="receipt-title">

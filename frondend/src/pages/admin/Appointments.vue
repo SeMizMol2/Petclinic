@@ -25,6 +25,32 @@
       </div>
     </section>
 
+    <section v-if="appointments.length > 0" class="alert-board">
+      <article class="alert-panel alert-panel-primary">
+        <span class="alert-kicker">overview</span>
+        <strong>{{ adminAlertTitle }}</strong>
+        <p>{{ adminAlertDescription }}</p>
+      </article>
+
+      <article class="alert-panel">
+        <span class="alert-kicker">today</span>
+        <strong>{{ todayAppointments.length }}</strong>
+        <p>คิวที่ต้องดูแลในวันนี้</p>
+      </article>
+
+      <article class="alert-panel">
+        <span class="alert-kicker">tomorrow</span>
+        <strong>{{ tomorrowAppointments.length }}</strong>
+        <p>คิวที่ควรวางแผนล่วงหน้า</p>
+      </article>
+
+      <article class="alert-panel" :class="{ 'alert-panel-danger': overdueAppointments.length > 0 }">
+        <span class="alert-kicker">overdue</span>
+        <strong>{{ overdueAppointments.length }}</strong>
+        <p>รายการที่ผ่านเวลานัดแต่ยังไม่ยกเลิก</p>
+      </article>
+    </section>
+
     <section class="table-panel">
       <div class="table-wrap">
         <table>
@@ -123,15 +149,22 @@
                   type="text"
                   v-model="searchPetQuery"
                   @focus="showPetDropdown = true"
+                  @input="showPetDropdown = true"
+                  @blur="handlePetInputBlur"
                   placeholder="พิมพ์ชื่อสัตว์เลี้ยง เจ้าของ หรือรหัส"
                   required
                 />
                 <button v-if="form.pet_id" @click="clearPetSelection" type="button" class="inline-clear">ล้าง</button>
               </div>
-              <div v-if="showPetDropdown" @click="showPetDropdown = false" class="dropdown-backdrop"></div>
+              <p v-if="searchPetQuery && !form.pet_id" class="field-hint warning-text">
+                กรุณาเลือกสัตว์เลี้ยงจากรายการด้านล่างเพื่อยืนยันรายการนัดหมาย
+              </p>
+              <p v-else-if="form.pet_id" class="field-hint success-text">
+                เลือกสัตว์เลี้ยงแล้ว รหัส {{ form.pet_id }}
+              </p>
               <ul v-if="showPetDropdown" class="pet-dropdown">
                 <li v-if="filteredPets.length === 0" class="dropdown-empty">ไม่พบข้อมูลสัตว์เลี้ยง</li>
-                <li v-for="pet in filteredPets" :key="pet.pet_id" @click="selectPet(pet)" class="dropdown-item">
+                <li v-for="pet in filteredPets" :key="pet.pet_id" @mousedown.prevent="selectPet(pet)" class="dropdown-item">
                   <div class="primary-line">{{ pet.pet_name }}</div>
                   <div class="secondary-line">รหัส: {{ pet.pet_id }} | เจ้าของ: {{ pet.owner_name || 'ไม่ระบุ' }}</div>
                 </li>
@@ -303,6 +336,24 @@ const parseDateOnly = (dateStr) => {
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
 }
 
+const toAppointmentDateTime = (apptDate, apptTime = '00:00') => {
+  const normalizedDate = formatInputDate(apptDate)
+  if (!normalizedDate) return null
+  const safeTime = String(apptTime || '00:00').slice(0, 5)
+  const date = new Date(`${normalizedDate}T${safeTime}:00`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const startOfLocalToday = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+const startOfLocalTomorrow = () => {
+  const today = startOfLocalToday()
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+}
+
 const filteredPets = computed(() => {
   if (!searchPetQuery.value) return petsList.value
   const query = searchPetQuery.value.toLowerCase()
@@ -316,6 +367,50 @@ const filteredAppointments = computed(() => {
   return appointments.value.filter((item) => item.appt_status === statusFilter.value)
 })
 
+const isActiveAppointment = (item) => normalizeAppointmentStatus(item.appt_status) !== APPT_STATUS_CANCELED
+
+const todayAppointments = computed(() => {
+  const today = startOfLocalToday().getTime()
+  const tomorrow = startOfLocalTomorrow().getTime()
+  return appointments.value.filter((item) => {
+    if (!isActiveAppointment(item)) return false
+    const at = toAppointmentDateTime(item.appt_date, item.appt_time)
+    return at && at.getTime() >= today && at.getTime() < tomorrow
+  })
+})
+
+const tomorrowAppointments = computed(() => {
+  const tomorrow = startOfLocalTomorrow().getTime()
+  const nextDay = tomorrow + 24 * 60 * 60 * 1000
+  return appointments.value.filter((item) => {
+    if (!isActiveAppointment(item)) return false
+    const at = toAppointmentDateTime(item.appt_date, item.appt_time)
+    return at && at.getTime() >= tomorrow && at.getTime() < nextDay
+  })
+})
+
+const overdueAppointments = computed(() => {
+  const now = Date.now()
+  return appointments.value.filter((item) => {
+    if (!isActiveAppointment(item)) return false
+    const at = toAppointmentDateTime(item.appt_date, item.appt_time)
+    return at && at.getTime() < now
+  })
+})
+
+const nextUpcomingAppointment = computed(() => {
+  const now = Date.now()
+  return (
+    appointments.value
+      .filter((item) => {
+        if (!isActiveAppointment(item)) return false
+        const at = toAppointmentDateTime(item.appt_date, item.appt_time)
+        return at && at.getTime() >= now
+      })
+      .sort((a, b) => toAppointmentDateTime(a.appt_date, a.appt_time) - toAppointmentDateTime(b.appt_date, b.appt_time))[0] || null
+  )
+})
+
 const selectPet = (pet) => {
   form.value.pet_id = pet.pet_id
   searchPetQuery.value = `${pet.pet_name} (เจ้าของ: ${pet.owner_name || 'ไม่ระบุ'})`
@@ -326,6 +421,12 @@ const clearPetSelection = () => {
   form.value.pet_id = ''
   searchPetQuery.value = ''
   showPetDropdown.value = true
+}
+
+const handlePetInputBlur = () => {
+  setTimeout(() => {
+    showPetDropdown.value = false
+  }, 120)
 }
 
 const getDay = (dateStr) => {
@@ -351,6 +452,17 @@ const formatFullDate = (dateStr) => {
 }
 
 const formatTime = (timeStr) => (timeStr ? String(timeStr).slice(0, 5) : '-')
+const formatShortDate = (dateStr) => {
+  const date = parseDateOnly(dateStr)
+  return date
+    ? date.toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC'
+      })
+    : '-'
+}
 const getInitial = (name) => (name ? String(name).charAt(0).toUpperCase() : '?')
 
 const getPetColor = (name) => {
@@ -358,6 +470,32 @@ const getPetColor = (name) => {
   if (!name) return colors[0]
   return colors[String(name).charCodeAt(0) % colors.length]
 }
+
+const adminAlertTitle = computed(() => {
+  if (todayAppointments.value.length > 0) return 'วันนี้มีคิวรอให้บริการ'
+  if (tomorrowAppointments.value.length > 0) return 'พรุ่งนี้มีคิวนัดหมาย'
+  if (overdueAppointments.value.length > 0) return 'มีรายการเลยเวลานัด'
+  if (nextUpcomingAppointment.value) return 'คิวถัดไปของคลินิก'
+  return 'ไม่มีคิวที่ต้องติดตาม'
+})
+
+const adminAlertDescription = computed(() => {
+  if (todayAppointments.value.length > 0) {
+    const first = todayAppointments.value[0]
+    return `${first.pet_name || 'สัตว์เลี้ยง'} เจ้าของ ${first.owner_name || '-'} เวลา ${formatTime(first.appt_time)} น.`
+  }
+  if (tomorrowAppointments.value.length > 0) {
+    const first = tomorrowAppointments.value[0]
+    return `${first.pet_name || 'สัตว์เลี้ยง'} วันที่ ${formatShortDate(first.appt_date)}`
+  }
+  if (overdueAppointments.value.length > 0) {
+    return `มี ${overdueAppointments.value.length} รายการที่ควรติดต่อกลับหรืออัปเดตสถานะ`
+  }
+  if (nextUpcomingAppointment.value) {
+    return `${nextUpcomingAppointment.value.pet_name || 'สัตว์เลี้ยง'} เวลา ${formatTime(nextUpcomingAppointment.value.appt_time)} น. วันที่ ${formatShortDate(nextUpcomingAppointment.value.appt_date)}`
+  }
+  return 'เมื่อมีการสร้างคิว ระบบจะแสดงรายการสำคัญตรงส่วนนี้'
+})
 
 const fetchAppointments = async () => {
   try {
@@ -432,6 +570,11 @@ const handleSubmit = async () => {
     const headers = { Authorization: `Bearer ${token}` }
 
     if (modalMode.value === 'add') {
+      if (!form.value.pet_id) {
+        alert('กรุณาเลือกสัตว์เลี้ยงจากรายการก่อนบันทึกนัดหมาย')
+        return
+      }
+
       const response = await axios.post(
         'http://localhost:3000/api/appointments',
         {
@@ -724,6 +867,65 @@ th {
   padding: 28px 14px;
 }
 
+.alert-board {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.alert-panel {
+  padding: 20px 22px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(217, 226, 236, 0.92);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.alert-panel-primary {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  border-color: transparent;
+}
+
+.alert-panel-danger {
+  background: linear-gradient(180deg, #fff7f7 0%, #fff1f2 100%);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.alert-kicker {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.alert-panel-primary .alert-kicker {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.alert-panel strong {
+  display: block;
+  margin-top: 10px;
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.alert-panel-primary strong {
+  color: #ffffff;
+}
+
+.alert-panel p {
+  margin: 10px 0 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.alert-panel-primary p {
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .empty-card {
   text-align: center;
 }
@@ -824,15 +1026,9 @@ textarea:focus {
   font-weight: 700;
 }
 
-.dropdown-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-}
-
 .pet-dropdown {
   position: absolute;
-  z-index: 2;
+  z-index: 8;
   width: 100%;
   margin: 8px 0 0;
   padding: 8px;
@@ -863,6 +1059,20 @@ textarea:focus {
   color: #64748b;
 }
 
+.field-hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.warning-text {
+  color: #b45309;
+}
+
+.success-text {
+  color: #0f766e;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -871,6 +1081,11 @@ textarea:focus {
 }
 
 @media (max-width: 900px) {
+  .alert-board,
+  .page-header {
+    grid-template-columns: 1fr;
+  }
+
   .page-header {
     flex-direction: column;
     align-items: stretch;

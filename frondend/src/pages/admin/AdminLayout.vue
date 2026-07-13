@@ -5,7 +5,7 @@
         <div class="brand-badge">PC</div>
         <div class="brand-copy">
           <span class="brand-kicker">Clinic Admin</span>
-          <h1>Pet Clinic</h1>
+          <h1>โรงพยาบาลสัตว์เมืองเลย</h1>
           <p>พื้นที่จัดการข้อมูลลูกค้า สัตว์เลี้ยง การรักษา การเงิน และงานประจำของคลินิกในมุมมองเดียว</p>
         </div>
       </div>

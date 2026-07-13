@@ -3,7 +3,7 @@
     <div class="container navbar-content">
       <router-link to="/" class="brand">
         <div class="logo-icon">+</div>
-        <span class="brand-text">{{ clinicName || 'Pet Clinic' }}</span>
+        <span class="brand-text">{{ clinicName || 'โรงพยาบาลสัตว์เมืองเลย' }}</span>
       </router-link>
 
       <div class="auth-buttons">
@@ -18,7 +18,7 @@
 defineProps({
   clinicName: {
     type: String,
-    default: 'Pet Clinic'
+    default: 'โรงพยาบาลสัตว์เมืองเลย'
   }
 })
 </script>

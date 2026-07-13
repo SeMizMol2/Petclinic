@@ -303,6 +303,16 @@ onMounted(loadPets)
   padding: 28px;
 }
 
+.hero-section,
+.state-section,
+.pet-card,
+.modal-card {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(217, 226, 236, 0.92);
+  border-radius: 22px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: #0f766e;
@@ -338,6 +348,27 @@ onMounted(loadPets)
   justify-content: center;
   gap: 8px;
   text-decoration: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.primary-link,
+.primary-btn {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: #ffffff;
+  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.18);
+}
+
+.secondary-btn,
+.ghost-btn {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: rgba(203, 213, 225, 0.88);
 }
 
 .state-section {
@@ -414,6 +445,15 @@ onMounted(loadPets)
   background: #fef2f2;
   color: #b91c1c;
   border: 1px solid rgba(220, 38, 38, 0.12);
+}
+
+.primary-link:hover,
+.primary-btn:hover,
+.secondary-btn:hover,
+.ghost-btn:hover,
+.danger-btn:hover,
+.close-btn:hover {
+  transform: translateY(-1px);
 }
 
 .metric-grid {
@@ -550,7 +590,20 @@ onMounted(loadPets)
   color: #475569;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+}
+
 .modal-card {
+  width: min(760px, 100%);
+  max-height: min(88vh, 860px);
   overflow: hidden;
 }
 
@@ -579,6 +632,17 @@ onMounted(loadPets)
   padding: 20px;
 }
 
+.close-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(203, 213, 225, 0.88);
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -589,6 +653,35 @@ onMounted(loadPets)
 .form-grid.single,
 .textarea-wrap {
   display: block;
+}
+
+.modal-body label,
+.textarea-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.input-field {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.input-field:focus {
+  border-color: rgba(20, 184, 166, 0.65);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+}
+
+textarea.input-field {
+  min-height: 108px;
+  resize: vertical;
 }
 
 @media (max-width: 720px) {

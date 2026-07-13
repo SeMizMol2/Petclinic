@@ -3,7 +3,7 @@
     <div class="container footer-content">
       <div class="divider"></div>
       <div class="footer-text">
-        <p>&copy; 2026 {{ clinicName || 'Pet Clinic' }} Management System. All rights reserved.</p>
+        <p>&copy; 2026 {{ clinicName || 'โรงพยาบาลสัตว์เมืองเลย' }} Management System. All rights reserved.</p>
       </div>
     </div>
   </footer>
@@ -13,7 +13,7 @@
 defineProps({
   clinicName: {
     type: String,
-    default: 'Pet Clinic'
+    default: 'โรงพยาบาลสัตว์เมืองเลย'
   }
 })
 </script>

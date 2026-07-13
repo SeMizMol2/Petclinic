@@ -48,7 +48,7 @@ const routes = require('./routes');
 app.use('/api', routes);
 
 app.get('/', (req, res) => {
-  res.send('Petclinic API is running');
+  res.send('Muang Loei Animal Hospital API is running');
 });
 
 app.listen(3000, () => {

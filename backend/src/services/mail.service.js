@@ -55,9 +55,9 @@ const formatTime = (value) => {
 };
 
 const getSubjectByType = (type) => {
-    if (type === 'created') return 'ยืนยันการนัดหมาย - Pet Clinic';
-    if (type === 'canceled') return 'แจ้งยกเลิกการนัดหมาย - Pet Clinic';
-    return 'แจ้งเปลี่ยนแปลงการนัดหมาย - Pet Clinic';
+    if (type === 'created') return 'ยืนยันการนัดหมาย - โรงพยาบาลสัตว์เมืองเลย';
+    if (type === 'canceled') return 'แจ้งยกเลิกการนัดหมาย - โรงพยาบาลสัตว์เมืองเลย';
+    return 'แจ้งเปลี่ยนแปลงการนัดหมาย - โรงพยาบาลสัตว์เมืองเลย';
 };
 
 const getHeadingByType = (type) => {
@@ -67,7 +67,7 @@ const getHeadingByType = (type) => {
 };
 
 const buildAppointmentMessage = (type, appointment) => {
-    const clinicName = appointment.clinic_name || 'Pet Clinic';
+    const clinicName = appointment.clinic_name || 'โรงพยาบาลสัตว์เมืองเลย';
     const heading = getHeadingByType(type);
     const dateText = formatThaiDate(appointment.appt_date);
     const timeText = formatTime(appointment.appt_time);

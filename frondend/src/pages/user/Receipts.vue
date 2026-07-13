@@ -182,8 +182,8 @@ onMounted(loadReceipts)
 .receipt-card {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(217, 226, 236, 0.92);
-  border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  border-radius: 22px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.07);
 }
 
 .hero-section,
@@ -338,6 +338,20 @@ onMounted(loadReceipts)
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e8eef5;
+}
+
+.upload-box input[type='file'] {
+  flex: 1 1 260px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: #ffffff;
+  color: #334155;
 }
 
 .upload-box button {
@@ -349,6 +363,8 @@ onMounted(loadReceipts)
   color: #ffffff;
   font-size: 14px;
   font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.18);
 }
 
 .upload-box button:disabled {
