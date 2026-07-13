@@ -7,7 +7,7 @@ router.get('/public', async (req, res) => {
     try {
         const services = await pool.query(
             `
-            SELECT service_id, service_name, service_desc, service_price
+            SELECT service_id, service_name, service_desc, service_price, service_image
             FROM tb_service
             ORDER BY service_id ASC
             `
@@ -37,7 +37,7 @@ router.get('/', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
     try {
-        const { service_name, service_desc, service_price } = req.body;
+        const { service_name, service_desc, service_price, service_image } = req.body;
 
         const lastService = await pool.query(
             'SELECT service_id FROM tb_service ORDER BY service_id DESC LIMIT 1'
@@ -52,10 +52,10 @@ router.post('/', auth, async (req, res) => {
 
         await pool.query(
             `
-            INSERT INTO tb_service (service_id, service_name, service_desc, service_price)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO tb_service (service_id, service_name, service_desc, service_price, service_image)
+            VALUES ($1, $2, $3, $4, $5)
             `,
-            [newId, service_name, service_desc, service_price]
+            [newId, service_name, service_desc, service_price, service_image || null]
         );
 
         res.status(201).json({
@@ -73,7 +73,7 @@ router.post('/', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { service_name, service_desc, service_price } = req.body;
+        const { service_name, service_desc, service_price, service_image } = req.body;
 
         const result = await pool.query(
             `
@@ -81,10 +81,11 @@ router.put('/:id', auth, async (req, res) => {
             SET service_name = $1,
                 service_desc = $2,
                 service_price = $3,
+                service_image = $4,
                 update_datetime = CURRENT_TIMESTAMP
-            WHERE service_id = $4
+            WHERE service_id = $5
             `,
-            [service_name, service_desc, service_price, id]
+            [service_name, service_desc, service_price, service_image || null, id]
         );
 
         if (result.rowCount === 0) {

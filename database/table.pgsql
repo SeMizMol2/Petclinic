@@ -88,6 +88,7 @@ CREATE TABLE tb_service (
     service_name VARCHAR(100) NOT NULL,
     service_desc TEXT,
     service_price DECIMAL(10,2) NOT NULL,
+    service_image VARCHAR(255),
     create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_datetime TIMESTAMP
 );

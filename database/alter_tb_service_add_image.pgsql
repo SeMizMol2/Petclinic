@@ -1,0 +1,2 @@
+ALTER TABLE tb_service
+ADD COLUMN IF NOT EXISTS service_image VARCHAR(255);
