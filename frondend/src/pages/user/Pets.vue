@@ -22,7 +22,8 @@
         <div class="pet-header">
           <div class="pet-identity">
             <div class="pet-avatar">
-              <AppIcon :name="getPetIcon(pet.pet_type)" :size="30" />
+              <img v-if="pet.pet_image" :src="resolveImageUrl(pet.pet_image)" alt="pet photo" />
+              <AppIcon v-else :name="getPetIcon(pet.pet_type)" :size="30" />
             </div>
             <div>
               <h2>{{ pet.pet_name }}</h2>
@@ -55,7 +56,7 @@
           </div>
           <div class="metric-item">
             <span>วันเกิด</span>
-            <strong>{{ formatDateDisplay(pet.pet_birthdate) }}</strong>
+            <strong>{{ formatPetBirthdate(pet.pet_birthdate) }}</strong>
           </div>
         </div>
 
@@ -110,6 +111,19 @@
 
           <div class="modal-body">
             <div class="form-grid single">
+              <label class="image-edit-field">
+                <span>รูปภาพสัตว์เลี้ยง</span>
+                <div class="edit-image-row">
+                  <div class="edit-image-preview">
+                    <img v-if="editImagePreview || editPet.pet_image" :src="editImagePreview || resolveImageUrl(editPet.pet_image)" alt="pet photo" />
+                    <AppIcon v-else :name="getPetIcon(editPet.pet_type)" :size="28" />
+                  </div>
+                  <div class="edit-image-controls">
+                    <input type="file" accept="image/*" @change="handleEditImageChange" />
+                    <input v-model="editPet.pet_image" class="input-field" placeholder="URL / path รูปภาพ" />
+                  </div>
+                </div>
+              </label>
               <label>
                 <span>ชื่อสัตว์เลี้ยง</span>
                 <input v-model="editPet.pet_name" class="input-field" />
@@ -180,6 +194,8 @@ const pets = ref([])
 const loading = ref(false)
 const showEdit = ref(false)
 const editPet = ref({})
+const editImageFile = ref(null)
+const editImagePreview = ref('')
 const historyByPet = ref({})
 
 const getHeaders = () => ({
@@ -197,10 +213,17 @@ const formatDateDisplay = (date) => {
   })
 }
 
+const formatPetBirthdate = (birthdate) => {
+  if (!birthdate) return 'ไม่ทราบวันเกิด'
+  const parsedDate = new Date(birthdate)
+  if (Number.isNaN(parsedDate.getTime())) return 'ไม่ทราบวันเกิด'
+  return formatDateDisplay(birthdate)
+}
+
 const calculateAge = (birthdate) => {
-  if (!birthdate) return '-'
+  if (!birthdate) return 'ไม่ทราบอายุ'
   const birth = new Date(birthdate)
-  if (Number.isNaN(birth.getTime())) return '-'
+  if (Number.isNaN(birth.getTime())) return 'ไม่ทราบอายุ'
 
   const now = new Date()
   let age = now.getFullYear() - birth.getFullYear()
@@ -221,6 +244,42 @@ const getPetIcon = (type) => {
   if (petType.includes('นก') || petType.includes('bird')) return 'bird'
   if (petType.includes('ปลา') || petType.includes('fish')) return 'fish'
   return 'paw'
+}
+
+const resolveImageUrl = (value) => {
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  if (value.startsWith('/uploads/')) return `http://localhost:3000${value}`
+  if (value.startsWith('uploads/')) return `http://localhost:3000/${value}`
+  return value.startsWith('/') ? value : `/${value}`
+}
+
+const handleEditImageChange = (event) => {
+  const file = event.target.files?.[0]
+  editImageFile.value = file || null
+
+  if (editImagePreview.value) {
+    URL.revokeObjectURL(editImagePreview.value)
+  }
+
+  editImagePreview.value = file ? URL.createObjectURL(file) : ''
+}
+
+const buildEditPetFormData = () => {
+  const formData = new FormData()
+
+  Object.entries({
+    ...editPet.value,
+    pet_birthdate: editPet.value.pet_birthdate || ''
+  }).forEach(([key, value]) => {
+    formData.append(key, value ?? '')
+  })
+
+  if (editImageFile.value) {
+    formData.append('petImage', editImageFile.value)
+  }
+
+  return formData
 }
 
 const getRecentHistory = (petId) => (historyByPet.value[petId] || []).slice(0, 2)
@@ -258,12 +317,14 @@ const openEdit = (pet) => {
   }
 
   editPet.value = petData
+  editImageFile.value = null
+  editImagePreview.value = ''
   showEdit.value = true
 }
 
 const updatePet = async () => {
   try {
-    await axios.put(`http://localhost:3000/api/pets/${editPet.value.pet_id}`, editPet.value, getHeaders())
+    await axios.put(`http://localhost:3000/api/pets/${editPet.value.pet_id}`, buildEditPetFormData(), getHeaders())
     alert('บันทึกข้อมูลสัตว์เลี้ยงเรียบร้อยแล้ว')
     showEdit.value = false
     await loadPets()
@@ -423,6 +484,14 @@ onMounted(loadPets)
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0.12);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.pet-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .pet-identity p {
@@ -604,6 +673,8 @@ onMounted(loadPets)
 .modal-card {
   width: min(760px, 100%);
   max-height: min(88vh, 860px);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -626,9 +697,14 @@ onMounted(loadPets)
 .modal-footer {
   border-top: 1px solid #e5edf5;
   justify-content: flex-end;
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.98);
 }
 
 .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   padding: 20px;
 }
 
@@ -653,6 +729,49 @@ onMounted(loadPets)
 .form-grid.single,
 .textarea-wrap {
   display: block;
+}
+
+.image-edit-field {
+  margin-bottom: 16px;
+}
+
+.edit-image-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.edit-image-preview {
+  width: 120px;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
+  color: #0f766e;
+  border: 1px solid rgba(20, 184, 166, 0.16);
+}
+
+.edit-image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.edit-image-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.edit-image-controls input[type="file"] {
+  width: 100%;
+  border: 1px dashed #94a3b8;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+  color: #334155;
 }
 
 .modal-body label,
@@ -696,8 +815,13 @@ textarea.input-field {
   }
 
   .metric-grid,
-  .form-grid {
+  .form-grid,
+  .edit-image-row {
     grid-template-columns: 1fr;
+  }
+
+  .edit-image-preview {
+    width: 100%;
   }
 
   .pet-actions {

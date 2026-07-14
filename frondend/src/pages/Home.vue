@@ -71,7 +71,7 @@
 
       <section class="gallery-showcase">
         <div class="gallery-copy">
-          <p class="section-kicker">Clinic gallery</p>
+          <p class="section-kicker">ภาพจากโรงพยาบาล</p>
           <h2>บรรยากาศและเคสบริการของโรงพยาบาล</h2>
           <p class="section-description">
             ใช้สำหรับแสดงภาพสถานที่จริง การดูแลสัตว์เลี้ยง และเคสที่สะท้อนรูปแบบการให้บริการของโรงพยาบาลสัตว์เมืองเลย
@@ -92,7 +92,7 @@
                 class="gallery-tile"
                 :class="item.tall ? 'tall' : ''"
               >
-                <img :src="item.src" :alt="item.title">
+              <img :src="item.src" :alt="item.title" loading="lazy">
                 <div class="gallery-overlay">
                   <strong>{{ item.title }}</strong>
                   <span>{{ item.note }}</span>
@@ -117,7 +117,7 @@
         <div v-if="services.length" class="service-scroll">
           <article v-for="service in serviceCards" :key="service.service_id" class="service-card">
             <div class="service-media">
-              <img :src="service.image" :alt="service.service_name" />
+              <img :src="service.image" :alt="service.service_name" loading="lazy" />
               <span class="service-id">{{ service.service_id }}</span>
             </div>
 
@@ -177,7 +177,7 @@
 
       <section id="trust" class="trust-section">
         <div class="trust-panel">
-          <p class="section-kicker">System trust</p>
+          <p class="section-kicker">ข้อมูลเชื่อมกันทั้งระบบ</p>
           <h2>รองรับการจัดการข้อมูลเจ้าของ สัตว์เลี้ยง การรักษา และการเงินในระบบเดียว</h2>
           <p>
             ช่วยให้ข้อมูลตั้งแต่นัดหมาย การรักษา วัคซีน ผ่าตัด ไปจนถึงใบเสร็จและการชำระเงินเชื่อมโยงกัน
@@ -265,7 +265,19 @@ const clinicGalleryColumns = computed(() => [
 
 function resolveServiceImage(service) {
   if (service.service_image) {
-    if (/^https?:\/\//i.test(service.service_image) || service.service_image.startsWith('/')) {
+    if (/^https?:\/\//i.test(service.service_image)) {
+      return service.service_image
+    }
+
+    if (service.service_image.startsWith('/uploads/')) {
+      return `http://localhost:3000${service.service_image}`
+    }
+
+    if (service.service_image.startsWith('uploads/')) {
+      return `http://localhost:3000/${service.service_image}`
+    }
+
+    if (service.service_image.startsWith('/')) {
       return service.service_image
     }
 
@@ -310,16 +322,21 @@ onMounted(async () => {
 <style scoped>
 .home-page {
   min-height: 100vh;
+  width: 100%;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at top left, rgba(20, 184, 166, 0.08), transparent 24%),
-    linear-gradient(180deg, #f5f8fb 0%, #edf3f6 100%);
+    radial-gradient(circle at 12% 0%, rgba(20, 184, 166, 0.1), transparent 28%),
+    linear-gradient(180deg, #f7fafc 0%, #edf3f6 100%);
   color: #0f172a;
+}
+
+.home-page * {
+  box-sizing: border-box;
 }
 
 .top-nav,
 .home-main {
-  width: min(1180px, calc(100% - 40px));
+  width: min(1200px, calc(100vw - 48px));
   margin: 0 auto;
 }
 
@@ -328,7 +345,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 24px 0 14px;
+  padding: 22px 0 14px;
 }
 
 .brand {
@@ -355,11 +372,13 @@ onMounted(async () => {
 
 .brand-copy strong {
   font-size: 1.08rem;
+  line-height: 1.25;
 }
 
 .brand-copy span {
   color: #526071;
   font-size: 0.94rem;
+  line-height: 1.45;
 }
 
 .nav-links,
@@ -376,6 +395,11 @@ onMounted(async () => {
   color: #334155;
   text-decoration: none;
   font-weight: 600;
+  transition: color 0.18s ease;
+}
+
+.nav-links a:hover {
+  color: #0f766e;
 }
 
 .nav-solid-button,
@@ -397,11 +421,12 @@ onMounted(async () => {
 .nav-solid-button:hover,
 .primary-button:hover {
   transform: translateY(-1px);
+  background: #0b5e57;
 }
 
 .home-main {
   display: grid;
-  gap: 20px;
+  gap: 22px;
   padding-bottom: 44px;
 }
 
@@ -410,17 +435,18 @@ onMounted(async () => {
 .trust-panel {
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(214, 225, 235, 0.96);
-  border-radius: 18px;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+  border-radius: 16px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
   overflow: hidden;
 }
 
 .hero-section {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
-  gap: 26px;
-  padding: 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 480px);
+  gap: 32px;
+  padding: 32px;
   align-items: center;
+  min-width: 0;
 }
 
 .hero-copy {
@@ -449,9 +475,9 @@ onMounted(async () => {
 
 .hero-copy h1,
 .hero-copy h2 {
-  max-width: 10ch;
-  font-size: 3.5rem;
-  line-height: 1.03;
+  max-width: 13ch;
+  font-size: 3.15rem;
+  line-height: 1.08;
   text-wrap: balance;
 }
 
@@ -463,6 +489,11 @@ onMounted(async () => {
   margin: 0;
   color: #526071;
   line-height: 1.65;
+}
+
+.hero-description,
+.section-description {
+  max-width: 72ch;
 }
 
 .hero-actions {
@@ -509,18 +540,19 @@ onMounted(async () => {
   gap: 16px;
   align-items: stretch;
   min-width: 0;
+  overflow: hidden;
 }
 
 .hero-photo {
   overflow: hidden;
-  border-radius: 22px;
-  min-height: 340px;
+  border-radius: 18px;
+  min-height: 320px;
   background: #e2e8f0;
   aspect-ratio: 4 / 5;
 }
 
 .hero-photo.small {
-  min-height: 340px;
+  min-height: 320px;
   aspect-ratio: 3 / 5;
 }
 
@@ -541,7 +573,7 @@ onMounted(async () => {
 }
 
 .content-section {
-  padding: 22px;
+  padding: 24px;
 }
 
 .section-head {
@@ -554,11 +586,11 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.22fr);
   gap: 20px;
-  padding: 22px;
+  padding: 24px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(214, 225, 235, 0.96);
-  border-radius: 18px;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+  border-radius: 16px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
   overflow: hidden;
 }
 
@@ -572,7 +604,7 @@ onMounted(async () => {
 .gallery-copy h2 {
   margin: 0;
   color: #0f172a;
-  max-width: 12ch;
+  max-width: 14ch;
   line-height: 1.08;
 }
 
@@ -613,7 +645,7 @@ onMounted(async () => {
   min-height: 180px;
   height: 180px;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 16px;
   background: #d7e3ea;
   isolation: isolate;
 }
@@ -681,6 +713,7 @@ onMounted(async () => {
   padding-inline: 4px;
   scroll-snap-type: x proximity;
   overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -699,14 +732,21 @@ onMounted(async () => {
 }
 
 .service-card {
-  flex: 0 0 320px;
+  flex: 0 0 304px;
   overflow: hidden;
   border: 1px solid #e3ecf2;
-  border-radius: 18px;
+  border-radius: 16px;
   background: #ffffff;
   display: grid;
   min-width: 0;
   scroll-snap-align: start;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.service-card:hover {
+  transform: translateY(-2px);
+  border-color: #cfe1ea;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
 
 .service-media {
@@ -775,7 +815,7 @@ onMounted(async () => {
 .clinic-card {
   padding: 18px;
   border: 1px solid #e3ecf2;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #f9fbfc;
   display: grid;
   grid-template-columns: 40px 1fr;
@@ -803,7 +843,7 @@ onMounted(async () => {
 
 .trust-panel {
   padding: 26px;
-  background: linear-gradient(135deg, #0f172a 0%, #12324d 52%, #0f766e 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #17324a 58%, #0f766e 100%);
   border-color: transparent;
 }
 
@@ -845,7 +885,7 @@ onMounted(async () => {
 @media (max-width: 860px) {
   .top-nav,
   .home-main {
-    width: min(100% - 24px, 1180px);
+    width: min(100vw - 24px, 1180px);
   }
 
   .top-nav {
@@ -874,7 +914,7 @@ onMounted(async () => {
   }
 
   .hero-section {
-    padding: 20px;
+    padding: 22px;
   }
 
   .hero-copy h1,
@@ -903,13 +943,27 @@ onMounted(async () => {
 
   .hero-copy h1,
   .hero-copy h2 {
-    font-size: 2.35rem;
+    font-size: 2.15rem;
+  }
+
+  .brand-copy span,
+  .nav-links {
+    display: none;
+  }
+
+  .nav-solid-button,
+  .primary-button {
+    width: 100%;
   }
 
   .content-section,
   .trust-panel,
   .gallery-showcase {
     padding: 18px;
+  }
+
+  .service-card {
+    flex-basis: min(82vw, 304px);
   }
 
   .gallery-board {

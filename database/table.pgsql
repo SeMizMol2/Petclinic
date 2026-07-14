@@ -23,6 +23,7 @@ CREATE TABLE tb_pet (
   pet_id VARCHAR(20) PRIMARY KEY,
   owner_id VARCHAR(20),
   pet_name VARCHAR(50),
+  pet_image VARCHAR(255),
   pet_type VARCHAR(20),
   pet_breed VARCHAR(50),
   pet_gender pet_gender_enum,

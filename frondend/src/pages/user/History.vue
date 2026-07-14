@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="history-page">
     <section class="hero-section">
       <div>
@@ -21,7 +21,8 @@
         <article class="profile-card">
           <div class="profile-top">
             <div class="pet-avatar">
-              <AppIcon :name="getPetIcon(summary.pet.pet_type)" :size="34" />
+              <img v-if="summary.pet.pet_image" :src="resolveImageUrl(summary.pet.pet_image)" alt="pet photo" />
+              <AppIcon v-else :name="getPetIcon(summary.pet.pet_type)" :size="34" />
             </div>
             <div>
               <h2>{{ summary.pet.pet_name }}</h2>
@@ -48,7 +49,7 @@
             </div>
             <div class="info-item">
               <span>วันเกิด</span>
-              <strong>{{ formatDate(summary.pet.pet_birthdate) }}</strong>
+              <strong>{{ formatBirthdate(summary.pet.pet_birthdate) }}</strong>
             </div>
             <div class="info-item">
               <span>แพ้ยา</span>
@@ -266,6 +267,16 @@ const formatDate = (value) => {
   })
 }
 
+const formatBirthdate = (value) => {
+  if (!value) return 'ไม่ทราบวันเกิด'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'ไม่ทราบวันเกิด'
+  return date.toLocaleDateString('th-TH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+}
 const formatDateTime = (value) => {
   if (!value) return '-'
   const date = new Date(value)
@@ -292,9 +303,9 @@ const formatPrice = (value) =>
   })
 
 const calculateAge = (birthdate) => {
-  if (!birthdate) return '-'
+  if (!birthdate) return 'ไม่ทราบอายุ'
   const birth = new Date(birthdate)
-  if (Number.isNaN(birth.getTime())) return '-'
+  if (Number.isNaN(birth.getTime())) return 'ไม่ทราบอายุ'
 
   const now = new Date()
   let age = now.getFullYear() - birth.getFullYear()
@@ -315,6 +326,12 @@ const getPetIcon = (type) => {
   if (petType.includes('นก') || petType.includes('bird')) return 'bird'
   if (petType.includes('ปลา') || petType.includes('fish')) return 'fish'
   return 'paw'
+}
+
+const resolveImageUrl = (value) => {
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  return value.startsWith('/') ? value : `/${value}`
 }
 
 const formatAppointmentSummary = (item) => {
@@ -473,6 +490,14 @@ onMounted(loadSummary)
   place-items: center;
   background: linear-gradient(135deg, #d1fae5 0%, #ccfbf1 100%);
   color: #0f766e;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.pet-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-top p,
@@ -705,3 +730,4 @@ onMounted(loadSummary)
   }
 }
 </style>
+

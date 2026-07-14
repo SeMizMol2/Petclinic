@@ -31,8 +31,16 @@
           <tbody>
             <tr v-for="pet in filteredPets" :key="pet.pet_id">
               <td>
-                <strong>{{ pet.pet_name }}</strong>
-                <span class="muted">{{ pet.pet_id }}</span>
+                <div class="pet-cell">
+                  <div class="pet-thumb">
+                    <img v-if="pet.pet_image" :src="resolveImageUrl(pet.pet_image)" alt="pet photo" />
+                    <span v-else>{{ getPetInitial(pet.pet_name) }}</span>
+                  </div>
+                  <div>
+                    <strong>{{ pet.pet_name }}</strong>
+                    <span class="muted">{{ pet.pet_id }}</span>
+                  </div>
+                </div>
               </td>
               <td>
                 <div>{{ pet.owner_name || '-' }}</div>
@@ -94,6 +102,14 @@
             <input v-model="form.pet_breed" />
           </label>
           <label>
+            Pet image
+            <input v-model="form.pet_image" placeholder="/images/pets/example.jpg or image URL" />
+          </label>
+          <div class="form-preview">
+            <img v-if="form.pet_image" :src="resolveImageUrl(form.pet_image)" alt="pet photo preview" />
+            <span v-else>Pet photo preview</span>
+          </div>
+          <label>
             เพศ
             <select v-model="form.pet_gender" required>
               <option value="" disabled>เลือกเพศ</option>
@@ -147,10 +163,23 @@ const form = ref({})
 
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
+const resolveImageUrl = (value) => {
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  return value.startsWith('/') ? value : `/${value}`
+}
+
+const getPetInitial = (name) => String(name || '?').trim().charAt(0).toUpperCase()
+
 const normalizeDate = (value) => {
   if (!value) return ''
   return String(value).slice(0, 10)
 }
+
+const buildPetPayload = () => ({
+  ...form.value,
+  pet_birthdate: form.value.pet_birthdate || null
+})
 
 const fetchPets = async () => {
   const res = await axios.get('http://localhost:3000/api/admin/pets', { headers: headers() })
@@ -186,6 +215,7 @@ const filteredPets = computed(() => {
 const emptyForm = () => ({
   owner_id: '',
   pet_name: '',
+  pet_image: '',
   pet_type: '',
   pet_breed: '',
   pet_gender: '',
@@ -213,11 +243,13 @@ const closeModal = () => {
 
 const submitPet = async () => {
   try {
+    const payload = buildPetPayload()
+
     if (modalMode.value === 'add') {
-      await axios.post('http://localhost:3000/api/admin/pets', form.value, { headers: headers() })
+      await axios.post('http://localhost:3000/api/admin/pets', payload, { headers: headers() })
       alert('เพิ่มสัตว์เลี้ยงสำเร็จ')
     } else {
-      await axios.put(`http://localhost:3000/api/admin/pets/${form.value.pet_id}`, form.value, { headers: headers() })
+      await axios.put(`http://localhost:3000/api/admin/pets/${form.value.pet_id}`, payload, { headers: headers() })
       alert('แก้ไขสัตว์เลี้ยงสำเร็จ')
     }
     closeModal()
@@ -405,6 +437,31 @@ strong {
   margin-top: 4px;
 }
 
+.pet-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pet-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
+  color: #0f766e;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.pet-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .center {
   text-align: center;
 }
@@ -494,6 +551,25 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.form-preview {
+  min-height: 112px;
+  border-radius: 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.85);
+  background: #f8fafc;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.form-preview img {
+  width: 100%;
+  height: 100%;
+  min-height: 112px;
+  object-fit: cover;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -518,6 +594,10 @@ textarea {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pet-cell {
+    align-items: flex-start;
   }
 }
 </style>

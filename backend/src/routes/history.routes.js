@@ -10,6 +10,7 @@ const getPetWithOwner = async (petId) => {
       p.pet_id,
       p.owner_id,
       p.pet_name,
+      p.pet_image,
       p.pet_type,
       p.pet_breed,
       p.pet_gender,

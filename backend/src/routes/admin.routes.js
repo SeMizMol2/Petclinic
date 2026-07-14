@@ -326,7 +326,8 @@ router.post('/pets', auth, async (req, res) => {
       sterile_status,
       pet_color,
       pet_birthdate,
-      drug_allergy
+      drug_allergy,
+      pet_image
     } = req.body;
 
     if (!owner_id || !pet_name || !pet_type || !pet_gender || !sterile_status) {
@@ -336,14 +337,15 @@ router.post('/pets', auth, async (req, res) => {
     const petId = makeId('P', 20);
     await pool.query(
       `INSERT INTO tb_pet (
-        pet_id, owner_id, pet_name, pet_type, pet_breed,
+        pet_id, owner_id, pet_name, pet_image, pet_type, pet_breed,
         pet_gender, sterile_status, pet_color, pet_birthdate, drug_allergy
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
         petId,
         owner_id,
         pet_name,
+        pet_image || null,
         pet_type,
         pet_breed || null,
         pet_gender,
@@ -375,7 +377,8 @@ router.put('/pets/:id', auth, async (req, res) => {
       sterile_status,
       pet_color,
       pet_birthdate,
-      drug_allergy
+      drug_allergy,
+      pet_image
     } = req.body;
 
     if (!owner_id || !pet_name || !pet_type || !pet_gender || !sterile_status) {
@@ -386,17 +389,19 @@ router.put('/pets/:id', auth, async (req, res) => {
       `UPDATE tb_pet SET
         owner_id = $1,
         pet_name = $2,
-        pet_type = $3,
-        pet_breed = $4,
-        pet_gender = $5,
-        sterile_status = $6,
-        pet_color = $7,
-        pet_birthdate = $8,
-        drug_allergy = $9
-       WHERE pet_id = $10`,
+        pet_image = $3,
+        pet_type = $4,
+        pet_breed = $5,
+        pet_gender = $6,
+        sterile_status = $7,
+        pet_color = $8,
+        pet_birthdate = $9,
+        drug_allergy = $10
+       WHERE pet_id = $11`,
       [
         owner_id,
         pet_name,
+        pet_image || null,
         pet_type,
         pet_breed || null,
         pet_gender,

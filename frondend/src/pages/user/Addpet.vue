@@ -11,6 +11,17 @@
     <form class="form-shell" @submit.prevent="submitPet">
       <section class="form-section">
         <h2>ข้อมูลพื้นฐาน</h2>
+        <div class="image-uploader">
+          <div class="pet-photo-preview">
+            <img v-if="imagePreview" :src="imagePreview" alt="pet photo" />
+            <span v-else>Pet photo</span>
+          </div>
+          <label class="image-picker">
+            <span>รูปภาพสัตว์เลี้ยง</span>
+            <input type="file" accept="image/*" @change="handleImageChange" />
+            <small>เลือกรูปสัตว์เลี้ยงเพื่อแสดงในประวัติรายตัว</small>
+          </label>
+        </div>
         <div class="form-grid">
           <label>
             <span>ชื่อสัตว์เลี้ยง</span>
@@ -78,9 +89,12 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const submitting = ref(false)
+const selectedImage = ref(null)
+const imagePreview = ref('')
 
 const pet = ref({
   pet_name: '',
+  pet_image: '',
   pet_type: '',
   pet_breed: '',
   pet_gender: '',
@@ -89,6 +103,34 @@ const pet = ref({
   pet_birthdate: '',
   drug_allergy: ''
 })
+
+const handleImageChange = (event) => {
+  const file = event.target.files?.[0]
+  selectedImage.value = file || null
+
+  if (imagePreview.value) {
+    URL.revokeObjectURL(imagePreview.value)
+  }
+
+  imagePreview.value = file ? URL.createObjectURL(file) : ''
+}
+
+const buildPetFormData = () => {
+  const formData = new FormData()
+
+  Object.entries({
+    ...pet.value,
+    pet_birthdate: pet.value.pet_birthdate || ''
+  }).forEach(([key, value]) => {
+    formData.append(key, value ?? '')
+  })
+
+  if (selectedImage.value) {
+    formData.append('petImage', selectedImage.value)
+  }
+
+  return formData
+}
 
 const submitPet = async () => {
   const token = localStorage.getItem('token')
@@ -102,7 +144,7 @@ const submitPet = async () => {
   submitting.value = true
 
   try {
-    await axios.post('http://localhost:3000/api/pets', pet.value, {
+    await axios.post('http://localhost:3000/api/pets', buildPetFormData(), {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -121,13 +163,16 @@ const submitPet = async () => {
 .add-pet-page {
   display: grid;
   gap: 20px;
+  color: #0f172a;
+  font-family: inherit;
 }
 
 .hero-section,
 .form-shell {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid rgba(217, 226, 236, 0.92);
+  border-radius: 22px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
 }
 
 .hero-section {
@@ -140,15 +185,18 @@ const submitPet = async () => {
 
 .hero-section h1 {
   margin: 0;
-  color: #111827;
-  font-size: 30px;
+  color: #0f172a;
+  font-size: 32px;
+  line-height: 1.2;
+  letter-spacing: 0;
 }
 
 .hero-text {
   margin: 10px 0 0;
   max-width: 640px;
-  color: #4b5563;
+  color: #64748b;
   line-height: 1.7;
+  font-size: 15px;
 }
 
 .back-link,
@@ -157,19 +205,28 @@ const submitPet = async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  min-height: 44px;
+  border-radius: 14px;
   padding: 10px 15px;
+  font: inherit;
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
   cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
 }
 
 .back-link,
 .secondary-btn {
-  border: 1px solid #d1d5db;
+  border: 1px solid rgba(203, 213, 225, 0.9);
   background: #ffffff;
-  color: #374151;
+  color: #0f172a;
+}
+
+.back-link:hover,
+.secondary-btn:hover,
+.primary-btn:hover {
+  transform: translateY(-1px);
 }
 
 .form-shell {
@@ -182,8 +239,59 @@ const submitPet = async () => {
 
 .form-section h2 {
   margin: 0 0 16px;
-  font-size: 18px;
-  color: #111827;
+  font-size: 20px;
+  line-height: 1.35;
+  color: #0f172a;
+}
+
+.image-uploader {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid #d9e2ec;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.pet-photo-preview {
+  width: 132px;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #ecfdf5, #e0f2fe);
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  border: 1px solid rgba(20, 184, 166, 0.14);
+}
+
+.pet-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-picker input {
+  width: 100%;
+  border: 1px dashed #94a3b8;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+}
+
+.image-picker small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  line-height: 1.55;
 }
 
 .form-grid {
@@ -195,20 +303,35 @@ const submitPet = async () => {
 label span {
   display: block;
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
+  color: #334155;
+  letter-spacing: 0;
 }
 
 .input-field {
   width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 11px 12px;
-  font-size: 14px;
-  color: #111827;
+  min-height: 48px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 15px;
+  color: #0f172a;
   box-sizing: border-box;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.input-field::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.input-field:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
 }
 
 .actions {
@@ -220,8 +343,9 @@ label span {
 
 .primary-btn {
   border: none;
-  background: #4f46e5;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   color: #ffffff;
+  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.18);
 }
 
 .primary-btn:disabled {
@@ -238,6 +362,14 @@ label span {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .image-uploader {
+    grid-template-columns: 1fr;
+  }
+
+  .pet-photo-preview {
+    width: 100%;
   }
 }
 </style>
