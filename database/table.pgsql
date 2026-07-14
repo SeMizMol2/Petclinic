@@ -6,6 +6,10 @@ CREATE TABLE tb_user (
     user_role user_role_enum
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tb_user_email_lower
+ON tb_user (LOWER(email))
+WHERE email IS NOT NULL AND TRIM(email) <> '';
+
 CREATE TABLE tb_owner (
   owner_id VARCHAR(20) PRIMARY KEY,
   user_id VARCHAR(20),

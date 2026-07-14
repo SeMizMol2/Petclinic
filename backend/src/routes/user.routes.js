@@ -6,6 +6,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
 router.get('/me', auth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -36,15 +39,35 @@ router.get('/me', auth, async (req, res) => {
 });
 
 router.put('/me', auth, async (req, res) => {
+  let client;
   try {
     const { owner_name, owner_email, tel } = req.body;
+    const normalizedEmail = normalizeEmail(owner_email);
 
-    await pool.query(
+    if (normalizedEmail && !emailPattern.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'รูปแบบอีเมลไม่ถูกต้อง' });
+    }
+
+    client = await pool.connect();
+
+    if (normalizedEmail) {
+      const duplicateEmail = await client.query(
+        'SELECT user_id FROM tb_user WHERE LOWER(email) = $1 AND user_id <> $2 LIMIT 1',
+        [normalizedEmail, req.user.user_id]
+      );
+
+      if (duplicateEmail.rows.length > 0) {
+        return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
+      }
+    }
+
+    await client.query('BEGIN');
+    await client.query(
       'UPDATE tb_user SET email = $1 WHERE user_id = $2',
-      [owner_email || null, req.user.user_id]
+      [normalizedEmail || null, req.user.user_id]
     );
 
-    await pool.query(
+    await client.query(
       `
       UPDATE tb_owner
       SET owner_name = $1,
@@ -52,16 +75,22 @@ router.put('/me', auth, async (req, res) => {
           owner_tel = $3
       WHERE user_id = $4
       `,
-      [owner_name || null, owner_email || null, tel || null, req.user.user_id]
+      [owner_name || null, normalizedEmail || null, tel || null, req.user.user_id]
     );
 
+    await client.query('COMMIT');
     res.json({ message: 'บันทึกสำเร็จ' });
   } catch (err) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Update user profile error:', err);
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
+    }
     res.status(500).json({ message: 'บันทึกข้อมูลไม่สำเร็จ' });
+  } finally {
+    if (client) client.release();
   }
 });
-
 const uploadDir = path.join(__dirname, '../../../uploads/profiles');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });

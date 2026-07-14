@@ -4,6 +4,9 @@ const pool = require('../database/db');
 const auth = require('./auth.middleware');
 const bcrypt = require('bcryptjs');
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
 const requireAdmin = (req, res) => {
   if (req.user.role !== 'admin') {
     res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึง' });
@@ -78,6 +81,11 @@ router.get('/users', auth, async (req, res) => {
 router.post('/users', auth, async (req, res) => {
   try {
     const { owner_name, email, tel } = req.body;
+    const normalizedEmail = normalizeEmail(email);
+
+    if (normalizedEmail && !emailPattern.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
 
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์ทำรายการ' });
@@ -92,18 +100,21 @@ router.post('/users', auth, async (req, res) => {
     await pool.query(
       `INSERT INTO tb_user (user_id, username, email, password, user_role)
        VALUES ($1, $2, $3, $4, $5)`,
-      [userId, mockUsername, email || null, mockPassword, 'user']
+      [userId, mockUsername, normalizedEmail || null, mockPassword, 'user']
     );
 
     await pool.query(
       `INSERT INTO tb_owner (owner_id, user_id, owner_name, owner_email, owner_tel)
        VALUES ($1, $2, $3, $4, $5)`,
-      [ownerId, userId, owner_name, email, tel]
+      [ownerId, userId, owner_name, normalizedEmail || null, tel]
     );
 
     res.json({ message: 'เพิ่มสมาชิกสำเร็จ', username: mockUsername });
   } catch (err) {
     console.error(err);
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
     res.status(500).json({ message: 'เพิ่มสมาชิกไม่สำเร็จ' });
   }
 });
@@ -129,6 +140,11 @@ router.put('/users/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
     const { username, owner_name, email, tel } = req.body;
+    const normalizedEmail = normalizeEmail(email);
+
+    if (normalizedEmail && !emailPattern.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
 
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์ทำรายการ' });
@@ -137,20 +153,23 @@ router.put('/users/:id', auth, async (req, res) => {
     if (username) {
       await pool.query(
         'UPDATE tb_user SET username = $1, email = $2 WHERE user_id = $3',
-        [username, email || null, id]
+        [username, normalizedEmail || null, id]
       );
     } else {
-      await pool.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [email || null, id]);
+      await pool.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [normalizedEmail || null, id]);
     }
 
     await pool.query(
       'UPDATE tb_owner SET owner_name = $1, owner_email = $2, owner_tel = $3 WHERE user_id = $4',
-      [owner_name, email, tel, id]
+      [owner_name, normalizedEmail || null, tel, id]
     );
 
     res.json({ message: 'แก้ไขข้อมูลสำเร็จ' });
   } catch (err) {
     console.error(err);
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
     res.status(500).json({ message: 'แก้ไขไม่สำเร็จ' });
   }
 });
@@ -171,7 +190,7 @@ router.get('/owners', auth, async (req, res) => {
       FROM tb_owner o
       LEFT JOIN tb_user u ON o.user_id = u.user_id
       LEFT JOIN tb_pet p ON o.owner_id = p.owner_id
-      GROUP BY o.owner_id, u.username
+      GROUP BY o.owner_id, u.username, u.email
       ORDER BY o.owner_id DESC
     `);
 
@@ -188,6 +207,11 @@ router.post('/owners', auth, async (req, res) => {
     if (!requireAdmin(req, res)) return;
 
     const { owner_name, owner_email, owner_tel, username, password } = req.body;
+    const normalizedOwnerEmail = normalizeEmail(owner_email);
+
+    if (normalizedOwnerEmail && !emailPattern.test(normalizedOwnerEmail)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
 
     if (!owner_name) {
       return res.status(400).json({ message: 'กรุณากรอกชื่อเจ้าของสัตว์' });
@@ -203,12 +227,12 @@ router.post('/owners', auth, async (req, res) => {
     await client.query(
       `INSERT INTO tb_user (user_id, username, email, password, user_role)
        VALUES ($1, $2, $3, $4, $5)`,
-      [userId, loginName, owner_email || null, hashedPassword, 'user']
+      [userId, loginName, normalizedOwnerEmail || null, hashedPassword, 'user']
     );
     await client.query(
       `INSERT INTO tb_owner (owner_id, user_id, owner_name, owner_email, owner_tel)
        VALUES ($1, $2, $3, $4, $5)`,
-      [ownerId, userId, owner_name, owner_email || null, owner_tel || null]
+      [ownerId, userId, owner_name, normalizedOwnerEmail || null, owner_tel || null]
     );
     await client.query('COMMIT');
 
@@ -221,6 +245,9 @@ router.post('/owners', auth, async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
     res.status(500).json({ message: 'เพิ่มเจ้าของสัตว์ไม่สำเร็จ' });
   } finally {
     client.release();
@@ -233,6 +260,11 @@ router.put('/owners/:id', auth, async (req, res) => {
 
     const { id } = req.params;
     const { owner_name, owner_email, owner_tel, username } = req.body;
+    const normalizedOwnerEmail = normalizeEmail(owner_email);
+
+    if (normalizedOwnerEmail && !emailPattern.test(normalizedOwnerEmail)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
 
     if (!owner_name) {
       return res.status(400).json({ message: 'กรุณากรอกชื่อเจ้าของสัตว์' });
@@ -245,7 +277,7 @@ router.put('/owners/:id', auth, async (req, res) => {
            owner_tel = $3
        WHERE owner_id = $4
        RETURNING user_id`,
-      [owner_name, owner_email || null, owner_tel || null, id]
+      [owner_name, normalizedOwnerEmail || null, owner_tel || null, id]
     );
 
     if (result.rows.length === 0) {
@@ -255,15 +287,18 @@ router.put('/owners/:id', auth, async (req, res) => {
     if (username && result.rows[0].user_id) {
       await pool.query(
         'UPDATE tb_user SET username = $1, email = $2 WHERE user_id = $3',
-        [username, owner_email || null, result.rows[0].user_id]
+        [username, normalizedOwnerEmail || null, result.rows[0].user_id]
       );
     } else if (result.rows[0].user_id) {
-      await pool.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [owner_email || null, result.rows[0].user_id]);
+      await pool.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [normalizedOwnerEmail || null, result.rows[0].user_id]);
     }
 
     res.json({ message: 'แก้ไขเจ้าของสัตว์สำเร็จ' });
   } catch (err) {
     console.error(err);
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
     res.status(500).json({ message: 'แก้ไขเจ้าของสัตว์ไม่สำเร็จ' });
   }
 });

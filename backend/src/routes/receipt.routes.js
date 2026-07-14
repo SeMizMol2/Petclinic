@@ -197,7 +197,7 @@ router.get('/detail/:id', auth, async (req, res) => {
                 r.*,
                 o.owner_name,
                 o.owner_tel,
-                o.owner_email,
+                COALESCE(o.owner_email, owner_user.email) AS owner_email,
                 p.pet_name,
                 p.pet_type,
                 p.pet_breed,
@@ -207,6 +207,7 @@ router.get('/detail/:id', auth, async (req, res) => {
                 u.username AS issued_by
             FROM tb_receipt r
             LEFT JOIN tb_owner o ON r.owner_id = o.owner_id
+            LEFT JOIN tb_user owner_user ON o.user_id = owner_user.user_id
             LEFT JOIN tb_treatment t ON r.treatment_id = t.treatment_id
             LEFT JOIN tb_pet p ON t.pet_id = p.pet_id
             LEFT JOIN tb_user u ON r.user_id = u.user_id

@@ -56,6 +56,7 @@
               </td>
               <td class="center">
                 <div class="actions">
+                  <router-link class="action view" :to="`/admin/history/${pet.pet_id}`">สรุป</router-link>
                   <button class="action edit" @click="openEditModal(pet)">แก้ไข</button>
                   <button class="action delete" @click="deletePet(pet)">ลบ</button>
                 </div>
@@ -475,6 +476,16 @@ strong {
 .action {
   min-height: 36px;
   padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.action.view {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  border-color: rgba(59, 130, 246, 0.16);
 }
 
 .action.edit {

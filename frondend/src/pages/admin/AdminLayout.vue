@@ -138,8 +138,17 @@ const currentUserName = computed(() => {
   }
 })
 
-const pageTitle = computed(() => pageMeta[route.path]?.[0] || 'Clinic Admin')
-const pageSubtitle = computed(() => pageMeta[route.path]?.[1] || 'ระบบจัดการคลินิกสัตว์เลี้ยง')
+const pageTitle = computed(() => {
+  if (route.path.startsWith('/admin/history/')) return 'สรุปประวัติสัตว์เลี้ยง'
+  return pageMeta[route.path]?.[0] || 'Clinic Admin'
+})
+
+const pageSubtitle = computed(() => {
+  if (route.path.startsWith('/admin/history/')) {
+    return 'รายงานสรุปข้อมูลสัตว์เลี้ยง เจ้าของ นัดหมาย การรักษา วัคซีน ผ่าตัด และใบเสร็จจากข้อมูลเดิมในระบบ'
+  }
+  return pageMeta[route.path]?.[1] || 'ระบบจัดการคลินิกสัตว์เลี้ยง'
+})
 
 const logout = () => {
   if (!window.confirm('ต้องการออกจากระบบใช่หรือไม่?')) return

@@ -19,11 +19,12 @@ const getPetWithOwner = async (petId) => {
       p.pet_birthdate,
       p.drug_allergy,
       o.owner_name,
-      o.owner_email,
+      COALESCE(o.owner_email, u.email) AS owner_email,
       o.owner_tel,
       o.user_id
     FROM tb_pet p
     LEFT JOIN tb_owner o ON p.owner_id = o.owner_id
+    LEFT JOIN tb_user u ON o.user_id = u.user_id
     WHERE p.pet_id = $1
     LIMIT 1
     `,

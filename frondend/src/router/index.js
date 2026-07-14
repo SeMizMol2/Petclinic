@@ -61,6 +61,7 @@ const routes = [
       { path: 'users', component: AdminUsers},
       { path: 'owners', component: AdminOwners },
       { path: 'pets', component: AdminPets },
+      { path: 'history/:petId', component: History },
       { path: 'veterinarians', component: AdminVeterinarians },
       { path: 'clinic', component: AdminClinic },
       { path: 'surgeries', component: AdminSurgeries },

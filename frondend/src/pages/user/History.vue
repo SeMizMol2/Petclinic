@@ -2,15 +2,15 @@
   <div class="history-page">
     <section class="hero-section">
       <div>
-        <p class="eyebrow">สรุปข้อมูลสัตว์เลี้ยง</p>
+        <p class="eyebrow">รายงานจากข้อมูลเดิมในระบบ</p>
         <h1>สรุปประวัติสัตว์เลี้ยงรายตัว</h1>
         <p class="hero-text" v-if="summary.pet">
           ดูข้อมูลสัตว์เลี้ยง เจ้าของ นัดหมาย การรักษา วัคซีน การผ่าตัด และใบเสร็จของ
           <strong>{{ summary.pet.pet_name }}</strong>
-          ได้ในหน้าเดียว
+          ได้ในหน้าเดียว โดยไม่ต้องบันทึกข้อมูลใหม่
         </p>
       </div>
-      <router-link to="/user/pets" class="back-link">กลับไปหน้าสัตว์เลี้ยง</router-link>
+      <router-link :to="backTarget" class="back-link">{{ backLabel }}</router-link>
     </section>
 
     <section v-if="loading" class="state-section">กำลังโหลดข้อมูล...</section>
@@ -234,7 +234,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import AppIcon from '../../components/AppIcon.vue'
@@ -251,6 +251,10 @@ const summary = ref({
   surgeries: [],
   receipts: []
 })
+
+const isAdminView = computed(() => route.path.startsWith('/admin/'))
+const backTarget = computed(() => (isAdminView.value ? '/admin/pets' : '/user/pets'))
+const backLabel = computed(() => (isAdminView.value ? 'กลับไปหน้าจัดการสัตว์เลี้ยง' : 'กลับไปหน้าสัตว์เลี้ยง'))
 
 const getHeaders = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
