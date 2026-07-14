@@ -14,7 +14,7 @@
       <nav class="nav-links">
         <a href="#services">บริการ</a>
         <a href="#clinic-info">ข้อมูลคลินิก</a>
-        <a href="#trust">เกี่ยวกับระบบ</a>
+        <router-link to="/register">สมาชิก</router-link>
       </nav>
 
       <router-link to="/login" class="nav-solid-button">เข้าสู่ระบบ</router-link>
@@ -29,10 +29,6 @@
             ระบบสำหรับคลินิกและเจ้าของสัตว์เลี้ยงที่ช่วยเชื่อมข้อมูลสัตว์เลี้ยง นัดหมาย การรักษา วัคซีน
             ผ่าตัด และใบเสร็จให้อยู่ในลำดับการทำงานเดียวกัน
           </p>
-
-          <div class="hero-actions">
-            <router-link to="/login" class="primary-button">เข้าสู่ระบบ</router-link>
-          </div>
 
           <div class="hero-trust-row">
             <div class="trust-item">
@@ -56,14 +52,8 @@
         <div class="hero-gallery">
           <article class="hero-photo large">
             <img
-              src="https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=80"
-              alt="สุนัขในโรงพยาบาลสัตว์"
-            />
-          </article>
-          <article class="hero-photo small">
-            <img
-              src="https://images.unsplash.com/photo-1519052537078-e6302a4968d4?auto=format&fit=crop&w=900&q=80"
-              alt="แมวสำหรับการดูแลและรักษา"
+              src="/images/clinic-gallery/รูปภาพ1.png"
+              alt="ภาพหน้าโรงพยาบาลสัตว์เมืองเลย"
             />
           </article>
         </div>
@@ -442,7 +432,7 @@ onMounted(async () => {
 
 .hero-section {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 480px);
+  grid-template-columns: minmax(0, 1fr) minmax(390px, 520px);
   gap: 32px;
   padding: 32px;
   align-items: center;
@@ -475,9 +465,9 @@ onMounted(async () => {
 
 .hero-copy h1,
 .hero-copy h2 {
-  max-width: 13ch;
-  font-size: 3.15rem;
-  line-height: 1.08;
+  max-width: 18ch;
+  font-size: clamp(2.55rem, 4.2vw, 4.2rem);
+  line-height: 1.12;
   text-wrap: balance;
 }
 
@@ -535,9 +525,7 @@ onMounted(async () => {
 }
 
 .hero-gallery {
-  display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 16px;
+  display: block;
   align-items: stretch;
   min-width: 0;
   overflow: hidden;
@@ -545,15 +533,10 @@ onMounted(async () => {
 
 .hero-photo {
   overflow: hidden;
-  border-radius: 18px;
-  min-height: 320px;
+  border-radius: 22px;
+  min-height: 420px;
   background: #e2e8f0;
-  aspect-ratio: 4 / 5;
-}
-
-.hero-photo.small {
-  min-height: 320px;
-  aspect-ratio: 3 / 5;
+  aspect-ratio: 4 / 3;
 }
 
 .hero-photo img {
@@ -565,11 +548,7 @@ onMounted(async () => {
 }
 
 .hero-photo.large img {
-  object-position: center 38%;
-}
-
-.hero-photo.small img {
-  object-position: center 28%;
+  object-position: center;
 }
 
 .content-section {
@@ -873,8 +852,8 @@ onMounted(async () => {
 
   .hero-copy h1,
   .hero-copy h2 {
-    max-width: 12ch;
-    font-size: 3rem;
+    max-width: 18ch;
+    font-size: clamp(2.45rem, 6vw, 3.4rem);
   }
 
   .gallery-copy h2 {
@@ -944,6 +923,7 @@ onMounted(async () => {
   .hero-copy h1,
   .hero-copy h2 {
     font-size: 2.15rem;
+    line-height: 1.16;
   }
 
   .brand-copy span,

@@ -10,7 +10,17 @@
         </div>
       </div>
 
-      <nav class="workspace-nav">
+      <button
+        type="button"
+        class="mobile-menu-button"
+        :aria-expanded="isMobileMenuOpen"
+        @click="isMobileMenuOpen = !isMobileMenuOpen"
+      >
+        <span>{{ isMobileMenuOpen ? 'ซ่อนเมนู' : 'เมนู' }}</span>
+        <span class="menu-count">{{ navItemCount }}</span>
+      </button>
+
+      <nav class="workspace-nav" :class="{ open: isMobileMenuOpen }">
         <section class="nav-group">
           <p class="nav-title">Overview</p>
           <router-link v-for="item in overviewItems" :key="item.to" :to="item.to" class="nav-link" active-class="active">
@@ -67,6 +77,10 @@
         <div class="workspace-user">
           <span class="user-dot"></span>
           <span>{{ currentUserName }}</span>
+          <button @click="logout" type="button" class="header-logout-button" aria-label="ออกจากระบบ">
+            <AppIcon name="logout" :size="16" />
+            <span>ออกจากระบบ</span>
+          </button>
         </div>
       </header>
 
@@ -82,12 +96,13 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '../../components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
+const isMobileMenuOpen = ref(false)
 
 const overviewItems = [
   { to: '/admin/dashboard', icon: 'dashboard', label: 'Dashboard', description: 'ภาพรวมรายได้ รายจ่าย และปริมาณงาน' },
@@ -111,6 +126,8 @@ const operationsItems = [
   { to: '/admin/receipts', icon: 'receipt', label: 'ใบเสร็จรับเงิน', description: 'ออกบิล ติดตามการชำระ และพิมพ์เอกสาร' },
   { to: '/admin/expenses', icon: 'expense', label: 'รายจ่ายคลินิก', description: 'ต้นทุนและค่าใช้จ่ายในแต่ละวัน' }
 ]
+
+const navItemCount = computed(() => overviewItems.length + masterItems.length + operationsItems.length)
 
 const pageMeta = {
   '/admin/dashboard': ['Dashboard', 'ภาพรวมของคลินิก รายรับ รายจ่าย และจำนวนงานในช่วงเวลาที่เลือก'],
@@ -155,6 +172,13 @@ const logout = () => {
   localStorage.clear()
   router.push('/login')
 }
+
+watch(
+  () => route.fullPath,
+  () => {
+    isMobileMenuOpen.value = false
+  }
+)
 </script>
 
 <style scoped>
@@ -241,6 +265,10 @@ const logout = () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.mobile-menu-button {
+  display: none;
 }
 
 .nav-group {
@@ -429,9 +457,114 @@ const logout = () => {
   .workspace-shell {
     grid-template-columns: 1fr;
   }
+
+  .workspace-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: 14px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(248, 250, 252, 0.98);
+    backdrop-filter: blur(14px);
+  }
+
+  .workspace-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    overflow: visible;
+    padding: 2px;
+  }
+
+  .nav-group {
+    display: contents;
+  }
+
+  .nav-title {
+    display: none;
+  }
+
+  .nav-link {
+    width: 100%;
+    min-width: 0;
+    background: #ffffff;
+    border: 1px solid rgba(217, 226, 236, 0.88);
+  }
+
+  .workspace-footer {
+    display: none;
+  }
 }
 
 @media (max-width: 760px) {
+  .mobile-menu-button {
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 14px;
+    border: 1px solid rgba(217, 226, 236, 0.94);
+    border-radius: 16px;
+    background: #ffffff;
+    color: #0f172a;
+    font: inherit;
+    font-weight: 800;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  }
+
+  .menu-count {
+    min-width: 30px;
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #ecfdf5;
+    color: #0f766e;
+    font-size: 12px;
+  }
+
+  .workspace-nav {
+    display: none;
+  }
+
+  .workspace-nav.open {
+    display: grid;
+  }
+
+  .workspace-brand {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .brand-badge {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    font-size: 18px;
+  }
+
+  .brand-copy h1 {
+    font-size: 1.08rem;
+  }
+
+  .brand-copy p,
+  .nav-text small,
+  .workspace-label {
+    display: none;
+  }
+
+  .nav-link {
+    padding: 10px 12px;
+  }
+
+  .nav-icon-wrap {
+    width: 34px;
+    height: 34px;
+  }
+
   .workspace-main {
     padding: 16px;
   }
@@ -439,6 +572,18 @@ const logout = () => {
   .workspace-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .workspace-user {
+    justify-content: space-between;
+    width: 100%;
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .workspace-nav {
+    grid-template-columns: 1fr;
   }
 }
 </style>

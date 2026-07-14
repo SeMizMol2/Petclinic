@@ -30,7 +30,7 @@
           </thead>
           <tbody>
             <tr v-for="pet in filteredPets" :key="pet.pet_id">
-              <td>
+              <td data-label="สัตว์เลี้ยง">
                 <div class="pet-cell">
                   <div class="pet-thumb">
                     <img v-if="pet.pet_image" :src="resolveImageUrl(pet.pet_image)" alt="pet photo" />
@@ -42,19 +42,19 @@
                   </div>
                 </div>
               </td>
-              <td>
+              <td data-label="เจ้าของ">
                 <div>{{ pet.owner_name || '-' }}</div>
                 <span class="muted">{{ pet.owner_tel || '-' }}</span>
               </td>
-              <td>
+              <td data-label="ข้อมูลทั่วไป">
                 <div>{{ pet.pet_type || '-' }} / {{ pet.pet_breed || '-' }}</div>
                 <span class="muted">{{ pet.pet_gender || '-' }} · {{ pet.pet_color || '-' }}</span>
               </td>
-              <td>
+              <td data-label="สุขภาพ">
                 <div>{{ pet.sterile_status || '-' }}</div>
                 <span class="muted">แพ้ยา: {{ pet.drug_allergy || '-' }}</span>
               </td>
-              <td class="center">
+              <td class="center" data-label="จัดการ">
                 <div class="actions">
                   <router-link class="action view" :to="`/admin/history/${pet.pet_id}`">สรุป</router-link>
                   <button class="action edit" @click="openEditModal(pet)">แก้ไข</button>
@@ -609,6 +609,80 @@ textarea {
 
   .pet-cell {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .table-panel {
+    padding: 12px;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  table {
+    border-collapse: separate;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  tr {
+    padding: 14px;
+    border: 1px solid rgba(217, 226, 236, 0.9);
+    border-radius: 16px;
+    background: #ffffff;
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.72);
+    text-align: left !important;
+  }
+
+  td:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  td.state {
+    display: block;
+    text-align: center !important;
+  }
+
+  td.state::before {
+    content: none;
+  }
+
+  .actions {
+    justify-content: stretch;
   }
 }
 </style>

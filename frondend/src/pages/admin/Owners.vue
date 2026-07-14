@@ -30,17 +30,17 @@
           </thead>
           <tbody>
             <tr v-for="owner in filteredOwners" :key="owner.owner_id">
-              <td>
+              <td data-label="เจ้าของสัตว์">
                 <strong>{{ owner.owner_name }}</strong>
                 <span class="muted">{{ owner.owner_id }}</span>
               </td>
-              <td>{{ owner.username || '-' }}</td>
-              <td>
+              <td data-label="บัญชี">{{ owner.username || '-' }}</td>
+              <td data-label="ติดต่อ">
                 <div>{{ owner.owner_tel || '-' }}</div>
                 <span class="muted">{{ owner.owner_email || '-' }}</span>
               </td>
-              <td class="center">{{ owner.pet_count }}</td>
-              <td class="center">
+              <td class="center" data-label="จำนวนสัตว์">{{ owner.pet_count }}</td>
+              <td class="center" data-label="จัดการ">
                 <div class="actions">
                   <button class="action edit" @click="openEditModal(owner)">แก้ไข</button>
                   <button class="action delete" @click="deleteOwner(owner)">ลบ</button>
@@ -463,6 +463,80 @@ textarea {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .table-panel {
+    padding: 12px;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  table {
+    border-collapse: separate;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  tr {
+    padding: 14px;
+    border: 1px solid rgba(217, 226, 236, 0.9);
+    border-radius: 16px;
+    background: #ffffff;
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.72);
+    text-align: left !important;
+  }
+
+  td:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  td.state {
+    display: block;
+    text-align: center !important;
+  }
+
+  td.state::before {
+    content: none;
+  }
+
+  .actions {
+    justify-content: stretch;
   }
 }
 </style>

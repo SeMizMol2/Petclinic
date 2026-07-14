@@ -782,3 +782,268 @@ button {
     padding: 20px;
   }
 }
+
+/* Responsive safety layer for every workspace page */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+table {
+  max-width: 100%;
+}
+
+.workspace-shell,
+.workspace-main,
+.workspace-content,
+.user-content,
+.admin-page,
+.dashboard-page,
+.profile-page,
+.pets-page,
+.user-page {
+  min-width: 0;
+}
+
+.workspace-content,
+.user-content,
+.admin-page,
+.dashboard-page,
+.profile-page,
+.pets-page,
+.user-page {
+  width: 100%;
+  max-width: 100%;
+}
+
+.admin-page > *,
+.dashboard-page > *,
+.profile-page > *,
+.pets-page > *,
+.user-page > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.header-logout-button {
+  min-height: 36px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 8px 16px rgba(225, 29, 72, 0.08);
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.header-logout-button:hover {
+  transform: translateY(-1px);
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.table-wrap,
+.table-responsive,
+.receipt-table-wrap,
+.history-table-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 860px) {
+  .workspace-main {
+    padding: 16px !important;
+  }
+
+  .workspace-header,
+  .admin-page .page-header,
+  .admin-page .toolbar,
+  .dashboard-page .overview-head,
+  .dashboard-page .panel-head {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .workspace-user {
+    align-self: flex-start;
+  }
+
+  .admin-page .form-grid,
+  .admin-page .info-grid,
+  .admin-page .summary-grid,
+  .admin-page .dual-grid,
+  .dashboard-page .overview-grid,
+  .dashboard-page .content-grid,
+  .dashboard-page .summary-row,
+  .dashboard-page .metric-grid,
+  .profile-page .profile-card,
+  .profile-page .info-grid,
+  .pets-page .pet-grid,
+  .pets-page .form-grid,
+  .user-page .summary-grid,
+  .user-page .content-grid,
+  .user-page .detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-page .primary-btn,
+  .admin-page .ghost-btn,
+  .admin-page .danger-btn,
+  .admin-page .search-input,
+  .admin-users-container .toolbar-btn,
+  .admin-page .actions,
+  .admin-page .action,
+  .pets-page .primary-btn,
+  .pets-page .secondary-btn,
+  .pets-page .danger-btn,
+  .profile-page .action-btn {
+    width: 100%;
+  }
+
+  .admin-page table,
+  .admin-users-container table,
+  .dashboard-page .data-table {
+    min-width: 720px;
+  }
+
+  .admin-page .table-panel,
+  .admin-page .table-card,
+  .admin-users-container .table-card {
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --pc-radius: 14px;
+    --pc-radius-sm: 12px;
+  }
+
+  body {
+    background: #f6fafc;
+  }
+
+  .workspace-main {
+    padding: 12px !important;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .workspace-content,
+  .user-content {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+  }
+
+  .admin-page,
+  .dashboard-page,
+  .profile-page,
+  .pets-page,
+  .user-page {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .workspace-header,
+  .admin-page .page-header,
+  .admin-page .toolbar,
+  .admin-page .table-panel,
+  .admin-page .table-card,
+  .admin-page .panel-card,
+  .admin-page .summary-card,
+  .dashboard-page .overview-card,
+  .dashboard-page .panel-card,
+  .dashboard-page .summary-card,
+  .profile-page .hero-section,
+  .profile-page .profile-summary,
+  .profile-page .profile-details,
+  .pets-page .hero-section,
+  .pets-page .state-section,
+  .pets-page .pet-card {
+    border-radius: 14px !important;
+  }
+
+  .workspace-header,
+  .admin-page .page-header,
+  .admin-page .toolbar,
+  .admin-users-container,
+  .dashboard-page .overview-card,
+  .dashboard-page .panel-card {
+    padding: 16px !important;
+  }
+
+  .admin-page .table-panel,
+  .admin-page .table-card,
+  .admin-users-container .table-card {
+    padding: 10px !important;
+  }
+
+  .admin-page .page-header h1,
+  .admin-users-container h2,
+  .dashboard-page .overview-card h1 {
+    font-size: clamp(1.45rem, 8vw, 2rem) !important;
+    line-height: 1.18 !important;
+  }
+
+  .admin-page .modal-overlay,
+  .dashboard-page .modal-overlay,
+  .pets-page .modal-overlay {
+    align-items: flex-end;
+    padding: 10px;
+  }
+
+  .admin-page .modal,
+  .admin-users-container .role-modal,
+  .dashboard-page .modal-card,
+  .pets-page .modal-card,
+  .custom-modal-box {
+    width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 18px !important;
+  }
+
+  .admin-page .modal-actions,
+  .pets-page .modal-actions,
+  .form-actions,
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-page .actions,
+  .pets-page .actions,
+  .user-page .actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .admin-page .action,
+  .pets-page .action,
+  .user-page .action {
+    min-height: 40px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  input,
+  select,
+  textarea,
+  button,
+  .nav-solid-button,
+  .primary-button {
+    max-width: 100%;
+  }
+}
