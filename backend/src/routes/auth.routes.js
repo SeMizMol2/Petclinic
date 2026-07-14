@@ -8,23 +8,36 @@ const adminUsername = process.env.ADMIN_USERNAME;
 const adminPassword = process.env.ADMIN_PASSWORD;
 const adminUserId = process.env.ADMIN_USER_ID || 'admin_001';
 const adminDisplayName = process.env.ADMIN_DISPLAY_NAME || 'Administrator';
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ================= REGISTER =================
 router.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!username || !password) {
+    if (!username || !normalizedEmail || !password) {
       return res.status(400).json({ message: 'กรอกข้อมูลไม่ครบ' });
     }
 
+    if (!emailPattern.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'รูปแบบอีเมลไม่ถูกต้อง' });
+    }
+
     const checkUser = await pool.query(
-      'SELECT * FROM tb_user WHERE username = $1',
-      [username]
+      `SELECT username, email
+       FROM tb_user
+       WHERE username = $1 OR LOWER(email) = $2
+       LIMIT 1`,
+      [username, normalizedEmail]
     );
 
     if (checkUser.rows.length > 0) {
-      return res.status(400).json({ message: 'Username ซ้ำ' });
+      if (checkUser.rows[0].username === username) {
+        return res.status(400).json({ message: 'Username ซ้ำ' });
+      }
+
+      return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -34,15 +47,15 @@ router.post('/register', async (req, res) => {
     const ownerId = 'O' + time;
 
     await pool.query(
-      `INSERT INTO tb_user (user_id, username, password, user_role)
-       VALUES ($1,$2,$3,$4)`,
-      [userId, username, hashedPassword, 'user']
+      `INSERT INTO tb_user (user_id, username, email, password, user_role)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [userId, username, normalizedEmail, hashedPassword, 'user']
     );
 
     await pool.query(
-      `INSERT INTO tb_owner (owner_id, user_id, owner_name)
-       VALUES ($1,$2,$3)`,
-      [ownerId, userId, username]
+      `INSERT INTO tb_owner (owner_id, user_id, owner_name, owner_email)
+       VALUES ($1,$2,$3,$4)`,
+      [ownerId, userId, username, normalizedEmail]
     );
 
     res.json({ message: 'สมัครสมาชิกสำเร็จ' });

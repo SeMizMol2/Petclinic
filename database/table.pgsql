@@ -1,6 +1,7 @@
 CREATE TABLE tb_user (
     user_id VARCHAR(10) PRIMARY KEY,
     username VARCHAR(50),
+    email VARCHAR(100),
     password VARCHAR(255),
     user_role user_role_enum
 );

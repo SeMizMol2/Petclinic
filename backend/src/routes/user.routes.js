@@ -14,7 +14,7 @@ router.get('/me', auth, async (req, res) => {
         u.user_id,
         u.username,
         o.owner_name,
-        o.owner_email,
+        COALESCE(o.owner_email, u.email) AS owner_email,
         o.owner_tel AS tel,
         o.profile_pic
       FROM tb_user u
@@ -38,6 +38,11 @@ router.get('/me', auth, async (req, res) => {
 router.put('/me', auth, async (req, res) => {
   try {
     const { owner_name, owner_email, tel } = req.body;
+
+    await pool.query(
+      'UPDATE tb_user SET email = $1 WHERE user_id = $2',
+      [owner_email || null, req.user.user_id]
+    );
 
     await pool.query(
       `

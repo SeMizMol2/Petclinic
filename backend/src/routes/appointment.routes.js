@@ -91,13 +91,14 @@ const getAppointmentNotificationData = async (appointmentId) => {
             a.cancel_reason,
             p.pet_name,
             o.owner_name,
-            o.owner_email,
+            COALESCE(o.owner_email, u.email) AS owner_email,
             c.clinic_name,
             c.tel AS clinic_tel,
             c.address AS clinic_address
         FROM tb_appointment a
         LEFT JOIN tb_pet p ON a.pet_id = p.pet_id
         LEFT JOIN tb_owner o ON p.owner_id = o.owner_id
+        LEFT JOIN tb_user u ON o.user_id = u.user_id
         LEFT JOIN (
             SELECT clinic_name, tel, address
             FROM tb_clinic

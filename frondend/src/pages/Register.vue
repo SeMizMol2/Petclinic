@@ -14,6 +14,12 @@
         </label>
 
         <label class="field">
+          <span>อีเมล</span>
+          <input v-model.trim="email" type="email" placeholder="example@email.com" required />
+          <small>ใช้สำหรับรับการแจ้งเตือนนัดหมายจากคลินิก</small>
+        </label>
+
+        <label class="field">
           <span>รหัสผ่าน</span>
           <input v-model="password" type="password" placeholder="ตั้งรหัสผ่านที่ปลอดภัย" required />
         </label>
@@ -36,12 +42,14 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const username = ref('')
+const email = ref('')
 const password = ref('')
 
 const register = async () => {
   try {
     await axios.post('http://localhost:3000/api/auth/register', {
       username: username.value,
+      email: email.value,
       password: password.value
     })
 
@@ -111,6 +119,12 @@ const register = async () => {
   color: #334155;
   font-size: 14px;
   font-weight: 700;
+}
+
+.field small {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .field input {

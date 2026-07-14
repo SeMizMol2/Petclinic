@@ -60,7 +60,7 @@ router.get('/users', auth, async (req, res) => {
 
     const users = await pool.query(
       `SELECT u.user_id, u.username, u.user_role,
-              o.owner_name, o.owner_email, o.owner_tel,
+              o.owner_name, COALESCE(o.owner_email, u.email) AS owner_email, o.owner_tel,
               (SELECT COUNT(*) FROM tb_pet p WHERE p.owner_id = o.owner_id) AS pet_count
        FROM tb_user u
        LEFT JOIN tb_owner o ON u.user_id = o.user_id
@@ -90,9 +90,9 @@ router.post('/users', auth, async (req, res) => {
     const mockPassword = await bcrypt.hash('123456', 10);
 
     await pool.query(
-      `INSERT INTO tb_user (user_id, username, password, user_role)
-       VALUES ($1, $2, $3, $4)`,
-      [userId, mockUsername, mockPassword, 'user']
+      `INSERT INTO tb_user (user_id, username, email, password, user_role)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, mockUsername, email || null, mockPassword, 'user']
     );
 
     await pool.query(
@@ -136,9 +136,11 @@ router.put('/users/:id', auth, async (req, res) => {
 
     if (username) {
       await pool.query(
-        'UPDATE tb_user SET username = $1 WHERE user_id = $2',
-        [username, id]
+        'UPDATE tb_user SET username = $1, email = $2 WHERE user_id = $3',
+        [username, email || null, id]
       );
+    } else {
+      await pool.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [email || null, id]);
     }
 
     await pool.query(
@@ -162,7 +164,7 @@ router.get('/owners', auth, async (req, res) => {
         o.owner_id,
         o.user_id,
         o.owner_name,
-        o.owner_email,
+        COALESCE(o.owner_email, u.email) AS owner_email,
         o.owner_tel,
         u.username,
         COALESCE(COUNT(p.pet_id), 0) AS pet_count
@@ -199,9 +201,9 @@ router.post('/owners', auth, async (req, res) => {
 
     await client.query('BEGIN');
     await client.query(
-      `INSERT INTO tb_user (user_id, username, password, user_role)
-       VALUES ($1, $2, $3, $4)`,
-      [userId, loginName, hashedPassword, 'user']
+      `INSERT INTO tb_user (user_id, username, email, password, user_role)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, loginName, owner_email || null, hashedPassword, 'user']
     );
     await client.query(
       `INSERT INTO tb_owner (owner_id, user_id, owner_name, owner_email, owner_tel)
@@ -251,7 +253,12 @@ router.put('/owners/:id', auth, async (req, res) => {
     }
 
     if (username && result.rows[0].user_id) {
-      await pool.query('UPDATE tb_user SET username = $1 WHERE user_id = $2', [username, result.rows[0].user_id]);
+      await pool.query(
+        'UPDATE tb_user SET username = $1, email = $2 WHERE user_id = $3',
+        [username, owner_email || null, result.rows[0].user_id]
+      );
+    } else if (result.rows[0].user_id) {
+      await pool.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [owner_email || null, result.rows[0].user_id]);
     }
 
     res.json({ message: 'แก้ไขเจ้าของสัตว์สำเร็จ' });
