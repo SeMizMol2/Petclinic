@@ -190,6 +190,7 @@ router.get('/owners', auth, async (req, res) => {
       FROM tb_owner o
       LEFT JOIN tb_user u ON o.user_id = u.user_id
       LEFT JOIN tb_pet p ON o.owner_id = p.owner_id
+      WHERE COALESCE(u.user_role, 'user') <> 'admin'
       GROUP BY o.owner_id, u.username, u.email
       ORDER BY o.owner_id DESC
     `);

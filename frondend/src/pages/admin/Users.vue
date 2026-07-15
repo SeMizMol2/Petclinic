@@ -164,7 +164,7 @@ const toggleRole = async (user) => {
       { headers: { Authorization: `Bearer ${token}` } }
     )
 
-    user.user_role = newRole
+    await fetchUsers()
     alert('อัปเดตสิทธิ์สำเร็จ')
   } catch (err) {
     alert(err.response?.data?.message || 'อัปเดตสิทธิ์ไม่สำเร็จ')

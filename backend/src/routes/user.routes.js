@@ -139,7 +139,12 @@ router.get('/all', auth, async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT u.user_id, u.username, u.user_role, o.owner_name, o.owner_tel
+      SELECT
+        u.user_id,
+        u.username,
+        u.user_role,
+        CASE WHEN u.user_role = 'admin' THEN NULL ELSE o.owner_name END AS owner_name,
+        CASE WHEN u.user_role = 'admin' THEN NULL ELSE o.owner_tel END AS owner_tel
       FROM tb_user u
       LEFT JOIN tb_owner o ON u.user_id = o.user_id
       ORDER BY u.username ASC
@@ -162,6 +167,10 @@ router.put('/role/:id', auth, async (req, res) => {
 
     const targetUserId = req.params.id;
     const { user_role } = req.body;
+
+    if (!['admin', 'user'].includes(user_role)) {
+      return res.status(400).json({ message: 'สิทธิ์ผู้ใช้ไม่ถูกต้อง' });
+    }
 
     if (targetUserId === req.user.user_id || targetUserId === req.user.id) {
       return res.status(400).json({ message: 'ไม่สามารถเปลี่ยนสิทธิ์ของตัวเองได้' });
