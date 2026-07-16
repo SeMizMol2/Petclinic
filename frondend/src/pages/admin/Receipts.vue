@@ -3,7 +3,7 @@
     <section class="page-header">
       <div>
         <p class="eyebrow">Finance</p>
-        <h1>ใบเสร็จรับเงิน</h1>
+        <h1>ใบเสร็จชำระเงิน</h1>
         <p class="subtitle">ตรวจสอบสถานะการชำระ ดูรายละเอียด และพิมพ์ใบเสร็จให้ลูกค้า</p>
       </div>
       <button class="ghost-btn" @click="fetchReceipts">รีเฟรช</button>
@@ -98,7 +98,7 @@
               <p>ระบบจัดการข้อมูลการรักษาและบริการสัตว์เลี้ยง</p>
             </div>
             <div class="receipt-title">
-              <h1>ใบเสร็จรับเงิน</h1>
+              <h1>ใบเสร็จชำระเงิน</h1>
               <p>{{ selectedReceipt.receipt.receipt_id }}</p>
             </div>
           </header>
