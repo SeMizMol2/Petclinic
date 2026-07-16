@@ -193,7 +193,12 @@
           <div class="form-grid">
             <label>
               <span>วันที่นัดหมาย *</span>
-              <input v-model="form.appt_date" type="date" required />
+              <input
+                v-model="form.appt_date"
+                type="date"
+                :min="modalMode === 'add' ? todayInputValue() : undefined"
+                required
+              />
             </label>
             <label>
               <span>เวลานัดหมาย *</span>
@@ -212,7 +217,7 @@
             </label>
           </div>
 
-          <div class="form-grid" v-if="modalMode === 'add'">
+          <div class="form-grid">
             <label class="full-width">
               <span>เหตุผล / อาการเบื้องต้น</span>
               <textarea v-model="form.appt_reason" rows="2" placeholder="ระบุอาการเบื้องต้น"></textarea>
@@ -546,6 +551,7 @@ const openEditModal = (appointment) => {
     appt_status: normalizedAppointment.appt_status,
     appt_date: normalizedAppointment.appt_date,
     appt_time: normalizedAppointment.appt_time,
+    appt_reason: appointment.appt_reason || '',
     cancel_reason: normalizedAppointment.cancel_reason
   }
   isModalOpen.value = true
@@ -593,6 +599,7 @@ const handleSubmit = async () => {
         {
           appt_date: form.value.appt_date,
           appt_time: form.value.appt_time,
+          appt_reason: form.value.appt_reason,
           appt_status: form.value.appt_status,
           cancel_reason: form.value.appt_status === APPT_STATUS_CANCELED ? form.value.cancel_reason : null
         },

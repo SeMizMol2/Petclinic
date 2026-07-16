@@ -42,7 +42,11 @@ router.get('/pets', auth, async (req, res) => {
 router.get('/services', auth, async (req, res) => {
     try {
         const services = await pool.query(
-            'SELECT service_id, service_name, service_price FROM tb_service ORDER BY service_id ASC'
+            `
+            SELECT service_id, service_name, service_price, service_type
+            FROM tb_service
+            ORDER BY service_id ASC
+            `
         );
         res.json(services.rows);
     } catch (err) {
@@ -178,8 +182,7 @@ router.put('/:id', auth, async (req, res) => {
                 vet_id = $2,
                 symptom = $3,
                 diagnosis = $4,
-                total_amount = $5,
-                update_datetime = NOW()
+                total_amount = $5
             WHERE treatment_id = $6
             `,
             [pet_id, vet_id || null, symptom || null, diagnosis || null, total_amount || 0, id]
@@ -190,16 +193,54 @@ router.put('/:id', auth, async (req, res) => {
             return res.status(404).json({ message: '\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e01\u0e32\u0e23\u0e23\u0e31\u0e01\u0e29\u0e32' });
         }
 
-        await client.query('DELETE FROM tb_treatment_detail WHERE treatment_id = $1', [id]);
+        const existingDetails = await client.query(
+            'SELECT detail_id FROM tb_treatment_detail WHERE treatment_id = $1',
+            [id]
+        );
+        const existingDetailIds = new Set(existingDetails.rows.map((row) => Number(row.detail_id)));
+        const retainedDetailIds = [];
 
         for (const item of services || []) {
-            await client.query(
+            const detailId = Number(item.detail_id);
+
+            if (Number.isInteger(detailId) && existingDetailIds.has(detailId)) {
+                await client.query(
+                    `
+                    UPDATE tb_treatment_detail
+                    SET service_id = $1,
+                        quantity = $2,
+                        price = $3
+                    WHERE detail_id = $4
+                      AND treatment_id = $5
+                    `,
+                    [item.service_id, item.quantity || 1, item.price || 0, detailId, id]
+                );
+                retainedDetailIds.push(detailId);
+                continue;
+            }
+
+            const insertResult = await client.query(
                 `
                 INSERT INTO tb_treatment_detail (treatment_id, service_id, quantity, price)
                 VALUES ($1, $2, $3, $4)
+                RETURNING detail_id
                 `,
                 [id, item.service_id, item.quantity || 1, item.price || 0]
             );
+            retainedDetailIds.push(Number(insertResult.rows[0].detail_id));
+        }
+
+        if (retainedDetailIds.length > 0) {
+            await client.query(
+                `
+                DELETE FROM tb_treatment_detail
+                WHERE treatment_id = $1
+                  AND NOT (detail_id = ANY($2::int[]))
+                `,
+                [id, retainedDetailIds]
+            );
+        } else {
+            await client.query('DELETE FROM tb_treatment_detail WHERE treatment_id = $1', [id]);
         }
 
         await client.query('COMMIT');

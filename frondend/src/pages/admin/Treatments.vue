@@ -139,13 +139,47 @@
         </div>
       </div>
     </div>
+
+    <div v-if="specialtyFollowUps.length > 0" class="modal-overlay" @click.self="dismissSpecialtyFollowUps">
+      <section class="modal specialty-followup-modal" role="dialog" aria-modal="true" aria-labelledby="followup-title">
+        <div class="modal-head">
+          <div>
+            <h2 id="followup-title">บันทึกการรักษาสำเร็จ</h2>
+            <p>พบรายการที่ควรบันทึกรายละเอียดทางการแพทย์ต่อ เลือกรายการที่ต้องการดำเนินการได้เลย</p>
+          </div>
+          <button @click="dismissSpecialtyFollowUps" class="close-btn" type="button">ปิด</button>
+        </div>
+
+        <div class="followup-list">
+          <article v-for="item in specialtyFollowUps" :key="`${item.type}-${item.service_id}`" class="followup-item">
+            <div>
+              <span class="followup-type">{{ item.type === 'surgery' ? 'เวชระเบียนการผ่าตัด' : 'ประวัติวัคซีน' }}</span>
+              <strong>{{ item.service_name }}</strong>
+              <p>
+                ระบบจะเลือกสัตว์เลี้ยง สัตวแพทย์ และบริการจากการรักษารหัส
+                {{ specialtyTreatmentId }} ให้โดยอัตโนมัติ
+              </p>
+            </div>
+            <button @click="continueToSpecialty(item)" class="primary-btn" type="button">
+              กรอกรายละเอียดต่อ
+            </button>
+          </article>
+        </div>
+
+        <div class="modal-actions">
+          <button @click="dismissSpecialtyFollowUps" class="ghost-btn" type="button">ไว้บันทึกภายหลัง</button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 
+const router = useRouter()
 const treatments = ref([])
 const petsList = ref([])
 const servicesList = ref([])
@@ -154,6 +188,9 @@ const isModalOpen = ref(false)
 const isSubmitting = ref(false)
 const isEditing = ref(false)
 const selectedServiceId = ref('')
+const originalServiceIds = ref(new Set())
+const specialtyFollowUps = ref([])
+const specialtyTreatmentId = ref('')
 
 const emptyForm = () => ({
   treatment_id: '',
@@ -190,6 +227,7 @@ const fetchAllData = async () => {
 const openAddModal = () => {
   isEditing.value = false
   form.value = emptyForm()
+  originalServiceIds.value = new Set()
   selectedServiceId.value = ''
   isModalOpen.value = true
 }
@@ -213,6 +251,7 @@ const openEditModal = async (treatmentId) => {
       }))
     }
     selectedServiceId.value = ''
+    originalServiceIds.value = new Set(form.value.services.map((item) => item.service_id))
     isEditing.value = true
     isModalOpen.value = true
   } catch (err) {
@@ -251,17 +290,68 @@ const totalAmount = computed(() =>
   form.value.services.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0)
 )
 
+const getSpecialtyType = (item) => {
+  const service = servicesList.value.find((entry) => entry.service_id === item.service_id)
+  const text = `${service?.service_type || ''} ${item.service_name || service?.service_name || ''}`.toLowerCase()
+
+  if (/วัคซีน|vaccine|vaccination/.test(text)) return 'vaccine'
+  if (/ผ่าตัด|ทำหมัน|surgery|operation/.test(text)) return 'surgery'
+  return ''
+}
+
+const getSpecialtyFollowUps = () => {
+  const candidates = isEditing.value
+    ? form.value.services.filter((item) => !originalServiceIds.value.has(item.service_id))
+    : form.value.services
+
+  return candidates.reduce((items, serviceItem) => {
+    const type = getSpecialtyType(serviceItem)
+    if (!type || items.some((item) => item.type === type && item.service_id === serviceItem.service_id)) {
+      return items
+    }
+
+    items.push({
+      type,
+      service_id: serviceItem.service_id,
+      service_name: serviceItem.service_name || serviceItem.service_id
+    })
+    return items
+  }, [])
+}
+
+const dismissSpecialtyFollowUps = () => {
+  specialtyFollowUps.value = []
+  specialtyTreatmentId.value = ''
+}
+
+const continueToSpecialty = async (item) => {
+  const path = item.type === 'surgery' ? '/admin/surgeries' : '/admin/vaccines'
+  const query = {
+    source: 'treatment',
+    treatment_id: specialtyTreatmentId.value,
+    pet_id: form.value.pet_id,
+    vet_id: form.value.vet_id || '',
+    service_id: item.service_id,
+    service_name: item.service_name
+  }
+
+  dismissSpecialtyFollowUps()
+  await router.push({ path, query })
+}
+
 const submitTreatment = async () => {
   if (form.value.services.length === 0 && !confirm('ยังไม่มีรายการค่ารักษา ต้องการบันทึกหรือไม่?')) return
 
   isSubmitting.value = true
   try {
+    const followUps = getSpecialtyFollowUps()
     const payload = {
       pet_id: form.value.pet_id,
       vet_id: form.value.vet_id || null,
       symptom: form.value.symptom,
       diagnosis: form.value.diagnosis,
       services: form.value.services.map((item) => ({
+        detail_id: item.detail_id || null,
         service_id: item.service_id,
         quantity: Number(item.quantity || 1),
         price: Number(item.price || 0)
@@ -269,14 +359,20 @@ const submitTreatment = async () => {
       total_amount: totalAmount.value
     }
 
+    let savedTreatmentId = form.value.treatment_id
     if (isEditing.value) {
-      await axios.put(`http://localhost:3000/api/treatments/${form.value.treatment_id}`, payload, { headers: headers() })
+      await axios.put(`http://localhost:3000/api/treatments/${savedTreatmentId}`, payload, { headers: headers() })
     } else {
-      await axios.post('http://localhost:3000/api/treatments', payload, { headers: headers() })
+      const response = await axios.post('http://localhost:3000/api/treatments', payload, { headers: headers() })
+      savedTreatmentId = response.data?.treatment_id || ''
     }
 
     closeModal()
     await fetchAllData()
+    if (followUps.length > 0) {
+      specialtyTreatmentId.value = savedTreatmentId
+      specialtyFollowUps.value = followUps
+    }
   } catch (err) {
     alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึก')
   } finally {
@@ -461,9 +557,61 @@ onMounted(fetchAllData)
   background-color: #f8fafc;
 }
 
+.specialty-followup-modal {
+  width: min(760px, 100%);
+}
+
+.followup-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.followup-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid #dbe3ec;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.followup-item strong {
+  display: block;
+  margin-top: 6px;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.followup-item p {
+  max-width: 58ch;
+  margin: 6px 0 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.followup-type {
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 @media (max-width: 900px) {
   .form-layout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .followup-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .followup-item .primary-btn {
+    width: 100%;
   }
 }
 </style>

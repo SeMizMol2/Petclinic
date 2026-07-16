@@ -58,6 +58,9 @@
           <div>
             <h2>{{ modalMode === 'add' ? 'เพิ่มการผ่าตัด' : 'แก้ไขการผ่าตัด' }}</h2>
             <p>เลือกสัตว์เลี้ยงและสัตวแพทย์ที่เกี่ยวข้องกับการผ่าตัด</p>
+            <p v-if="sourceTreatmentId" class="prefill-note">
+              ข้อมูลพื้นฐานถูกส่งมาจากการรักษารหัส {{ sourceTreatmentId }}
+            </p>
           </div>
           <button type="button" class="close-btn" @click="closeModal">ปิด</button>
         </div>
@@ -115,8 +118,11 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
+const route = useRoute()
+const router = useRouter()
 const rows = ref([])
 const pets = ref([])
 const services = ref([])
@@ -127,6 +133,7 @@ const searchQuery = ref('')
 const isModalOpen = ref(false)
 const modalMode = ref('add')
 const form = ref({})
+const sourceTreatmentId = ref('')
 
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
@@ -179,17 +186,20 @@ const emptyForm = () => ({
 const openAddModal = () => {
   modalMode.value = 'add'
   form.value = emptyForm()
+  sourceTreatmentId.value = ''
   isModalOpen.value = true
 }
 
 const openEditModal = (row) => {
   modalMode.value = 'edit'
   form.value = { ...row }
+  sourceTreatmentId.value = ''
   isModalOpen.value = true
 }
 
 const closeModal = () => {
   isModalOpen.value = false
+  sourceTreatmentId.value = ''
 }
 
 const submitRow = async () => {
@@ -218,7 +228,26 @@ const deleteRow = async (row) => {
   }
 }
 
-onMounted(reloadAll)
+const applyTreatmentPrefill = async () => {
+  if (route.query.source !== 'treatment') return
+
+  sourceTreatmentId.value = String(route.query.treatment_id || '')
+  modalMode.value = 'add'
+  form.value = {
+    ...emptyForm(),
+    surg_type: String(route.query.service_name || ''),
+    service_id: String(route.query.service_id || ''),
+    pet_id: String(route.query.pet_id || ''),
+    vet_id: String(route.query.vet_id || '')
+  }
+  isModalOpen.value = true
+  await router.replace({ path: route.path })
+}
+
+onMounted(async () => {
+  await reloadAll()
+  await applyTreatmentPrefill()
+})
 </script>
 
 <style scoped>
@@ -252,6 +281,7 @@ strong, .muted { display: block; }
 .modal-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .modal-head h2 { margin: 0; }
 .modal-head p { margin: 4px 0 0; color: #64748b; }
+.modal-head .prefill-note { margin-top: 10px; color: #047857; font-weight: 700; }
 .close-btn { background: #f1f5f9; color: #475569; padding: 8px 12px; align-self: flex-start; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 label { display: grid; gap: 7px; font-weight: 700; color: #334155; }

@@ -56,6 +56,13 @@ const normalizeAppointmentTime = (value) => {
     return /^\d{2}:\d{2}(:\d{2})?$/.test(raw) ? raw : null;
 };
 
+const isAppointmentInPast = (apptDate, apptTime) => {
+    const rawTime = String(apptTime || '').slice(0, 8);
+    const normalizedTime = rawTime.length === 5 ? `${rawTime}:00` : rawTime;
+    const appointmentDateTime = new Date(`${apptDate}T${normalizedTime}+07:00`);
+    return Number.isNaN(appointmentDateTime.getTime()) || appointmentDateTime.getTime() < Date.now();
+};
+
 const findConflictingAppointment = async ({ apptDate, apptTime, excludeId = null }) => {
     const result = await pool.query(
         `
@@ -188,6 +195,12 @@ router.post('/', auth, async (req, res) => {
         const apptId = createAppointmentId();
         const normalizedStatus = normalizeStatus(appt_status, APPT_STATUS_CONFIRMED);
 
+        if (normalizedStatus !== APPT_STATUS_CANCELED && isAppointmentInPast(normalizedDate, normalizedTime)) {
+            return res.status(400).json({
+                message: 'วันและเวลานัดหมายต้องไม่เป็นเวลาที่ผ่านมาแล้ว'
+            });
+        }
+
         if (normalizedStatus !== APPT_STATUS_CANCELED) {
             const conflictingAppointment = await findConflictingAppointment({
                 apptDate: normalizedDate,
@@ -247,7 +260,7 @@ router.put('/:id', auth, async (req, res) => {
         if (!ensureAdmin(req, res)) return;
 
         const { id } = req.params;
-        const { appt_date, appt_time, appt_status, cancel_reason } = req.body;
+        const { appt_date, appt_time, appt_reason, appt_status, cancel_reason } = req.body;
         const normalizedDate = normalizeAppointmentDate(appt_date);
         const normalizedTime = normalizeAppointmentTime(appt_time);
         const normalizedStatus = normalizeStatus(appt_status, APPT_STATUS_CONFIRMED);
@@ -255,6 +268,40 @@ router.put('/:id', auth, async (req, res) => {
         if (!normalizedDate || !normalizedTime) {
             return res.status(400).json({
                 message: 'กรุณากรอกวันและเวลานัดหมายให้ถูกต้อง'
+            });
+        }
+
+        const currentAppointment = await pool.query(
+            `
+            SELECT appt_date::text AS appt_date, appt_time::text AS appt_time
+            FROM tb_appointment
+            WHERE appt_id = $1
+            LIMIT 1
+            `,
+            [id]
+        );
+
+        if (currentAppointment.rows.length === 0) {
+            return res.status(404).json({
+                message: 'ไม่พบข้อมูลการนัดหมาย'
+            });
+        }
+
+        const currentDate = String(currentAppointment.rows[0].appt_date).slice(0, 10);
+        const currentTime = String(currentAppointment.rows[0].appt_time || '').slice(0, 8);
+        const requestedTimeValue = String(normalizedTime).slice(0, 8);
+        const requestedTime = requestedTimeValue.length === 5
+            ? `${requestedTimeValue}:00`
+            : requestedTimeValue;
+        const slotChanged = currentDate !== normalizedDate || currentTime !== requestedTime;
+
+        if (
+            normalizedStatus !== APPT_STATUS_CANCELED &&
+            slotChanged &&
+            isAppointmentInPast(normalizedDate, normalizedTime)
+        ) {
+            return res.status(400).json({
+                message: 'ไม่สามารถเลื่อนนัดหมายไปยังวันหรือเวลาที่ผ่านมาแล้วได้'
             });
         }
 
@@ -277,12 +324,13 @@ router.put('/:id', auth, async (req, res) => {
             UPDATE tb_appointment
             SET appt_date = $1,
                 appt_time = $2,
-                appt_status = $3,
-                cancel_reason = $4,
+                appt_reason = $3,
+                appt_status = $4,
+                cancel_reason = $5,
                 update_datetime = NOW()
-            WHERE appt_id = $5
+            WHERE appt_id = $6
             `,
-            [normalizedDate, normalizedTime, normalizedStatus, cancel_reason || null, id]
+            [normalizedDate, normalizedTime, appt_reason || null, normalizedStatus, cancel_reason || null, id]
         );
 
         if (result.rowCount === 0) {
