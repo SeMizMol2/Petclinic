@@ -1,26 +1,8 @@
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 
 const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
-
-const proofUploadDir = path.join(__dirname, '../../../uploads/proofs');
-if (!fs.existsSync(proofUploadDir)) {
-    fs.mkdirSync(proofUploadDir, { recursive: true });
-}
-
-const proofStorage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, proofUploadDir),
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        cb(null, `proof-${req.user.user_id}-${uniqueSuffix}${path.extname(file.originalname)}`);
-    }
-});
-
-const uploadProof = multer({ storage: proofStorage });
 
 const RECEIPT_STATUS_UNPAID = '\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e0a\u0e33\u0e23\u0e30';
 const RECEIPT_STATUS_PAID = '\u0e0a\u0e33\u0e23\u0e30\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e2a\u0e34\u0e49\u0e19';
@@ -163,7 +145,6 @@ router.get('/', auth, async (req, res) => {
                 r.payment_status,
                 r.pay_method,
                 r.pay_date,
-                r.proof_image,
                 r.treatment_id,
                 o.owner_id,
                 o.owner_name,
@@ -302,7 +283,6 @@ router.get('/my-receipts/:user_id', auth, async (req, res) => {
                 r.payment_status,
                 r.pay_method,
                 r.pay_date,
-                r.proof_image,
                 r.treatment_id
             FROM tb_receipt r
             JOIN tb_owner o ON r.owner_id = o.owner_id
@@ -460,37 +440,6 @@ router.put('/:id/status', auth, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
-        });
-    }
-});
-
-router.post('/:id/proof', auth, uploadProof.single('proofImage'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: '\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e44\u0e1f\u0e25\u0e4c'
-            });
-        }
-
-        const { id } = req.params;
-        const imageUrl = `http://localhost:3000/uploads/proofs/${req.file.filename}`;
-
-        await pool.query(
-            'UPDATE tb_receipt SET proof_image = $1, update_datetime = NOW() WHERE receipt_id = $2',
-            [imageUrl, id]
-        );
-
-        res.json({
-            success: true,
-            imageUrl,
-            message: '\u0e2d\u0e31\u0e1b\u0e42\u0e2b\u0e25\u0e14\u0e2b\u0e25\u0e31\u0e01\u0e10\u0e32\u0e19\u0e01\u0e32\u0e23\u0e42\u0e2d\u0e19\u0e40\u0e07\u0e34\u0e19\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
-        });
-    } catch (err) {
-        console.error('Error Upload Proof:', err);
-        res.status(500).json({
-            success: false,
-            message: '\u0e2d\u0e31\u0e1b\u0e42\u0e2b\u0e25\u0e14\u0e2b\u0e25\u0e31\u0e01\u0e10\u0e32\u0e19\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
         });
     }
 });

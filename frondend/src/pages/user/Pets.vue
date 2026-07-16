@@ -21,10 +21,21 @@
       <article v-for="pet in pets" :key="pet.pet_id" class="pet-card">
         <div class="pet-header">
           <div class="pet-identity">
-            <div class="pet-avatar">
-              <img v-if="pet.pet_image" :src="resolveImageUrl(pet.pet_image)" alt="pet photo" />
-              <AppIcon v-else :name="getPetIcon(pet.pet_type)" :size="30" />
-            </div>
+            <button
+              type="button"
+              class="pet-avatar"
+              :class="{ 'has-image': pet.pet_image }"
+              :disabled="!pet.pet_image"
+              :aria-label="pet.pet_image ? `ดูรูป ${pet.pet_name} ขนาดใหญ่` : `ยังไม่มีรูป ${pet.pet_name}`"
+              @click="openPetImage(pet)"
+            >
+              <img
+                v-if="pet.pet_image"
+                :src="resolveImageUrl(pet.pet_image)"
+                :alt="`รูปสัตว์เลี้ยง ${pet.pet_name}`"
+              />
+              <AppIcon v-else :name="getPetIcon(pet.pet_type)" :size="58" />
+            </button>
             <div>
               <h2>{{ pet.pet_name }}</h2>
               <p>{{ pet.pet_breed || 'ไม่ระบุสายพันธุ์' }}</p>
@@ -182,6 +193,18 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div v-if="selectedPetImage" class="image-viewer-overlay" @click.self="closePetImage">
+        <div class="image-viewer-card" role="dialog" aria-modal="true" :aria-label="`รูป ${selectedPetName}`">
+          <div class="image-viewer-header">
+            <strong>{{ selectedPetName }}</strong>
+            <button type="button" class="close-btn" @click="closePetImage">ปิด</button>
+          </div>
+          <img :src="selectedPetImage" :alt="`รูปสัตว์เลี้ยง ${selectedPetName}`" />
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -197,6 +220,8 @@ const editPet = ref({})
 const editImageFile = ref(null)
 const editImagePreview = ref('')
 const historyByPet = ref({})
+const selectedPetImage = ref('')
+const selectedPetName = ref('')
 
 const getHeaders = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -252,6 +277,17 @@ const resolveImageUrl = (value) => {
   if (value.startsWith('/uploads/')) return `http://localhost:3000${value}`
   if (value.startsWith('uploads/')) return `http://localhost:3000/${value}`
   return value.startsWith('/') ? value : `/${value}`
+}
+
+const openPetImage = (pet) => {
+  if (!pet.pet_image) return
+  selectedPetImage.value = resolveImageUrl(pet.pet_image)
+  selectedPetName.value = pet.pet_name || 'รูปสัตว์เลี้ยง'
+}
+
+const closePetImage = () => {
+  selectedPetImage.value = ''
+  selectedPetName.value = ''
 }
 
 const handleEditImageChange = (event) => {
@@ -452,7 +488,7 @@ onMounted(loadPets)
 
 .pets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
 }
 
@@ -461,31 +497,45 @@ onMounted(loadPets)
 }
 
 .pet-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  align-items: start;
-  margin-bottom: 18px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 218px;
+  margin-bottom: 22px;
 }
 
 .pet-identity {
   display: flex;
-  gap: 14px;
+  flex-direction: column;
+  gap: 12px;
   align-items: center;
+  min-width: 0;
+  text-align: center;
 }
 
 .pet-avatar {
-  width: 58px;
-  height: 58px;
+  width: 156px;
+  height: 156px;
+  padding: 0;
+  border: 1px solid rgba(20, 184, 166, 0.18);
   border-radius: 18px;
   background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
   color: #0f766e;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0.12);
   overflow: hidden;
   flex: 0 0 auto;
+  cursor: default;
+}
+
+.pet-avatar.has-image {
+  cursor: zoom-in;
+}
+
+.pet-avatar:focus-visible {
+  outline: 3px solid rgba(20, 184, 166, 0.32);
+  outline-offset: 3px;
 }
 
 .pet-avatar img {
@@ -500,6 +550,9 @@ onMounted(loadPets)
 }
 
 .pet-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   gap: 8px;
 }
@@ -659,6 +712,40 @@ onMounted(loadPets)
   color: #475569;
 }
 
+.image-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.78);
+}
+
+.image-viewer-card {
+  width: min(760px, 100%);
+  overflow: hidden;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.image-viewer-header {
+  min-height: 62px;
+  padding: 10px 14px 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.image-viewer-card > img {
+  width: 100%;
+  max-height: 76vh;
+  display: block;
+  object-fit: contain;
+  background: #0f172a;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -805,8 +892,6 @@ textarea.input-field {
 
 @media (max-width: 720px) {
   .hero-section,
-  .pet-header,
-  .status-row,
   .history-header,
   .modal-header,
   .modal-footer {
@@ -824,9 +909,56 @@ textarea.input-field {
     width: 100%;
   }
 
+  .pet-card {
+    padding: 16px;
+  }
+
+  .pet-header {
+    min-height: 0;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .pet-avatar {
+    width: 124px;
+    height: 124px;
+    border-radius: 16px;
+  }
+
   .pet-actions {
+    position: static;
     width: 100%;
-    flex-direction: column;
+    justify-content: center;
+  }
+
+  .pet-actions button {
+    flex: 1 1 0;
+  }
+
+  .status-row {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .status-badge,
+  .age-chip {
+    justify-content: center;
+  }
+
+  .history-header {
+    gap: 10px;
+  }
+
+  .history-link {
+    min-height: 40px;
+  }
+
+  .image-viewer-overlay {
+    padding: 12px;
+  }
+
+  .image-viewer-card > img {
+    max-height: 70vh;
   }
 }
 </style>

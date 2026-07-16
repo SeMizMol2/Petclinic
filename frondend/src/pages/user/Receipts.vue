@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">Payments</p>
         <h1>ประวัติการชำระเงิน</h1>
-        <p class="hero-text">ตรวจสอบยอดชำระ สถานะใบเสร็จ และอัปโหลดหลักฐานการโอนเงินได้จากหน้านี้</p>
+        <p class="hero-text">ตรวจสอบยอดชำระ ช่องทางชำระเงิน และสถานะใบเสร็จได้จากหน้านี้</p>
       </div>
     </section>
 
@@ -53,23 +53,9 @@
             </div>
           </div>
 
-          <div class="upload-panel">
-            <template v-if="isPaid(item)">
-              <span class="upload-note done">รายการนี้ชำระเรียบร้อยแล้ว</span>
-            </template>
-
-            <template v-else-if="item.proof_image">
-              <span class="upload-note waiting">ส่งหลักฐานแล้ว รอตรวจสอบจากคลินิก</span>
-            </template>
-
-            <template v-else>
-              <div class="upload-box">
-                <input type="file" accept="image/*" @change="(event) => onFileSelected(event, item.receipt_id)" />
-                <button :disabled="uploadingId === item.receipt_id" @click="uploadProof(item.receipt_id)">
-                  {{ uploadingId === item.receipt_id ? 'กำลังส่ง...' : 'ส่งหลักฐานการโอน' }}
-                </button>
-              </div>
-            </template>
+          <div :class="['payment-note-panel', isPaid(item) ? 'done' : 'pending']">
+            <strong>{{ isPaid(item) ? 'รายการนี้ชำระเรียบร้อยแล้ว' : 'รายการนี้ยังค้างชำระ' }}</strong>
+            <span v-if="!isPaid(item)">กรุณาติดต่อชำระเงินกับทางโรงพยาบาลสัตว์</span>
           </div>
         </article>
       </div>
@@ -82,8 +68,6 @@ import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
 
 const receipts = ref([])
-const selectedFiles = ref({})
-const uploadingId = ref(null)
 
 const authHeader = () => {
   const token = localStorage.getItem('token')
@@ -130,40 +114,6 @@ const loadReceipts = async () => {
   } catch (error) {
     console.error('loadReceipts error:', error)
     alert('ไม่สามารถโหลดประวัติการชำระเงินได้')
-  }
-}
-
-const onFileSelected = (event, receiptId) => {
-  selectedFiles.value[receiptId] = event.target.files?.[0] || null
-}
-
-const uploadProof = async (receiptId) => {
-  const file = selectedFiles.value[receiptId]
-
-  if (!file) {
-    alert('กรุณาเลือกไฟล์หลักฐานก่อน')
-    return
-  }
-
-  try {
-    uploadingId.value = receiptId
-    const formData = new FormData()
-    formData.append('proofImage', file)
-
-    await axios.post(`http://localhost:3000/api/receipts/${receiptId}/proof`, formData, {
-      headers: {
-        ...authHeader(),
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-
-    alert('ส่งหลักฐานการโอนเงินเรียบร้อยแล้ว')
-    await loadReceipts()
-  } catch (error) {
-    console.error('uploadProof error:', error)
-    alert(error.response?.data?.message || 'ไม่สามารถส่งหลักฐานการโอนเงินได้')
-  } finally {
-    uploadingId.value = null
   }
 }
 
@@ -310,66 +260,33 @@ onMounted(loadReceipts)
   color: #b91c1c;
 }
 
-.upload-panel {
+.payment-note-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
   border-top: 1px solid #e5e7eb;
   padding-top: 16px;
+  font-size: 13px;
 }
 
-.upload-note {
-  display: inline-flex;
+.payment-note-panel strong {
   border-radius: 999px;
   padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 700;
 }
 
-.upload-note.done {
-  background: #ecfdf5;
+.payment-note-panel.done strong {
+  background: #dcfce7;
   color: #047857;
 }
 
-.upload-note.waiting {
-  background: #eff6ff;
-  color: #1d4ed8;
+.payment-note-panel.pending strong {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
-.upload-box {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  padding: 14px;
-  border-radius: 16px;
-  background: #f8fafc;
-  border: 1px solid #e8eef5;
-}
-
-.upload-box input[type='file'] {
-  flex: 1 1 260px;
-  min-height: 44px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(203, 213, 225, 0.9);
-  background: #ffffff;
-  color: #334155;
-}
-
-.upload-box button {
-  border: none;
-  border-radius: 14px;
-  min-height: 44px;
-  padding: 0 16px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.18);
-}
-
-.upload-box button:disabled {
-  opacity: 0.7;
-  cursor: wait;
+.payment-note-panel span {
+  color: #64748b;
 }
 
 @media (max-width: 720px) {

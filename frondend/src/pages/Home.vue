@@ -13,37 +13,48 @@
 
       <nav class="nav-links">
         <a href="#services">บริการ</a>
-        <a href="#clinic-info">ข้อมูลคลินิก</a>
-        <router-link to="/register">สมาชิก</router-link>
+        <a href="#pet-care">ความรู้สัตว์เลี้ยง</a>
       </nav>
 
-      <router-link to="/login" class="nav-solid-button">เข้าสู่ระบบ</router-link>
+      <div class="nav-account-actions">
+        <router-link to="/register" class="nav-secondary-button">สมัครสมาชิก</router-link>
+        <router-link to="/login" class="nav-solid-button">เข้าสู่ระบบ</router-link>
+      </div>
     </header>
 
     <main class="home-main">
       <section class="hero-section">
         <div class="hero-copy">
-          <p class="hero-label">โรงพยาบาลสัตว์เมืองเลย</p>
-          <h2>ดูแลข้อมูลสัตว์เลี้ยงและงานรักษาในระบบเดียว</h2>
+          <p class="hero-label">บริการดูแลสัตว์เลี้ยงในจังหวัดเลย</p>
+          <h1>{{ clinic.clinic_name || 'โรงพยาบาลสัตว์เมืองเลย' }}</h1>
+          <h2>ตรวจรักษา วัคซีน ผ่าตัด และติดตามประวัติสัตว์เลี้ยง</h2>
           <p class="hero-description">
-            ระบบสำหรับคลินิกและเจ้าของสัตว์เลี้ยงที่ช่วยเชื่อมข้อมูลสัตว์เลี้ยง นัดหมาย การรักษา วัคซีน
-            ผ่าตัด และใบเสร็จให้อยู่ในลำดับการทำงานเดียวกัน
+            ให้บริการดูแลสัตว์เลี้ยง พร้อมระบบสำหรับตรวจสอบข้อมูลสัตว์เลี้ยง นัดหมาย
+            ประวัติการรักษา และใบเสร็จของเจ้าของสัตว์เลี้ยง
           </p>
 
-          <div class="hero-trust-row">
-            <div class="trust-item">
-              <span class="trust-icon"><AppIcon name="clinic" :size="18" /></span>
+          <div class="hero-info-list">
+            <div class="hero-info-item">
+              <span class="hero-info-icon"><AppIcon name="phone" :size="18" /></span>
               <div>
-                <strong>{{ clinic.clinic_name || 'โรงพยาบาลสัตว์เมืองเลย' }}</strong>
-                <p>ข้อมูลคลินิกและบริการเชื่อมกับระบบจริง</p>
+                <small>โทรศัพท์</small>
+                <strong>{{ clinic.tel || 'ยังไม่ได้ระบุ' }}</strong>
               </div>
             </div>
 
-            <div class="trust-item">
-              <span class="trust-icon"><AppIcon name="calendar" :size="18" /></span>
+            <div class="hero-info-item">
+              <span class="hero-info-icon"><AppIcon name="history" :size="18" /></span>
               <div>
-                <strong>ติดตามนัดหมายและการรักษา</strong>
-                <p>จัดการข้อมูลต่อเนื่องตั้งแต่รับเคสจนถึงออกใบเสร็จ</p>
+                <small>เวลาเปิดให้บริการ</small>
+                <strong>{{ clinic.open_hours || 'ยังไม่ได้ระบุ' }}</strong>
+              </div>
+            </div>
+
+            <div class="hero-info-item address">
+              <span class="hero-info-icon"><AppIcon name="clinic" :size="18" /></span>
+              <div>
+                <small>ที่ตั้งโรงพยาบาล</small>
+                <strong>{{ clinic.address || 'กรุณาตรวจสอบข้อมูลกับทางโรงพยาบาล' }}</strong>
               </div>
             </div>
           </div>
@@ -62,33 +73,64 @@
       <section class="gallery-showcase">
         <div class="gallery-copy">
           <p class="section-kicker">ภาพจากโรงพยาบาล</p>
-          <h2>บรรยากาศและเคสบริการของโรงพยาบาล</h2>
-          <p class="section-description">
-            ใช้สำหรับแสดงภาพสถานที่จริง การดูแลสัตว์เลี้ยง และเคสที่สะท้อนรูปแบบการให้บริการของโรงพยาบาลสัตว์เมืองเลย
-          </p>
+          <h2>เคสบริการจริงและเคสตัวอย่าง</h2>
         </div>
 
-        <div class="gallery-board" aria-label="ภาพตัวอย่างโรงพยาบาลสัตว์เมืองเลย">
+        <div
+          class="gallery-slider"
+          aria-roledescription="carousel"
+          aria-label="เคสบริการของโรงพยาบาลสัตว์เมืองเลย"
+          @mouseenter="stopGalleryAutoSlide"
+          @mouseleave="startGalleryAutoSlide"
+          @touchstart.passive="onGalleryTouchStart"
+          @touchend.passive="onGalleryTouchEnd"
+        >
           <div
-            v-for="(column, columnIndex) in clinicGalleryColumns"
-            :key="`gallery-col-${columnIndex}`"
-            class="gallery-column"
-            :class="columnIndex % 2 === 1 ? 'reverse' : ''"
+            class="gallery-slide-track"
+            :class="{ 'without-transition': !galleryTransitionEnabled }"
+            :style="{ transform: `translateX(-${galleryPosition * 100}%)` }"
+            @transitionend="handleGalleryTransitionEnd"
           >
-            <div class="gallery-track">
-              <article
-                v-for="(item, itemIndex) in [...column, ...column]"
-                :key="`${columnIndex}-${item.id}-${itemIndex}`"
-                class="gallery-tile"
-                :class="item.tall ? 'tall' : ''"
-              >
-              <img :src="item.src" :alt="item.title" loading="lazy">
-                <div class="gallery-overlay">
-                  <strong>{{ item.title }}</strong>
-                  <span>{{ item.note }}</span>
-                </div>
-              </article>
-            </div>
+            <article
+              v-for="(item, itemIndex) in gallerySlides"
+              :key="`${item.id}-${itemIndex}`"
+              class="gallery-slide"
+              :aria-hidden="galleryPosition !== itemIndex"
+            >
+              <img :src="item.src" :alt="item.title" loading="lazy" />
+              <div class="gallery-slide-title">{{ item.title }}</div>
+            </article>
+          </div>
+
+          <button
+            type="button"
+            class="gallery-control previous"
+            title="ภาพก่อนหน้า"
+            aria-label="ดูภาพก่อนหน้า"
+            @click="previousGallery"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            class="gallery-control next"
+            title="ภาพถัดไป"
+            aria-label="ดูภาพถัดไป"
+            @click="nextGallery"
+          >
+            ›
+          </button>
+
+          <div class="gallery-dots" aria-label="เลือกภาพ">
+            <button
+              v-for="(item, itemIndex) in clinicGallery"
+              :key="`dot-${item.id}`"
+              type="button"
+              :class="{ active: currentGalleryIndex === itemIndex }"
+              :aria-label="`ดูภาพที่ ${itemIndex + 1}`"
+              :aria-current="currentGalleryIndex === itemIndex ? 'true' : undefined"
+              @click="goToGallery(itemIndex)"
+            />
           </div>
         </div>
       </section>
@@ -127,52 +169,66 @@
         </div>
       </section>
 
-      <section id="clinic-info" class="content-section clinic-section">
-        <div class="section-head">
+      <section id="pet-care" class="knowledge-section">
+        <div class="knowledge-heading">
           <div>
-            <p class="section-kicker">ข้อมูลคลินิก</p>
-            <h2>ข้อมูลสำหรับการติดต่อและเข้าใช้บริการ</h2>
+            <p class="section-kicker">ความรู้สำหรับเจ้าของสัตว์</p>
+            <h2>ดูแลให้ถูกวิธี สังเกตอาการได้เร็วขึ้น</h2>
           </div>
-          <p class="section-description">
-            แสดงข้อมูลจริงจากฐานข้อมูลคลินิกเพื่อใช้เป็นข้อมูลอ้างอิงบนหน้าแรก
-          </p>
-        </div>
-
-        <div class="clinic-grid">
-          <article class="clinic-card">
-            <span class="clinic-icon"><AppIcon name="phone" :size="18" /></span>
-            <div>
-              <small>เบอร์โทรศัพท์</small>
-              <strong>{{ clinic.tel || 'ยังไม่ได้ระบุ' }}</strong>
-            </div>
-          </article>
-
-          <article class="clinic-card">
-            <span class="clinic-icon"><AppIcon name="history" :size="18" /></span>
-            <div>
-              <small>เวลาเปิดทำการ</small>
-              <strong>{{ clinic.open_hours || 'ยังไม่ได้ระบุ' }}</strong>
-            </div>
-          </article>
-
-          <article class="clinic-card wide">
-            <span class="clinic-icon"><AppIcon name="clinic" :size="18" /></span>
-            <div>
-              <small>ที่อยู่</small>
-              <strong>{{ clinic.address || 'กรุณาแก้ไขข้อมูลคลินิกในระบบ' }}</strong>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section id="trust" class="trust-section">
-        <div class="trust-panel">
-          <p class="section-kicker">ข้อมูลเชื่อมกันทั้งระบบ</p>
-          <h2>รองรับการจัดการข้อมูลเจ้าของ สัตว์เลี้ยง การรักษา และการเงินในระบบเดียว</h2>
           <p>
-            ช่วยให้ข้อมูลตั้งแต่นัดหมาย การรักษา วัคซีน ผ่าตัด ไปจนถึงใบเสร็จและการชำระเงินเชื่อมโยงกัน
-            ลดการค้นหาข้อมูลซ้ำ และทำให้การตรวจสอบย้อนหลังเป็นระเบียบมากขึ้น
+            คำแนะนำเบื้องต้นสำหรับการดูแลสัตว์เลี้ยงในสถานการณ์ที่พบได้บ่อย
+            หากมีอาการผิดปกติควรติดต่อสัตวแพทย์เพื่อรับการตรวจที่เหมาะสม
           </p>
+        </div>
+
+        <div class="knowledge-layout">
+          <article class="knowledge-feature">
+            <div class="knowledge-feature-media">
+              <img
+                src="https://images.unsplash.com/photo-1576201836106-db1758fd1c97?auto=format&fit=crop&w=1200&q=80"
+                alt="สุนัขเตรียมเข้ารับการตรวจสุขภาพก่อนฉีดวัคซีน"
+                loading="lazy"
+              />
+            </div>
+            <div class="knowledge-feature-body">
+              <span class="knowledge-icon"><AppIcon name="vaccine" :size="20" /></span>
+              <div>
+                <h3>เตรียมสัตว์เลี้ยงก่อนฉีดวัคซีน</h3>
+                <p>
+                  สัตว์เลี้ยงควรมีสุขภาพแข็งแรง ไม่มีไข้ อาเจียน หรือท้องเสีย
+                  พร้อมนำสมุดวัคซีนเดิมมาให้สัตวแพทย์ตรวจสอบก่อนทุกครั้ง
+                </p>
+              </div>
+            </div>
+          </article>
+
+          <div class="knowledge-list">
+            <article class="knowledge-brief">
+              <img
+                src="https://images.unsplash.com/photo-1548681528-6a5c45b66b42?auto=format&fit=crop&w=900&q=80"
+                alt="แมวที่เจ้าของควรสังเกตอาการผิดปกติ"
+                loading="lazy"
+              />
+              <div>
+                <span class="knowledge-icon"><AppIcon name="stethoscope" :size="19" /></span>
+                <h3>อาการผิดปกติที่ไม่ควรรอดูเอง</h3>
+                <p>หายใจลำบาก ซึมมาก ชัก อาเจียนซ้ำ ปัสสาวะไม่ได้ หรือไม่กินอาหาร ควรรีบพบสัตวแพทย์</p>
+              </div>
+            </article>
+
+            <article class="knowledge-brief">
+              <img
+                src="https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&w=900&q=80"
+                alt="สุนัขพักฟื้นและได้รับการดูแลหลังผ่าตัด"
+                loading="lazy"
+              />
+              <div>
+                <span class="knowledge-icon"><AppIcon name="surgery" :size="19" /></span>
+                <h3>การดูแลหลังผ่าตัด</h3>
+                <p>ป้องกันการเลียแผล รักษาแผลให้แห้ง ให้ยาตามกำหนด และกลับมาตรวจตามนัดของสัตวแพทย์</p>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
     </main>
@@ -181,56 +237,47 @@
 
 <script setup>
 import axios from 'axios'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 
 const clinic = ref({})
 const services = ref([])
+const galleryPosition = ref(0)
+const galleryTransitionEnabled = ref(true)
+
+let galleryTimer = null
+let galleryTouchStartX = 0
 
 const clinicGallery = [
   {
     id: 'cg-01',
     src: '/images/clinic-gallery/clinic-01.png',
-    title: 'เคสบริการจริง',
-    note: 'ภาพตัวอย่างจากโรงพยาบาลสัตว์',
-    tall: true
+    title: 'เคสบริการจริง'
   },
   {
     id: 'cg-02',
     src: '/images/clinic-gallery/clinic-02.png',
-    title: 'ภาพการวินิจฉัย',
-    note: 'สื่อสารรูปแบบการรักษาในระบบ',
-    tall: false
+    title: 'เคสบริการจริง'
   },
   {
     id: 'cg-03',
     src: '/images/clinic-gallery/clinic-03.png',
-    title: 'เคสเฉพาะทาง',
-    note: 'ตัวอย่างงานบริการและผลการรักษา',
-    tall: false
+    title: 'เคสตัวอย่าง'
   },
   {
     id: 'cg-04',
     src: '/images/clinic-gallery/clinic-04.png',
-    title: 'ภาพการดูแลหลังรักษา',
-    note: 'ใช้โชว์บรรยากาศบริการจริงของคลินิก',
-    tall: true
+    title: 'เคสบริการจริง'
   },
   {
     id: 'cg-05',
     src: '/images/clinic-gallery/clinic-05.png',
-    title: 'ตัวอย่างเคสเพิ่มเติม',
-    note: 'รองรับการเปลี่ยนเป็นรูปใหม่ได้ภายหลัง',
-    tall: false
-  },
-  {
-    id: 'cg-06',
-    src: '/images/clinic-gallery/clinic-01.png',
-    title: 'งานบริการของโรงพยาบาล',
-    note: 'เลื่อนแสดงอัตโนมัติบนหน้าแรก',
-    tall: false
+    title: 'เคสตัวอย่าง'
   }
 ]
+
+const gallerySlides = computed(() => [...clinicGallery, clinicGallery[0]])
+const currentGalleryIndex = computed(() => galleryPosition.value % clinicGallery.length)
 
 const imageLibrary = {
   treatment: 'https://images.unsplash.com/photo-1628009368231-7bb7cfcb0def?auto=format&fit=crop&w=1200&q=80',
@@ -246,12 +293,6 @@ const serviceCards = computed(() =>
     image: resolveServiceImage(service)
   }))
 )
-
-const clinicGalleryColumns = computed(() => [
-  clinicGallery.filter((_, index) => index % 3 === 0),
-  clinicGallery.filter((_, index) => index % 3 === 1),
-  clinicGallery.filter((_, index) => index % 3 === 2)
-])
 
 function resolveServiceImage(service) {
   if (service.service_image) {
@@ -292,7 +333,89 @@ function formatPrice(value) {
   })
 }
 
+function stopGalleryAutoSlide() {
+  if (galleryTimer) {
+    window.clearInterval(galleryTimer)
+    galleryTimer = null
+  }
+}
+
+function startGalleryAutoSlide() {
+  stopGalleryAutoSlide()
+
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  if (clinicGallery.length > 1 && !reduceMotion) {
+    galleryTimer = window.setInterval(nextGallery, 5200)
+  }
+}
+
+function nextGallery() {
+  if (galleryPosition.value >= clinicGallery.length) return
+
+  galleryTransitionEnabled.value = true
+  galleryPosition.value += 1
+}
+
+function previousGallery() {
+  if (galleryPosition.value === 0) {
+    galleryTransitionEnabled.value = false
+    galleryPosition.value = clinicGallery.length
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        galleryTransitionEnabled.value = true
+        galleryPosition.value = clinicGallery.length - 1
+      })
+    })
+  } else {
+    galleryTransitionEnabled.value = true
+    galleryPosition.value -= 1
+  }
+
+  startGalleryAutoSlide()
+}
+
+function goToGallery(index) {
+  galleryTransitionEnabled.value = true
+  galleryPosition.value = index
+  startGalleryAutoSlide()
+}
+
+function handleGalleryTransitionEnd() {
+  if (galleryPosition.value === clinicGallery.length) {
+    galleryTransitionEnabled.value = false
+    galleryPosition.value = 0
+
+    window.requestAnimationFrame(() => {
+      galleryTransitionEnabled.value = true
+    })
+  }
+}
+
+function onGalleryTouchStart(event) {
+  galleryTouchStartX = event.changedTouches?.[0]?.clientX || 0
+  stopGalleryAutoSlide()
+}
+
+function onGalleryTouchEnd(event) {
+  const touchEndX = event.changedTouches?.[0]?.clientX || 0
+  const distance = touchEndX - galleryTouchStartX
+
+  if (Math.abs(distance) >= 45) {
+    if (distance < 0) {
+      nextGallery()
+    } else {
+      previousGallery()
+    }
+  }
+
+  startGalleryAutoSlide()
+}
+
 onMounted(async () => {
+  startGalleryAutoSlide()
+
   try {
     const [clinicResponse, servicesResponse] = await Promise.all([
       axios.get('http://localhost:3000/api/clinic'),
@@ -307,6 +430,8 @@ onMounted(async () => {
     services.value = []
   }
 })
+
+onBeforeUnmount(stopGalleryAutoSlide)
 </script>
 
 <style scoped>
@@ -372,6 +497,7 @@ onMounted(async () => {
 }
 
 .nav-links,
+.nav-account-actions,
 .hero-actions {
   display: flex;
   align-items: center;
@@ -379,6 +505,11 @@ onMounted(async () => {
 
 .nav-links {
   gap: 28px;
+}
+
+.nav-account-actions {
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .nav-links a {
@@ -390,6 +521,27 @@ onMounted(async () => {
 
 .nav-links a:hover {
   color: #0f766e;
+}
+
+.nav-secondary-button {
+  min-height: 46px;
+  padding: 0 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #b9d7d3;
+  border-radius: 14px;
+  color: #0f766e;
+  background: #ffffff;
+  text-decoration: none;
+  font-weight: 700;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.nav-secondary-button:hover {
+  border-color: #0f766e;
+  background: #eefaf8;
+  color: #0b5e57;
 }
 
 .nav-solid-button,
@@ -422,7 +574,7 @@ onMounted(async () => {
 
 .hero-section,
 .content-section,
-.trust-panel {
+.knowledge-section {
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(214, 225, 235, 0.96);
   border-radius: 16px;
@@ -432,7 +584,7 @@ onMounted(async () => {
 
 .hero-section {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(390px, 520px);
+  grid-template-columns: minmax(0, 0.9fr) minmax(460px, 1.1fr);
   gap: 32px;
   padding: 32px;
   align-items: center;
@@ -441,7 +593,8 @@ onMounted(async () => {
 
 .hero-copy {
   display: grid;
-  gap: 16px;
+  align-content: center;
+  gap: 14px;
 }
 
 .hero-label,
@@ -458,24 +611,31 @@ onMounted(async () => {
 .hero-copy h2,
 .section-head h2,
 .service-card h3,
-.trust-panel h2 {
+.knowledge-heading h2,
+.knowledge-feature h3,
+.knowledge-brief h3 {
   margin: 0;
   color: #0f172a;
 }
 
-.hero-copy h1,
+.hero-copy h1 {
+  max-width: 14ch;
+  font-size: clamp(2.6rem, 4.5vw, 4.5rem);
+  line-height: 1.06;
+  text-wrap: balance;
+}
+
 .hero-copy h2 {
-  max-width: 18ch;
-  font-size: clamp(2.55rem, 4.2vw, 4.2rem);
-  line-height: 1.12;
+  max-width: 28ch;
+  color: #0f766e;
+  font-size: clamp(1.25rem, 1.8vw, 1.65rem);
+  line-height: 1.4;
   text-wrap: balance;
 }
 
 .hero-description,
 .section-description,
-.service-card p,
-.trust-panel p,
-.hero-trust-row p {
+.service-card p {
   margin: 0;
   color: #526071;
   line-height: 1.65;
@@ -490,38 +650,60 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.hero-trust-row {
+.hero-info-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 4px;
+  gap: 0;
+  margin-top: 8px;
+  border-top: 1px solid #dce6eb;
+  border-bottom: 1px solid #dce6eb;
 }
 
-.trust-item {
+.hero-info-item {
   display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 12px;
-  align-items: start;
-  padding: 14px;
-  border-radius: 16px;
-  background: #f5fafb;
-  border: 1px solid #dfebf1;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 14px 14px 14px 0;
 }
 
-.trust-icon,
+.hero-info-item:nth-child(2) {
+  padding-left: 16px;
+  border-left: 1px solid #dce6eb;
+}
+
+.hero-info-item.address {
+  grid-column: 1 / -1;
+  padding-top: 12px;
+  border-top: 1px solid #dce6eb;
+}
+
+.hero-info-icon,
 .clinic-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #ecfdf5;
   color: #0f766e;
 }
 
-.trust-item strong {
+.hero-info-item small {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.hero-info-item strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #1e293b;
+  font-size: 0.94rem;
+  line-height: 1.45;
 }
 
 .hero-gallery {
@@ -533,10 +715,10 @@ onMounted(async () => {
 
 .hero-photo {
   overflow: hidden;
-  border-radius: 22px;
-  min-height: 420px;
+  border-radius: 14px;
+  min-height: 500px;
   background: #e2e8f0;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 5 / 4;
 }
 
 .hero-photo img {
@@ -563,8 +745,8 @@ onMounted(async () => {
 
 .gallery-showcase {
   display: grid;
-  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.22fr);
-  gap: 20px;
+  grid-template-columns: minmax(220px, 0.48fr) minmax(0, 1.52fr);
+  gap: 28px;
   padding: 24px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(214, 225, 235, 0.96);
@@ -575,108 +757,132 @@ onMounted(async () => {
 
 .gallery-copy {
   display: grid;
-  align-content: start;
+  align-content: center;
   gap: 10px;
-  padding-top: 8px;
 }
 
 .gallery-copy h2 {
   margin: 0;
   color: #0f172a;
-  max-width: 14ch;
-  line-height: 1.08;
+  max-width: 12ch;
+  font-size: clamp(1.85rem, 3.2vw, 2.85rem);
+  line-height: 1.12;
+  text-wrap: balance;
 }
 
-.gallery-board {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  min-height: 520px;
-  height: 520px;
-  overflow: hidden;
-  mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
-}
-
-.gallery-column {
+.gallery-slider {
   position: relative;
+  min-width: 0;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 14px;
+  background: #d7e3ea;
+  aspect-ratio: 16 / 9;
+  touch-action: pan-y;
 }
 
-.gallery-track {
-  display: grid;
-  gap: 14px;
-  animation: gallery-marquee 32s linear infinite;
+.gallery-slide-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
-.gallery-column.reverse .gallery-track {
-  animation-direction: reverse;
-  animation-duration: 36s;
+.gallery-slide-track.without-transition {
+  transition: none;
 }
 
-.gallery-board:hover .gallery-track {
-  animation-play-state: paused;
-}
-
-.gallery-tile {
+.gallery-slide {
   position: relative;
-  min-height: 180px;
-  height: 180px;
-  overflow: hidden;
-  border-radius: 16px;
-  background: #d7e3ea;
+  flex: 0 0 100%;
+  min-width: 100%;
+  height: 100%;
   isolation: isolate;
 }
 
-.gallery-tile.tall {
-  height: 280px;
-}
-
-.gallery-tile::after {
+.gallery-slide::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.72) 100%);
+  background: linear-gradient(180deg, transparent 52%, rgba(15, 23, 42, 0.76) 100%);
   z-index: 1;
 }
 
-.gallery-tile img {
+.gallery-slide img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  transform: scale(1.02);
 }
 
-.gallery-overlay {
+.gallery-slide-title {
   position: absolute;
-  inset: auto 0 0 0;
+  inset: auto 72px 0 0;
   z-index: 2;
-  display: grid;
-  gap: 4px;
-  padding: 16px;
+  padding: 22px;
   color: #ffffff;
-}
-
-.gallery-overlay strong {
-  font-size: 0.98rem;
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  font-weight: 800;
   line-height: 1.3;
 }
 
-.gallery-overlay span {
-  font-size: 0.82rem;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.84);
+.gallery-control {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+  font-family: Arial, sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
-@keyframes gallery-marquee {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(calc(-50% - 7px));
-  }
+.gallery-control:hover {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.gallery-control.previous {
+  left: 14px;
+}
+
+.gallery-control.next {
+  right: 14px;
+}
+
+.gallery-dots {
+  position: absolute;
+  z-index: 3;
+  right: 20px;
+  bottom: 22px;
+  display: flex;
+  gap: 7px;
+}
+
+.gallery-dots button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: width 0.2s ease, border-radius 0.2s ease, background 0.2s ease;
+}
+
+.gallery-dots button.active {
+  width: 22px;
+  border-radius: 999px;
+  background: #ffffff;
 }
 
 .service-scroll {
@@ -785,79 +991,151 @@ onMounted(async () => {
   color: #0f172a;
 }
 
-.clinic-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.clinic-card {
-  padding: 18px;
-  border: 1px solid #e3ecf2;
-  border-radius: 14px;
-  background: #f9fbfc;
-  display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 12px;
-  align-items: start;
-}
-
-.clinic-card small {
-  display: block;
-  margin-bottom: 6px;
-  color: #64748b;
-}
-
-.clinic-card strong {
-  line-height: 1.6;
-}
-
-.clinic-card.wide {
-  grid-column: span 1;
-}
-
-.trust-section {
-  padding-top: 2px;
-}
-
-.trust-panel {
+.knowledge-section {
   padding: 26px;
-  background: linear-gradient(135deg, #0f172a 0%, #17324a 58%, #0f766e 100%);
-  border-color: transparent;
 }
 
-.trust-panel .section-kicker,
-.trust-panel p {
+.knowledge-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(300px, 0.65fr);
+  justify-content: space-between;
+  gap: 32px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.knowledge-heading h2 {
+  margin-top: 4px;
+  font-size: clamp(1.8rem, 3vw, 2.65rem);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.knowledge-heading > p {
+  margin: 0;
+  color: #526071;
+  line-height: 1.65;
+}
+
+.knowledge-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+  gap: 18px;
+}
+
+.knowledge-feature {
+  display: grid;
+  grid-template-rows: minmax(270px, 1fr) auto;
+  min-height: 480px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #0f766e;
+}
+
+.knowledge-feature-media {
+  min-height: 0;
+}
+
+.knowledge-feature-media img,
+.knowledge-brief > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.knowledge-feature-body {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 14px;
+  padding: 22px;
+  color: #ffffff;
+}
+
+.knowledge-feature h3 {
+  color: #ffffff;
+  font-size: 1.35rem;
+  line-height: 1.35;
+}
+
+.knowledge-feature p,
+.knowledge-brief p {
+  margin: 7px 0 0;
+  line-height: 1.62;
+}
+
+.knowledge-feature p {
   color: rgba(255, 255, 255, 0.84);
 }
 
-.trust-panel h2 {
-  margin-top: 10px;
-  max-width: 18ch;
-  color: #ffffff;
-  line-height: 1.14;
+.knowledge-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #0f766e;
 }
 
-.trust-panel p {
+.knowledge-list {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.knowledge-brief {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.72fr) minmax(0, 1.28fr);
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #dfe8ed;
+  border-radius: 14px;
+  background: #f9fbfc;
+}
+
+.knowledge-brief > div {
+  padding: 18px;
+}
+
+.knowledge-brief h3 {
   margin-top: 12px;
-  max-width: 66ch;
+  font-size: 1.08rem;
+  line-height: 1.4;
+}
+
+.knowledge-brief p {
+  color: #526071;
 }
 
 @media (max-width: 1100px) {
   .hero-section,
-  .clinic-grid,
-  .gallery-showcase {
+  .gallery-showcase,
+  .knowledge-heading,
+  .knowledge-layout {
     grid-template-columns: 1fr;
   }
 
-  .hero-copy h1,
-  .hero-copy h2 {
+  .knowledge-feature {
+    min-height: 440px;
+  }
+
+  .hero-copy h1 {
     max-width: 18ch;
     font-size: clamp(2.45rem, 6vw, 3.4rem);
   }
 
+  .hero-copy h2 {
+    max-width: 30ch;
+    font-size: clamp(1.2rem, 2.4vw, 1.55rem);
+  }
+
   .gallery-copy h2 {
     max-width: none;
+  }
+
+  .gallery-slider {
+    width: 100%;
   }
 }
 
@@ -872,32 +1150,35 @@ onMounted(async () => {
   }
 
   .nav-links,
+  .nav-account-actions,
   .hero-actions {
     flex-wrap: wrap;
   }
 
   .hero-section,
-  .hero-trust-row,
-  .clinic-grid {
+  .hero-info-list {
     grid-template-columns: 1fr;
+  }
+
+  .hero-info-item:nth-child(2) {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid #dce6eb;
+  }
+
+  .hero-info-item.address {
+    grid-column: auto;
   }
 
   .hero-gallery {
     grid-template-columns: 1fr;
   }
 
-  .gallery-board {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    min-height: 440px;
-    height: 440px;
-  }
-
   .hero-section {
     padding: 22px;
   }
 
-  .hero-copy h1,
-  .hero-copy h2 {
+  .hero-copy h1 {
     max-width: none;
   }
 
@@ -920,10 +1201,14 @@ onMounted(async () => {
     gap: 12px;
   }
 
-  .hero-copy h1,
-  .hero-copy h2 {
+  .hero-copy h1 {
     font-size: 2.15rem;
     line-height: 1.16;
+  }
+
+  .hero-copy h2 {
+    font-size: 1.15rem;
+    line-height: 1.5;
   }
 
   .brand-copy span,
@@ -931,31 +1216,91 @@ onMounted(async () => {
     display: none;
   }
 
-  .nav-solid-button,
+  .nav-account-actions {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .nav-account-actions .nav-secondary-button,
+  .nav-account-actions .nav-solid-button {
+    flex: 1 1 0;
+    width: auto;
+    white-space: nowrap;
+  }
+
   .primary-button {
     width: 100%;
   }
 
   .content-section,
-  .trust-panel,
+  .knowledge-section,
   .gallery-showcase {
     padding: 18px;
+  }
+
+  .knowledge-feature {
+    min-height: 360px;
+  }
+
+  .knowledge-brief {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-brief > img {
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+
+  .knowledge-feature-body {
+    padding: 18px;
+  }
+
+  .knowledge-brief > div {
+    padding: 16px;
   }
 
   .service-card {
     flex-basis: min(82vw, 304px);
   }
 
-  .gallery-board {
-    grid-template-columns: 1fr;
-    min-height: 360px;
-    height: 360px;
+  .gallery-showcase {
+    gap: 16px;
+  }
+
+  .gallery-slider {
+    aspect-ratio: 4 / 3;
+  }
+
+  .gallery-slide-title {
+    inset: auto 56px 0 0;
+    padding: 16px;
+    font-size: 1.05rem;
+  }
+
+  .gallery-control {
+    width: 36px;
+    height: 36px;
+    font-size: 1.7rem;
+  }
+
+  .gallery-control.previous {
+    left: 10px;
+  }
+
+  .gallery-control.next {
+    right: 10px;
+  }
+
+  .gallery-dots {
+    right: 14px;
+    bottom: 17px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gallery-track {
-    animation: none;
+  .gallery-slide-track {
+    transition: none;
   }
 }
 </style>
