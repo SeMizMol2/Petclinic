@@ -29,6 +29,9 @@ const getTransporter = () => {
         host: config.host,
         port: config.port,
         secure: config.secure,
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 10000,
         auth: {
             user: config.user,
             pass: config.pass
@@ -54,21 +57,29 @@ const formatTime = (value) => {
     return String(value).slice(0, 5);
 };
 
-const getSubjectByType = (type) => {
-    if (type === 'created') return 'ยืนยันการนัดหมาย - โรงพยาบาลสัตว์เมืองเลย';
+const getSubjectByType = (type, appointment) => {
+    if (type === 'created' && appointment?.appt_status === 'รอ') {
+        return 'แจ้งนัดหมายใหม่ รอการตอบรับ - โรงพยาบาลสัตว์เมืองเลย';
+    }
+    if (type === 'created') return 'แจ้งนัดหมายใหม่ - โรงพยาบาลสัตว์เมืองเลย';
+    if (type === 'rescheduled') return 'กรุณาตอบรับวันนัดหมายใหม่ - โรงพยาบาลสัตว์เมืองเลย';
     if (type === 'canceled') return 'แจ้งยกเลิกการนัดหมาย - โรงพยาบาลสัตว์เมืองเลย';
     return 'แจ้งเปลี่ยนแปลงการนัดหมาย - โรงพยาบาลสัตว์เมืองเลย';
 };
 
-const getHeadingByType = (type) => {
+const getHeadingByType = (type, appointment) => {
+    if (type === 'created' && appointment?.appt_status === 'รอ') {
+        return 'คลินิกส่งนัดหมายใหม่ กรุณาตอบรับในระบบ';
+    }
     if (type === 'created') return 'นัดหมายของคุณถูกบันทึกเรียบร้อยแล้ว';
+    if (type === 'rescheduled') return 'คลินิกเสนอวันนัดหมายใหม่ กรุณาเข้าสู่ระบบเพื่อตอบรับ';
     if (type === 'canceled') return 'นัดหมายของคุณถูกยกเลิก';
     return 'มีการอัปเดตข้อมูลนัดหมายของคุณ';
 };
 
 const buildAppointmentMessage = (type, appointment) => {
     const clinicName = appointment.clinic_name || 'โรงพยาบาลสัตว์เมืองเลย';
-    const heading = getHeadingByType(type);
+    const heading = getHeadingByType(type, appointment);
     const dateText = formatThaiDate(appointment.appt_date);
     const timeText = formatTime(appointment.appt_time);
     const reasonText = appointment.appt_reason || 'ไม่ได้ระบุ';
@@ -76,9 +87,15 @@ const buildAppointmentMessage = (type, appointment) => {
     const clinicTel = appointment.clinic_tel || '-';
     const clinicAddress = appointment.clinic_address || '-';
 
-    const extraLine = type === 'canceled'
-        ? `เหตุผลการยกเลิก: ${cancelReasonText}`
-        : `อาการหรือเหตุผลนัดหมาย: ${reasonText}`;
+    const extraLabel = type === 'canceled'
+        ? 'เหตุผลการยกเลิก'
+        : type === 'rescheduled'
+            ? 'คำขอเดิมของเจ้าของสัตว์เลี้ยง'
+            : 'อาการหรือเหตุผลนัดหมาย';
+    const extraValue = type === 'canceled' || type === 'rescheduled'
+        ? cancelReasonText
+        : reasonText;
+    const extraLine = `${extraLabel}: ${extraValue}`;
 
     const text = [
         `เรียน คุณ${appointment.owner_name || 'ลูกค้า'}`,
@@ -87,6 +104,7 @@ const buildAppointmentMessage = (type, appointment) => {
         `สัตว์เลี้ยง: ${appointment.pet_name || '-'}`,
         `วันที่นัดหมาย: ${dateText}`,
         `เวลา: ${timeText} น.`,
+        `สัตวแพทย์: ${appointment.vet_name || '-'}`,
         extraLine,
         '',
         `คลินิก: ${clinicName}`,
@@ -102,7 +120,8 @@ const buildAppointmentMessage = (type, appointment) => {
                 <p style="margin: 0 0 8px;"><strong>สัตว์เลี้ยง:</strong> ${appointment.pet_name || '-'}</p>
                 <p style="margin: 0 0 8px;"><strong>วันที่นัดหมาย:</strong> ${dateText}</p>
                 <p style="margin: 0 0 8px;"><strong>เวลา:</strong> ${timeText} น.</p>
-                <p style="margin: 0;"><strong>${type === 'canceled' ? 'เหตุผลการยกเลิก' : 'อาการหรือเหตุผลนัดหมาย'}:</strong> ${type === 'canceled' ? cancelReasonText : reasonText}</p>
+                <p style="margin: 0 0 8px;"><strong>สัตวแพทย์:</strong> ${appointment.vet_name || '-'}</p>
+                <p style="margin: 0;"><strong>${extraLabel}:</strong> ${extraValue}</p>
             </div>
             <p style="margin-top: 16px;"><strong>คลินิก:</strong> ${clinicName}<br />
             <strong>โทร:</strong> ${clinicTel}<br />
@@ -138,7 +157,7 @@ const sendAppointmentNotification = async ({ type, appointment }) => {
         await mailer.sendMail({
             from: config.from,
             to: appointment.owner_email,
-            subject: getSubjectByType(type),
+            subject: getSubjectByType(type, appointment),
             text,
             html
         });
@@ -157,7 +176,41 @@ const sendAppointmentNotification = async ({ type, appointment }) => {
     }
 };
 
+const queueAppointmentNotification = ({ type, appointment }) => {
+    if (!appointment?.owner_email) {
+        return {
+            sent: false,
+            queued: false,
+            skipped: true,
+            reason: 'missing-recipient'
+        };
+    }
+
+    if (!isMailConfigured()) {
+        return {
+            sent: false,
+            queued: false,
+            skipped: true,
+            reason: 'mail-not-configured'
+        };
+    }
+
+    setImmediate(() => {
+        sendAppointmentNotification({ type, appointment }).catch((error) => {
+            console.error('Queued appointment email failed:', error.message);
+        });
+    });
+
+    return {
+        sent: false,
+        queued: true,
+        skipped: false,
+        message: 'บันทึกข้อมูลแล้ว ระบบกำลังส่งอีเมลแจ้งเตือน'
+    };
+};
+
 module.exports = {
     isMailConfigured,
-    sendAppointmentNotification
+    sendAppointmentNotification,
+    queueAppointmentNotification
 };

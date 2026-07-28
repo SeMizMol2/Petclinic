@@ -49,8 +49,9 @@ CREATE TABLE tb_appointment (
     appt_time TIME NOT NULL,
     appt_reason TEXT,
     cancel_reason TEXT,
-    appt_status VARCHAR(20) CHECK (appt_status IN ('ยืนยัน', 'ยกเลิก')) DEFAULT 'ยืนยัน',
+    appt_status VARCHAR(20) CHECK (appt_status IN ('รอ', 'ยืนยัน', 'ยกเลิก')) DEFAULT 'รอ',
     pet_id VARCHAR(20) NOT NULL,
+    vet_id VARCHAR(10),
     create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_datetime TIMESTAMP,
     

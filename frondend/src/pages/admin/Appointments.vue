@@ -11,6 +11,62 @@
       <button @click="openAddModal" class="primary-btn" type="button">เพิ่มการนัดหมาย</button>
     </section>
 
+    <section class="shift-panel">
+      <div class="shift-head">
+        <div>
+          <p class="eyebrow">Veterinarian availability</p>
+          <h2>ตารางเวรสัตวแพทย์</h2>
+          <p>บันทึกวันที่และช่วงเวลาที่สัตวแพทย์พร้อมให้บริการ ข้อมูลนี้จะแสดงในปฏิทินฝั่งเจ้าของสัตว์เลี้ยง</p>
+        </div>
+        <span class="shift-count">{{ schedules.length }} ช่วงเวลา</span>
+      </div>
+
+      <form class="shift-form" @submit.prevent="saveSchedule">
+        <label>
+          <span>สัตวแพทย์ *</span>
+          <select v-model="scheduleForm.vet_id" required>
+            <option value="" disabled>เลือกสัตวแพทย์</option>
+            <option v-for="vet in veterinarians" :key="vet.vet_id" :value="vet.vet_id">{{ vet.vet_name }}</option>
+          </select>
+        </label>
+        <label>
+          <span>วันที่เข้าเวร *</span>
+          <input v-model="scheduleForm.work_date" type="date" :min="todayInputValue()" required />
+        </label>
+        <label>
+          <span>เริ่ม *</span>
+          <input v-model="scheduleForm.start_time" type="time" required />
+        </label>
+        <label>
+          <span>สิ้นสุด *</span>
+          <input v-model="scheduleForm.end_time" type="time" required />
+        </label>
+        <label class="shift-note-field">
+          <span>หมายเหตุ</span>
+          <input v-model.trim="scheduleForm.schedule_note" type="text" maxlength="255" placeholder="เช่น ตรวจทั่วไปและติดตามอาการ" />
+        </label>
+        <button type="submit" class="primary-btn" :disabled="isSavingSchedule">
+          {{ isSavingSchedule ? 'กำลังบันทึก...' : 'เพิ่มตารางเวร' }}
+        </button>
+      </form>
+
+      <div v-if="schedules.length > 0" class="shift-list">
+        <article v-for="shift in schedules" :key="shift.schedule_id" class="shift-item">
+          <div class="shift-date">
+            <span>{{ getShortMonth(shift.work_date) }}</span>
+            <strong>{{ getDay(shift.work_date) }}</strong>
+          </div>
+          <div class="shift-detail">
+            <strong>{{ shift.vet_name }}</strong>
+            <span>{{ formatFullDate(shift.work_date) }} · {{ formatTime(shift.start_time) }} - {{ formatTime(shift.end_time) }} น.</span>
+            <small v-if="shift.schedule_note">{{ shift.schedule_note }}</small>
+          </div>
+          <button type="button" class="danger-btn mini-btn" @click="deleteSchedule(shift.schedule_id)">ลบ</button>
+        </article>
+      </div>
+      <div v-else class="shift-empty">ยังไม่มีตารางเวรในช่วงวันที่กำลังแสดง</div>
+    </section>
+
     <section class="toolbar">
       <div class="filter-pills">
         <button
@@ -57,6 +113,7 @@
           <thead>
             <tr>
               <th>วันและเวลา</th>
+              <th>สัตวแพทย์</th>
               <th>สัตว์เลี้ยง</th>
               <th>เหตุผล / อาการ</th>
               <th>สถานะ</th>
@@ -81,6 +138,10 @@
                 </div>
               </td>
               <td>
+                <div class="primary-line">{{ apt.vet_name || 'ยังไม่ระบุ' }}</div>
+                <div class="secondary-line">{{ apt.vet_id || '-' }}</div>
+              </td>
+              <td>
                 <div class="pet-cell">
                   <div class="pet-avatar" :style="{ backgroundColor: getPetColor(apt.pet_name) }">
                     {{ getInitial(apt.pet_name) }}
@@ -101,18 +162,29 @@
                   <span :class="['status-chip', getStatusClass(apt.appt_status)]">
                     {{ getStatusLabel(apt.appt_status) }}
                   </span>
-                  <span v-if="apt.cancel_reason" class="cancel-reason">{{ apt.cancel_reason }}</span>
+                  <span v-if="apt.cancel_reason" class="cancel-reason">
+                    {{ apt.appt_status === APPT_STATUS_CANCELED ? 'เหตุผลยกเลิก' : 'คำขอเดิม' }}:
+                    {{ apt.cancel_reason }}
+                  </span>
                 </div>
               </td>
               <td>
                 <div class="row-actions">
-                  <button @click="openEditModal(apt)" class="ghost-btn mini-btn" type="button">แก้ไข</button>
+                  <button
+                    v-if="apt.appt_status === APPT_STATUS_CANCELED"
+                    @click="openRescheduleModal(apt)"
+                    class="reschedule-btn mini-btn"
+                    type="button"
+                  >
+                    จัดนัดใหม่
+                  </button>
+                  <button v-else @click="openEditModal(apt)" class="ghost-btn mini-btn" type="button">แก้ไข</button>
                   <button @click="deleteAppointment(apt.appt_id)" class="danger-btn mini-btn" type="button">ลบ</button>
                 </div>
               </td>
             </tr>
             <tr v-if="filteredAppointments.length === 0">
-              <td colspan="5" class="state">
+              <td colspan="6" class="state">
                 <div class="empty-card">
                   <strong>ยังไม่มีข้อมูลนัดหมาย</strong>
                   <p>เมื่อมีการสร้างคิวนัดหมายในระบบ รายการทั้งหมดจะแสดงที่นี่</p>
@@ -128,14 +200,8 @@
       <div class="modal appointment-modal">
         <div class="modal-head">
           <div>
-            <h2>{{ modalMode === 'add' ? 'เพิ่มการนัดหมายใหม่' : 'แก้ไขการนัดหมาย' }}</h2>
-            <p>
-              {{
-                modalMode === 'add'
-                  ? 'กรอกข้อมูลให้ครบเพื่อสร้างคิวนัดหมาย'
-                  : 'อัปเดตวัน เวลา สถานะ หรือหมายเหตุของการนัดหมาย'
-              }}
-            </p>
+            <h2>{{ modalTitle }}</h2>
+            <p>{{ modalDescription }}</p>
           </div>
           <button @click="closeModal" class="close-btn" type="button">ปิด</button>
         </div>
@@ -172,10 +238,29 @@
             </label>
           </div>
 
-          <div class="form-grid" v-if="modalMode === 'edit'">
+          <div class="form-grid" v-if="modalMode !== 'add'">
             <label class="full-width">
               <span>สัตว์เลี้ยง</span>
               <input type="text" :value="form.pet_display" readonly />
+            </label>
+          </div>
+
+          <div v-if="modalMode === 'reschedule'" class="reschedule-banner">
+            <strong>คำขอจากเจ้าของสัตว์เลี้ยง</strong>
+            <p>{{ form.original_cancel_reason || 'เจ้าของสัตว์เลี้ยงขอยกเลิกนัดหมายเดิม' }}</p>
+            <small>เลือกวัน เวลา และสัตวแพทย์ใหม่ ระบบจะส่งรายการกลับไปให้ลูกค้ากดยืนยันอีกครั้ง</small>
+          </div>
+
+          <div class="form-grid">
+            <label class="full-width">
+              <span>สัตวแพทย์ *</span>
+              <select v-model="form.vet_id" required>
+                <option value="" disabled>เลือกสัตวแพทย์ที่ลงเวร</option>
+                <option v-for="vet in veterinarians" :key="vet.vet_id" :value="vet.vet_id">{{ vet.vet_name }}</option>
+              </select>
+              <small v-if="form.appt_date && form.vet_id" class="field-hint">
+                {{ matchingShiftText }}
+              </small>
             </label>
           </div>
 
@@ -187,6 +272,7 @@
                 <option :value="APPT_STATUS_CONFIRMED">ยืนยัน</option>
                 <option :value="APPT_STATUS_CANCELED">ยกเลิก</option>
               </select>
+              <small class="field-hint">นัดใหม่จะเป็น “รอยืนยัน” และให้เจ้าของสัตว์เลี้ยงตอบรับจากบัญชีของตนเอง</small>
             </label>
           </div>
 
@@ -196,7 +282,7 @@
               <input
                 v-model="form.appt_date"
                 type="date"
-                :min="modalMode === 'add' ? todayInputValue() : undefined"
+                :min="modalMode === 'edit' ? undefined : todayInputValue()"
                 required
               />
             </label>
@@ -227,7 +313,7 @@
           <div class="modal-actions">
             <button type="button" @click="closeModal" class="ghost-btn">ยกเลิก</button>
             <button type="submit" :disabled="isSubmitting" class="primary-btn">
-              {{ isSubmitting ? 'กำลังบันทึก...' : modalMode === 'add' ? 'บันทึกนัดหมาย' : 'บันทึกการแก้ไข' }}
+              {{ isSubmitting ? 'กำลังบันทึก...' : submitLabel }}
             </button>
           </div>
         </form>
@@ -246,6 +332,8 @@ const APPT_STATUS_CANCELED = 'ยกเลิก'
 
 const appointments = ref([])
 const petsList = ref([])
+const veterinarians = ref([])
+const schedules = ref([])
 const statusFilter = ref('all')
 const isModalOpen = ref(false)
 const modalMode = ref('add')
@@ -253,6 +341,18 @@ const form = ref({})
 const isSubmitting = ref(false)
 const searchPetQuery = ref('')
 const showPetDropdown = ref(false)
+const isSavingSchedule = ref(false)
+const scheduleForm = ref({
+  vet_id: '',
+  work_date: '',
+  start_time: '09:00',
+  end_time: '17:00',
+  schedule_note: ''
+})
+
+const authHeaders = () => ({
+  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+})
 
 const formatDateParts = (value) => {
   const raw = String(value || '').trim()
@@ -327,6 +427,24 @@ const filters = computed(() => [
   { label: 'ยกเลิก', value: APPT_STATUS_CANCELED }
 ])
 
+const modalTitle = computed(() => {
+  if (modalMode.value === 'add') return 'เพิ่มการนัดหมายใหม่'
+  if (modalMode.value === 'reschedule') return 'จัดวันนัดหมายใหม่'
+  return 'แก้ไขการนัดหมาย'
+})
+
+const modalDescription = computed(() => {
+  if (modalMode.value === 'add') return 'กรอกข้อมูลให้ครบเพื่อสร้างคิวนัดหมาย'
+  if (modalMode.value === 'reschedule') return 'กำหนดคิวใหม่แล้วส่งให้เจ้าของสัตว์เลี้ยงตอบรับ'
+  return 'อัปเดตวัน เวลา สถานะ หรือหมายเหตุของการนัดหมาย'
+})
+
+const submitLabel = computed(() => {
+  if (modalMode.value === 'add') return 'บันทึกนัดหมาย'
+  if (modalMode.value === 'reschedule') return 'ส่งวันนัดใหม่'
+  return 'บันทึกการแก้ไข'
+})
+
 const todayInputValue = () => {
   const now = new Date()
   const year = now.getFullYear()
@@ -370,6 +488,20 @@ const filteredPets = computed(() => {
 const filteredAppointments = computed(() => {
   if (statusFilter.value === 'all') return appointments.value
   return appointments.value.filter((item) => item.appt_status === statusFilter.value)
+})
+
+const matchingShifts = computed(() =>
+  schedules.value.filter(
+    (shift) =>
+      String(shift.work_date || '').slice(0, 10) === form.value.appt_date && shift.vet_id === form.value.vet_id
+  )
+)
+
+const matchingShiftText = computed(() => {
+  if (matchingShifts.value.length === 0) return 'ยังไม่พบตารางเวรของสัตวแพทย์ในวันที่เลือก'
+  return `ช่วงเข้าเวร: ${matchingShifts.value
+    .map((shift) => `${formatTime(shift.start_time)}-${formatTime(shift.end_time)} น.`)
+    .join(', ')}`
 })
 
 const isActiveAppointment = (item) => normalizeAppointmentStatus(item.appt_status) !== APPT_STATUS_CANCELED
@@ -526,11 +658,72 @@ const fetchPetsList = async () => {
   }
 }
 
+const fetchVeterinarians = async () => {
+  try {
+    const res = await axios.get('http://localhost:3000/api/appointments/veterinarians-list', authHeaders())
+    veterinarians.value = res.data || []
+  } catch (err) {
+    console.error('Fetch veterinarians error:', err)
+  }
+}
+
+const scheduleRange = () => {
+  const today = new Date()
+  const end = new Date(today.getFullYear(), today.getMonth() + 4, 0)
+  const toKey = (date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return { from: toKey(today), to: toKey(end) }
+}
+
+const fetchSchedules = async () => {
+  try {
+    const res = await axios.get('http://localhost:3000/api/appointments/vet-schedules', {
+      ...authHeaders(),
+      params: scheduleRange()
+    })
+    schedules.value = res.data || []
+  } catch (err) {
+    console.error('Fetch veterinarian schedules error:', err)
+  }
+}
+
+const saveSchedule = async () => {
+  isSavingSchedule.value = true
+  try {
+    await axios.post('http://localhost:3000/api/appointments/vet-schedules', scheduleForm.value, authHeaders())
+    scheduleForm.value = {
+      vet_id: scheduleForm.value.vet_id,
+      work_date: '',
+      start_time: '09:00',
+      end_time: '17:00',
+      schedule_note: ''
+    }
+    await fetchSchedules()
+  } catch (error) {
+    console.error('Save veterinarian schedule error:', error)
+    alert(error.response?.data?.message || 'บันทึกตารางเวรไม่สำเร็จ')
+  } finally {
+    isSavingSchedule.value = false
+  }
+}
+
+const deleteSchedule = async (scheduleId) => {
+  if (!confirm('ยืนยันลบตารางเวรนี้หรือไม่?')) return
+  try {
+    await axios.delete(`http://localhost:3000/api/appointments/vet-schedules/${scheduleId}`, authHeaders())
+    await fetchSchedules()
+  } catch (error) {
+    console.error('Delete veterinarian schedule error:', error)
+    alert(error.response?.data?.message || 'ลบตารางเวรไม่สำเร็จ')
+  }
+}
+
 const openAddModal = () => {
   modalMode.value = 'add'
   form.value = {
     pet_id: '',
-    appt_status: APPT_STATUS_CONFIRMED,
+    vet_id: '',
+    appt_status: APPT_STATUS_PENDING,
     appt_date: todayInputValue(),
     appt_time: '',
     appt_reason: '',
@@ -547,12 +740,31 @@ const openEditModal = (appointment) => {
   form.value = {
     appt_id: appointment.appt_id,
     pet_id: appointment.pet_id,
+    vet_id: appointment.vet_id || '',
     pet_display: `${appointment.pet_name || '-'} (เจ้าของ: ${appointment.owner_name || 'ไม่ระบุ'})`,
     appt_status: normalizedAppointment.appt_status,
     appt_date: normalizedAppointment.appt_date,
     appt_time: normalizedAppointment.appt_time,
     appt_reason: appointment.appt_reason || '',
     cancel_reason: normalizedAppointment.cancel_reason
+  }
+  isModalOpen.value = true
+}
+
+const openRescheduleModal = (appointment) => {
+  modalMode.value = 'reschedule'
+  const normalizedAppointment = normalizeAppointmentRecord(appointment)
+  form.value = {
+    appt_id: appointment.appt_id,
+    pet_id: appointment.pet_id,
+    vet_id: appointment.vet_id || '',
+    pet_display: `${appointment.pet_name || '-'} (เจ้าของ: ${appointment.owner_name || 'ไม่ระบุ'})`,
+    appt_status: APPT_STATUS_PENDING,
+    appt_date: '',
+    appt_time: '',
+    appt_reason: appointment.appt_reason || '',
+    cancel_reason: '',
+    original_cancel_reason: normalizedAppointment.cancel_reason
   }
   isModalOpen.value = true
 }
@@ -565,7 +777,11 @@ const closeModal = () => {
 
 const showAppointmentFeedback = (response) => {
   const emailMessage = response?.data?.email_notification?.message
-  const baseMessage = modalMode.value === 'add' ? 'บันทึกนัดหมายสำเร็จ' : 'อัปเดตการนัดหมายสำเร็จ'
+  const baseMessage = modalMode.value === 'add'
+    ? 'บันทึกนัดหมายสำเร็จ'
+    : modalMode.value === 'reschedule'
+      ? 'ส่งวันนัดหมายใหม่ให้ลูกค้าตอบรับแล้ว'
+      : 'อัปเดตการนัดหมายสำเร็จ'
   alert(emailMessage ? `${baseMessage}\n${emailMessage}` : baseMessage)
 }
 
@@ -585,10 +801,11 @@ const handleSubmit = async () => {
         'http://localhost:3000/api/appointments',
         {
           pet_id: form.value.pet_id,
+          vet_id: form.value.vet_id,
           appt_date: form.value.appt_date,
           appt_time: form.value.appt_time,
           appt_reason: form.value.appt_reason,
-          appt_status: APPT_STATUS_CONFIRMED
+          appt_status: APPT_STATUS_PENDING
         },
         { headers }
       )
@@ -598,10 +815,12 @@ const handleSubmit = async () => {
         `http://localhost:3000/api/appointments/${form.value.appt_id}`,
         {
           appt_date: form.value.appt_date,
+          vet_id: form.value.vet_id,
           appt_time: form.value.appt_time,
           appt_reason: form.value.appt_reason,
           appt_status: form.value.appt_status,
-          cancel_reason: form.value.appt_status === APPT_STATUS_CANCELED ? form.value.cancel_reason : null
+          cancel_reason: form.value.appt_status === APPT_STATUS_CANCELED ? form.value.cancel_reason : null,
+          reschedule: modalMode.value === 'reschedule'
         },
         { headers }
       )
@@ -634,7 +853,7 @@ const deleteAppointment = async (apptId) => {
 }
 
 onMounted(async () => {
-  await Promise.all([fetchAppointments(), fetchPetsList()])
+  await Promise.all([fetchAppointments(), fetchPetsList(), fetchVeterinarians(), fetchSchedules()])
   await nextTick()
   await waitForRender()
 })
@@ -647,6 +866,7 @@ onMounted(async () => {
 }
 
 .page-header,
+.shift-panel,
 .toolbar,
 .table-panel,
 .modal {
@@ -686,9 +906,134 @@ onMounted(async () => {
   line-height: 1.7;
 }
 
+.shift-panel {
+  padding: 22px 24px;
+}
+
+.shift-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.shift-head h2 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.shift-head p:last-child {
+  margin: 8px 0 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.shift-count {
+  flex: none;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: #e8faf5;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.shift-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.8fr) 120px 120px minmax(220px, 1.25fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 16px;
+  border: 1px solid #dce7ef;
+  border-radius: 16px;
+  background: #f8fbfd;
+}
+
+.shift-form label {
+  gap: 6px;
+}
+
+.shift-form label span {
+  font-size: 12px;
+}
+
+.shift-form input,
+.shift-form select {
+  min-height: 44px;
+  padding: 10px 11px;
+  border-radius: 11px;
+}
+
+.shift-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.shift-item {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #dce7ef;
+  border-radius: 15px;
+  background: #ffffff;
+}
+
+.shift-date {
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: #ecfdf8;
+  color: #0f766e;
+  text-align: center;
+}
+
+.shift-date span,
+.shift-date strong,
+.shift-detail strong,
+.shift-detail span,
+.shift-detail small {
+  display: block;
+}
+
+.shift-date span {
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.shift-date strong {
+  margin-top: 3px;
+  font-size: 1.35rem;
+}
+
+.shift-detail strong {
+  color: #0f172a;
+}
+
+.shift-detail span,
+.shift-detail small {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.shift-empty {
+  margin-top: 16px;
+  padding: 22px;
+  border: 1px dashed #cbd8e4;
+  border-radius: 14px;
+  color: #64748b;
+  text-align: center;
+}
+
 .primary-btn,
 .ghost-btn,
 .danger-btn,
+.reschedule-btn,
 .close-btn,
 .pill-btn {
   min-height: 42px;
@@ -719,9 +1064,16 @@ onMounted(async () => {
   border-color: rgba(239, 68, 68, 0.16);
 }
 
+.reschedule-btn {
+  background: #ecfdf5;
+  color: #0f766e;
+  border-color: #99f6e4;
+}
+
 .primary-btn:hover,
 .ghost-btn:hover,
 .danger-btn:hover,
+.reschedule-btn:hover,
 .close-btn:hover,
 .pill-btn:hover {
   transform: translateY(-1px);
@@ -857,6 +1209,7 @@ th {
 .cancel-reason {
   color: #b91c1c;
   font-size: 12px;
+  line-height: 1.5;
 }
 
 .row-actions {
@@ -973,6 +1326,32 @@ th {
 
 form {
   margin-top: 18px;
+}
+
+.reschedule-banner {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #7c2d12;
+}
+
+.reschedule-banner strong,
+.reschedule-banner p,
+.reschedule-banner small {
+  display: block;
+}
+
+.reschedule-banner p {
+  margin: 6px 0;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.reschedule-banner small {
+  color: #9a3412;
+  line-height: 1.55;
 }
 
 .form-grid {
@@ -1097,6 +1476,14 @@ textarea:focus {
     flex-direction: column;
     align-items: stretch;
   }
+
+  .shift-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shift-note-field {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1115,8 +1502,30 @@ textarea:focus {
   .primary-btn,
   .ghost-btn,
   .danger-btn,
+  .reschedule-btn,
   .close-btn {
     width: 100%;
+  }
+
+  .shift-head {
+    flex-direction: column;
+  }
+
+  .shift-form,
+  .shift-list {
+    grid-template-columns: 1fr;
+  }
+
+  .shift-note-field {
+    grid-column: auto;
+  }
+
+  .shift-item {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .shift-item .danger-btn {
+    grid-column: 1 / -1;
   }
 }
 </style>
