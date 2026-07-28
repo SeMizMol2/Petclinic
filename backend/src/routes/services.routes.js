@@ -3,6 +3,37 @@ const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
 
+const PET_TYPE_VALUES = new Map([
+    ['all', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'],
+    ['\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'],
+    ['\u0e17\u0e38\u0e01\u0e1b\u0e23\u0e30\u0e40\u0e20\u0e17', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'],
+    ['dog', '\u0e2a\u0e38\u0e19\u0e31\u0e02'],
+    ['\u0e2b\u0e21\u0e32', '\u0e2a\u0e38\u0e19\u0e31\u0e02'],
+    ['\u0e2a\u0e38\u0e19\u0e31\u0e02', '\u0e2a\u0e38\u0e19\u0e31\u0e02'],
+    ['cat', '\u0e41\u0e21\u0e27'],
+    ['\u0e41\u0e21\u0e27', '\u0e41\u0e21\u0e27']
+]);
+
+const PET_GENDER_VALUES = new Map([
+    ['all', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'],
+    ['\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'],
+    ['\u0e17\u0e38\u0e01\u0e40\u0e1e\u0e28', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'],
+    ['male', '\u0e1c\u0e39\u0e49'],
+    ['\u0e1c\u0e39\u0e49', '\u0e1c\u0e39\u0e49'],
+    ['\u0e40\u0e1e\u0e28\u0e1c\u0e39\u0e49', '\u0e1c\u0e39\u0e49'],
+    ['female', '\u0e40\u0e21\u0e35\u0e22'],
+    ['\u0e40\u0e21\u0e35\u0e22', '\u0e40\u0e21\u0e35\u0e22'],
+    ['\u0e40\u0e1e\u0e28\u0e40\u0e21\u0e35\u0e22', '\u0e40\u0e21\u0e35\u0e22']
+]);
+
+const normalizeApplicability = (typeValue, genderValue) => {
+    const type = PET_TYPE_VALUES.get(String(typeValue || 'all').trim().toLowerCase());
+    const gender = PET_GENDER_VALUES.get(String(genderValue || 'all').trim().toLowerCase());
+
+    if (!type || !gender) return null;
+    return { type, gender };
+};
+
 router.get('/public', async (req, res) => {
     try {
         const services = await pool.query(
@@ -37,7 +68,21 @@ router.get('/', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
     try {
-        const { service_name, service_desc, service_price, service_image } = req.body;
+        const {
+            service_name,
+            service_desc,
+            service_price,
+            service_image,
+            applicable_pet_type,
+            applicable_pet_gender
+        } = req.body;
+        const applicability = normalizeApplicability(applicable_pet_type, applicable_pet_gender);
+
+        if (!applicability) {
+            return res.status(400).json({
+                message: '\u0e01\u0e23\u0e38\u0e13\u0e32\u0e23\u0e30\u0e1a\u0e38\u0e1b\u0e23\u0e30\u0e40\u0e20\u0e17\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e41\u0e25\u0e30\u0e40\u0e1e\u0e28\u0e17\u0e35\u0e48\u0e43\u0e0a\u0e49\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23\u0e44\u0e14\u0e49\u0e43\u0e2b\u0e49\u0e16\u0e39\u0e01\u0e15\u0e49\u0e2d\u0e07'
+            });
+        }
 
         const lastService = await pool.query(
             'SELECT service_id FROM tb_service ORDER BY service_id DESC LIMIT 1'
@@ -52,10 +97,26 @@ router.post('/', auth, async (req, res) => {
 
         await pool.query(
             `
-            INSERT INTO tb_service (service_id, service_name, service_desc, service_price, service_image)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO tb_service (
+                service_id,
+                service_name,
+                service_desc,
+                service_price,
+                service_image,
+                applicable_pet_type,
+                applicable_pet_gender
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             `,
-            [newId, service_name, service_desc, service_price, service_image || null]
+            [
+                newId,
+                service_name,
+                service_desc,
+                service_price,
+                service_image || null,
+                applicability.type,
+                applicability.gender
+            ]
         );
 
         res.status(201).json({
@@ -73,7 +134,21 @@ router.post('/', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { service_name, service_desc, service_price, service_image } = req.body;
+        const {
+            service_name,
+            service_desc,
+            service_price,
+            service_image,
+            applicable_pet_type,
+            applicable_pet_gender
+        } = req.body;
+        const applicability = normalizeApplicability(applicable_pet_type, applicable_pet_gender);
+
+        if (!applicability) {
+            return res.status(400).json({
+                message: '\u0e01\u0e23\u0e38\u0e13\u0e32\u0e23\u0e30\u0e1a\u0e38\u0e1b\u0e23\u0e30\u0e40\u0e20\u0e17\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e41\u0e25\u0e30\u0e40\u0e1e\u0e28\u0e17\u0e35\u0e48\u0e43\u0e0a\u0e49\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23\u0e44\u0e14\u0e49\u0e43\u0e2b\u0e49\u0e16\u0e39\u0e01\u0e15\u0e49\u0e2d\u0e07'
+            });
+        }
 
         const result = await pool.query(
             `
@@ -82,10 +157,20 @@ router.put('/:id', auth, async (req, res) => {
                 service_desc = $2,
                 service_price = $3,
                 service_image = $4,
+                applicable_pet_type = $5,
+                applicable_pet_gender = $6,
                 update_datetime = CURRENT_TIMESTAMP
-            WHERE service_id = $5
+            WHERE service_id = $7
             `,
-            [service_name, service_desc, service_price, service_image || null, id]
+            [
+                service_name,
+                service_desc,
+                service_price,
+                service_image || null,
+                applicability.type,
+                applicability.gender,
+                id
+            ]
         );
 
         if (result.rowCount === 0) {

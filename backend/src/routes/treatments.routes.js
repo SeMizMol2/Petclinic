@@ -3,6 +3,8 @@ const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
 
+const RECEIPT_STATUS_PAID = '\u0e0a\u0e33\u0e23\u0e30\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e2a\u0e34\u0e49\u0e19';
+
 const ensureAdmin = (req, res) => {
     if (req.user.role !== 'admin') {
         res.status(403).json({ message: '\u0e44\u0e21\u0e48\u0e21\u0e35\u0e2a\u0e34\u0e17\u0e18\u0e34\u0e4c\u0e17\u0e33\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23' });
@@ -24,10 +26,189 @@ const nextTreatmentId = async (dbClient) => {
     return newId;
 };
 
+const normalizePetType = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (['dog', '\u0e2b\u0e21\u0e32', '\u0e2a\u0e38\u0e19\u0e31\u0e02'].includes(normalized)) return 'dog';
+    if (['cat', '\u0e41\u0e21\u0e27'].includes(normalized)) return 'cat';
+    return normalized ? `other:${normalized}` : '';
+};
+
+const normalizePetGender = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (['male', '\u0e1c\u0e39\u0e49', '\u0e40\u0e1e\u0e28\u0e1c\u0e39\u0e49'].includes(normalized)) return 'male';
+    if (['female', '\u0e40\u0e21\u0e35\u0e22', '\u0e40\u0e1e\u0e28\u0e40\u0e21\u0e35\u0e22'].includes(normalized)) return 'female';
+    return normalized ? `other:${normalized}` : '';
+};
+
+const isAllApplicability = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    return !normalized || ['all', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14', '\u0e17\u0e38\u0e01\u0e1b\u0e23\u0e30\u0e40\u0e20\u0e17', '\u0e17\u0e38\u0e01\u0e40\u0e1e\u0e28'].includes(normalized);
+};
+
+const validateServiceApplicability = async (dbClient, petId, serviceItems) => {
+    const petResult = await dbClient.query(
+        'SELECT pet_id, pet_name, pet_type, pet_gender FROM tb_pet WHERE pet_id = $1',
+        [petId]
+    );
+
+    if (petResult.rows.length === 0) {
+        return {
+            status: 404,
+            message: '\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e40\u0e25\u0e35\u0e49\u0e22\u0e07\u0e17\u0e35\u0e48\u0e40\u0e25\u0e37\u0e2d\u0e01'
+        };
+    }
+
+    const serviceIds = [...new Set(
+        (serviceItems || []).map((item) => String(item.service_id || '').trim()).filter(Boolean)
+    )];
+    if (serviceIds.length === 0) return null;
+
+    const serviceResult = await dbClient.query(
+        `
+        SELECT service_id, service_name, applicable_pet_type, applicable_pet_gender
+        FROM tb_service
+        WHERE service_id = ANY($1::varchar[])
+        `,
+        [serviceIds]
+    );
+
+    if (serviceResult.rows.length !== serviceIds.length) {
+        return {
+            status: 400,
+            message: '\u0e1e\u0e1a\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23\u0e17\u0e35\u0e48\u0e44\u0e21\u0e48\u0e21\u0e35\u0e43\u0e19\u0e23\u0e30\u0e1a\u0e1a'
+        };
+    }
+
+    const pet = petResult.rows[0];
+    const petType = normalizePetType(pet.pet_type);
+    const petGender = normalizePetGender(pet.pet_gender);
+    const incompatible = serviceResult.rows.find((service) => {
+        const typeMatches = isAllApplicability(service.applicable_pet_type)
+            || normalizePetType(service.applicable_pet_type) === petType;
+        const genderMatches = isAllApplicability(service.applicable_pet_gender)
+            || normalizePetGender(service.applicable_pet_gender) === petGender;
+        return !typeMatches || !genderMatches;
+    });
+
+    if (!incompatible) return null;
+    return {
+        status: 400,
+        message: `\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23 "${incompatible.service_name}" \u0e44\u0e21\u0e48\u0e23\u0e2d\u0e07\u0e23\u0e31\u0e1a ${pet.pet_name} (${pet.pet_type || '-'} / ${pet.pet_gender || '-'})`
+    };
+};
+
+const isPaidReceiptStatus = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized === RECEIPT_STATUS_PAID
+        || normalized === 'paid'
+        || normalized.includes('\u0e0a\u0e33\u0e23\u0e30\u0e41\u0e25\u0e49\u0e27')
+        || normalized.includes('\u0e40\u0e2a\u0e23\u0e47\u0e08');
+};
+
+const normalizeQuantity = (value) => {
+    const quantity = Number(value);
+    return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+};
+
+const normalizePrice = (value) => {
+    const price = Number(value);
+    return Number.isFinite(price) && price >= 0 ? price : 0;
+};
+
+const calculateServicesTotal = (services) => (services || []).reduce(
+    (total, item) => total + (normalizePrice(item.price) * normalizeQuantity(item.quantity)),
+    0
+);
+
+const hasFinancialChanges = (currentTreatment, currentDetails, submittedPetId, submittedServices) => {
+    if (String(currentTreatment.pet_id) !== String(submittedPetId)) return true;
+
+    if (currentDetails.length !== (submittedServices || []).length) return true;
+
+    const currentById = new Map(
+        currentDetails.map((item) => [Number(item.detail_id), item])
+    );
+
+    return (submittedServices || []).some((item) => {
+        const current = currentById.get(Number(item.detail_id));
+        if (!current) return true;
+        return String(current.service_id) !== String(item.service_id)
+            || Number(current.quantity || 0) !== normalizeQuantity(item.quantity)
+            || Math.abs(Number(current.price || 0) - normalizePrice(item.price)) > 0.009;
+    });
+};
+
+const nextReceiptDetailId = async (dbClient) => {
+    const result = await dbClient.query(`
+        SELECT detail_id
+        FROM tb_receipt_detail
+        WHERE detail_id LIKE 'RD%'
+        ORDER BY detail_id DESC
+        LIMIT 1
+    `);
+    const lastId = result.rows[0]?.detail_id || 'RD0000000000000';
+    const lastNumber = Number(String(lastId).replace(/^RD/, '')) || 0;
+    return `RD${String(lastNumber + 1).padStart(13, '0')}`;
+};
+
+const syncUnpaidReceipt = async (dbClient, receipt, treatmentId, petId, totalAmount) => {
+    const ownerResult = await dbClient.query(
+        'SELECT owner_id FROM tb_pet WHERE pet_id = $1',
+        [petId]
+    );
+
+    await dbClient.query(
+        `
+        UPDATE tb_receipt
+        SET total_amount = $1,
+            owner_id = $2,
+            update_datetime = NOW()
+        WHERE receipt_id = $3
+        `,
+        [totalAmount, ownerResult.rows[0]?.owner_id || null, receipt.receipt_id]
+    );
+
+    const details = await dbClient.query(
+        `
+        SELECT d.detail_id AS t_detail_id, d.service_id, d.quantity, d.price, s.service_name
+        FROM tb_treatment_detail d
+        LEFT JOIN tb_service s ON d.service_id = s.service_id
+        WHERE d.treatment_id = $1
+        ORDER BY d.detail_id ASC
+        `,
+        [treatmentId]
+    );
+
+    for (const item of details.rows) {
+        const detailId = await nextReceiptDetailId(dbClient);
+        await dbClient.query(
+            `
+            INSERT INTO tb_receipt_detail (
+                detail_id,
+                receipt_id,
+                t_detail_id,
+                ref_type,
+                description,
+                amount,
+                create_datetime
+            )
+            VALUES ($1, $2, $3, 'treatment', $4, $5, NOW())
+            `,
+            [
+                detailId,
+                receipt.receipt_id,
+                item.t_detail_id,
+                item.service_name || item.service_id || 'service item',
+                Number(item.price || 0) * Number(item.quantity || 0)
+            ]
+        );
+    }
+};
+
 router.get('/pets', auth, async (req, res) => {
     try {
         const pets = await pool.query(`
-            SELECT p.pet_id, p.pet_name, o.owner_name
+            SELECT p.pet_id, p.pet_name, p.pet_type, p.pet_gender, o.owner_name
             FROM tb_pet p
             LEFT JOIN tb_owner o ON p.owner_id = o.owner_id
             ORDER BY p.pet_id DESC
@@ -43,7 +224,13 @@ router.get('/services', auth, async (req, res) => {
     try {
         const services = await pool.query(
             `
-            SELECT service_id, service_name, service_price, service_type
+            SELECT
+                service_id,
+                service_name,
+                service_price,
+                service_type,
+                applicable_pet_type,
+                applicable_pet_gender
             FROM tb_service
             ORDER BY service_id ASC
             `
@@ -70,6 +257,9 @@ router.get('/:id', auth, async (req, res) => {
                 t.symptom,
                 t.diagnosis,
                 t.total_amount,
+                r.receipt_id,
+                r.payment_status,
+                r.pay_method,
                 p.pet_name,
                 o.owner_name,
                 u.username AS doctor_name,
@@ -79,6 +269,7 @@ router.get('/:id', auth, async (req, res) => {
             JOIN tb_owner o ON p.owner_id = o.owner_id
             LEFT JOIN tb_user u ON t.user_id = u.user_id
             LEFT JOIN tb_veterinarian v ON t.vet_id = v.vet_id
+            LEFT JOIN tb_receipt r ON t.treatment_id = r.treatment_id
             WHERE t.treatment_id = $1
             `,
             [req.params.id]
@@ -119,22 +310,28 @@ router.post('/', auth, async (req, res) => {
     try {
         if (!ensureAdmin(req, res)) return;
 
-        const { pet_id, vet_id, symptom, diagnosis, services, total_amount } = req.body;
+        const { pet_id, vet_id, symptom, diagnosis, services } = req.body;
         const user_id = req.user.user_id;
 
         if (!pet_id) {
             return res.status(400).json({ message: '\u0e01\u0e23\u0e38\u0e13\u0e32\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e40\u0e25\u0e35\u0e49\u0e22\u0e07' });
         }
 
+        const applicabilityError = await validateServiceApplicability(client, pet_id, services);
+        if (applicabilityError) {
+            return res.status(applicabilityError.status).json({ message: applicabilityError.message });
+        }
+
         await client.query('BEGIN');
         const newTrId = await nextTreatmentId(client);
+        const calculatedTotal = calculateServicesTotal(services);
 
         await client.query(
             `
             INSERT INTO tb_treatment (treatment_id, pet_id, user_id, vet_id, symptom, diagnosis, total_amount)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             `,
-            [newTrId, pet_id, user_id, vet_id || null, symptom || null, diagnosis || null, total_amount || 0]
+            [newTrId, pet_id, user_id, vet_id || null, symptom || null, diagnosis || null, calculatedTotal]
         );
 
         for (const item of services || []) {
@@ -143,7 +340,7 @@ router.post('/', auth, async (req, res) => {
                 INSERT INTO tb_treatment_detail (treatment_id, service_id, quantity, price)
                 VALUES ($1, $2, $3, $4)
                 `,
-                [newTrId, item.service_id, item.quantity || 1, item.price || 0]
+                [newTrId, item.service_id, normalizeQuantity(item.quantity), normalizePrice(item.price)]
             );
         }
 
@@ -167,7 +364,7 @@ router.put('/:id', auth, async (req, res) => {
         if (!ensureAdmin(req, res)) return;
 
         const { id } = req.params;
-        const { pet_id, vet_id, symptom, diagnosis, services, total_amount } = req.body;
+        const { pet_id, vet_id, symptom, diagnosis, services } = req.body;
 
         if (!pet_id) {
             return res.status(400).json({ message: '\u0e01\u0e23\u0e38\u0e13\u0e32\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e40\u0e25\u0e35\u0e49\u0e22\u0e07' });
@@ -175,7 +372,93 @@ router.put('/:id', auth, async (req, res) => {
 
         await client.query('BEGIN');
 
-        const updateResult = await client.query(
+        const currentTreatmentResult = await client.query(
+            `
+            SELECT treatment_id, pet_id, total_amount
+            FROM tb_treatment
+            WHERE treatment_id = $1
+            FOR UPDATE
+            `,
+            [id]
+        );
+
+        if (currentTreatmentResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: '\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e01\u0e32\u0e23\u0e23\u0e31\u0e01\u0e29\u0e32' });
+        }
+
+        const receiptResult = await client.query(
+            `
+            SELECT receipt_id, payment_status, total_amount
+            FROM tb_receipt
+            WHERE treatment_id = $1
+            LIMIT 1
+            FOR UPDATE
+            `,
+            [id]
+        );
+        const receipt = receiptResult.rows[0] || null;
+
+        const currentDetailsResult = await client.query(
+            `
+            SELECT detail_id, service_id, quantity, price
+            FROM tb_treatment_detail
+            WHERE treatment_id = $1
+            ORDER BY detail_id ASC
+            `,
+            [id]
+        );
+
+        if (
+            receipt
+            && isPaidReceiptStatus(receipt.payment_status)
+            && hasFinancialChanges(
+                currentTreatmentResult.rows[0],
+                currentDetailsResult.rows,
+                pet_id,
+                services
+            )
+        ) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({
+                message: '\u0e43\u0e1a\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e0a\u0e33\u0e23\u0e30\u0e41\u0e25\u0e49\u0e27 \u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e40\u0e1b\u0e25\u0e35\u0e48\u0e22\u0e19\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e40\u0e25\u0e35\u0e49\u0e22\u0e07 \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23 \u0e08\u0e33\u0e19\u0e27\u0e19 \u0e2b\u0e23\u0e37\u0e2d\u0e23\u0e32\u0e04\u0e32\u0e44\u0e14\u0e49'
+            });
+        }
+
+        if (receipt && isPaidReceiptStatus(receipt.payment_status)) {
+            await client.query(
+                `
+                UPDATE tb_treatment
+                SET vet_id = $1,
+                    symptom = $2,
+                    diagnosis = $3
+                WHERE treatment_id = $4
+                `,
+                [vet_id || null, symptom || null, diagnosis || null, id]
+            );
+
+            await client.query('COMMIT');
+            return res.json({
+                message: '\u0e41\u0e01\u0e49\u0e44\u0e02\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e01\u0e32\u0e23\u0e23\u0e31\u0e01\u0e29\u0e32\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 \u0e42\u0e14\u0e22\u0e04\u0e07\u0e22\u0e2d\u0e14\u0e43\u0e1a\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e17\u0e35\u0e48\u0e0a\u0e33\u0e23\u0e30\u0e41\u0e25\u0e49\u0e27\u0e44\u0e27\u0e49',
+                financial_locked: true
+            });
+        }
+
+        const applicabilityError = await validateServiceApplicability(client, pet_id, services);
+        if (applicabilityError) {
+            await client.query('ROLLBACK');
+            return res.status(applicabilityError.status).json({ message: applicabilityError.message });
+        }
+
+        if (receipt) {
+            await client.query(
+                'DELETE FROM tb_receipt_detail WHERE receipt_id = $1',
+                [receipt.receipt_id]
+            );
+        }
+
+        const calculatedTotal = calculateServicesTotal(services);
+        await client.query(
             `
             UPDATE tb_treatment
             SET pet_id = $1,
@@ -185,19 +468,10 @@ router.put('/:id', auth, async (req, res) => {
                 total_amount = $5
             WHERE treatment_id = $6
             `,
-            [pet_id, vet_id || null, symptom || null, diagnosis || null, total_amount || 0, id]
+            [pet_id, vet_id || null, symptom || null, diagnosis || null, calculatedTotal, id]
         );
 
-        if (updateResult.rowCount === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ message: '\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e01\u0e32\u0e23\u0e23\u0e31\u0e01\u0e29\u0e32' });
-        }
-
-        const existingDetails = await client.query(
-            'SELECT detail_id FROM tb_treatment_detail WHERE treatment_id = $1',
-            [id]
-        );
-        const existingDetailIds = new Set(existingDetails.rows.map((row) => Number(row.detail_id)));
+        const existingDetailIds = new Set(currentDetailsResult.rows.map((row) => Number(row.detail_id)));
         const retainedDetailIds = [];
 
         for (const item of services || []) {
@@ -213,7 +487,13 @@ router.put('/:id', auth, async (req, res) => {
                     WHERE detail_id = $4
                       AND treatment_id = $5
                     `,
-                    [item.service_id, item.quantity || 1, item.price || 0, detailId, id]
+                    [
+                        item.service_id,
+                        normalizeQuantity(item.quantity),
+                        normalizePrice(item.price),
+                        detailId,
+                        id
+                    ]
                 );
                 retainedDetailIds.push(detailId);
                 continue;
@@ -225,7 +505,7 @@ router.put('/:id', auth, async (req, res) => {
                 VALUES ($1, $2, $3, $4)
                 RETURNING detail_id
                 `,
-                [id, item.service_id, item.quantity || 1, item.price || 0]
+                [id, item.service_id, normalizeQuantity(item.quantity), normalizePrice(item.price)]
             );
             retainedDetailIds.push(Number(insertResult.rows[0].detail_id));
         }
@@ -243,8 +523,17 @@ router.put('/:id', auth, async (req, res) => {
             await client.query('DELETE FROM tb_treatment_detail WHERE treatment_id = $1', [id]);
         }
 
+        if (receipt) {
+            await syncUnpaidReceipt(client, receipt, id, pet_id, calculatedTotal);
+        }
+
         await client.query('COMMIT');
-        res.json({ message: '\u0e41\u0e01\u0e49\u0e44\u0e02\u0e01\u0e32\u0e23\u0e23\u0e31\u0e01\u0e29\u0e32\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08' });
+        res.json({
+            message: receipt
+                ? '\u0e41\u0e01\u0e49\u0e44\u0e02\u0e01\u0e32\u0e23\u0e23\u0e31\u0e01\u0e29\u0e32\u0e41\u0e25\u0e30\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e43\u0e1a\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e04\u0e49\u0e32\u0e07\u0e0a\u0e33\u0e23\u0e30\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
+                : '\u0e41\u0e01\u0e49\u0e44\u0e02\u0e01\u0e32\u0e23\u0e23\u0e31\u0e01\u0e29\u0e32\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08',
+            receipt_synced: Boolean(receipt)
+        });
     } catch (err) {
         await client.query('ROLLBACK');
         console.error('Update Treatment Error:', err);
@@ -293,6 +582,9 @@ router.get('/', auth, async (req, res) => {
                 t.total_amount,
                 t.pet_id,
                 t.vet_id,
+                r.receipt_id,
+                r.payment_status,
+                r.pay_method,
                 p.pet_name,
                 o.owner_name,
                 u.username AS doctor_name,
@@ -302,6 +594,7 @@ router.get('/', auth, async (req, res) => {
             JOIN tb_owner o ON p.owner_id = o.owner_id
             LEFT JOIN tb_user u ON t.user_id = u.user_id
             LEFT JOIN tb_veterinarian v ON t.vet_id = v.vet_id
+            LEFT JOIN tb_receipt r ON t.treatment_id = r.treatment_id
             ORDER BY t.treatment_date DESC
         `);
         res.json(history.rows);

@@ -96,6 +96,9 @@ CREATE TABLE tb_service (
     service_desc TEXT,
     service_price DECIMAL(10,2) NOT NULL,
     service_image VARCHAR(255),
+    service_type VARCHAR(50),
+    applicable_pet_type VARCHAR(20) NOT NULL DEFAULT 'ทั้งหมด',
+    applicable_pet_gender VARCHAR(20) NOT NULL DEFAULT 'ทั้งหมด',
     create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_datetime TIMESTAMP
 );

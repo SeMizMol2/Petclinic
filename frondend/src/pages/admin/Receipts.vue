@@ -9,22 +9,6 @@
       <button class="ghost-btn" @click="fetchReceipts">รีเฟรช</button>
     </section>
 
-    <section class="panel-card create-panel">
-      <div>
-        <h2>สร้างใบเสร็จจากการรักษา</h2>
-        <p>กรอกรหัสการรักษา เช่น TR001 เพื่อออกใบเสร็จจากยอดค่ารักษาที่บันทึกไว้</p>
-      </div>
-      <form class="create-form" @submit.prevent="createReceipt">
-        <input v-model="newTreatmentId" placeholder="รหัสการรักษา" required />
-        <select v-model="newPayMethod">
-          <option value="">ยังไม่ระบุช่องทาง</option>
-          <option :value="cashMethod">เงินสด</option>
-          <option :value="transferMethod">โอนเงิน</option>
-        </select>
-        <button class="primary-btn" type="submit">สร้างใบเสร็จ</button>
-      </form>
-    </section>
-
     <section class="toolbar">
       <input v-model="searchQuery" class="search-input" placeholder="ค้นหาเลขที่ใบเสร็จ เจ้าของ หรือสัตว์เลี้ยง" />
       <select v-model="statusFilter">
@@ -157,21 +141,20 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 
+const route = useRoute()
 const receipts = ref([])
 const selectedReceipt = ref(null)
 const loading = ref(false)
 const error = ref('')
 const searchQuery = ref('')
 const statusFilter = ref('')
-const newTreatmentId = ref('')
-const newPayMethod = ref('')
 
 const paidStatus = 'ชำระเสร็จสิ้น'
 const unpaidStatus = 'ยังไม่ได้ชำระ'
 const cashMethod = 'เงินสด'
-const transferMethod = 'โอนเงิน'
 
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
@@ -223,24 +206,6 @@ const openReceipt = async (receipt) => {
     selectedReceipt.value = res.data.data
   } catch (err) {
     alert(err.response?.data?.message || 'โหลดรายละเอียดใบเสร็จไม่สำเร็จ')
-  }
-}
-
-const createReceipt = async () => {
-  try {
-    const res = await axios.post(
-      'http://localhost:3000/api/receipts',
-      { treatment_id: newTreatmentId.value.trim(), pay_method: newPayMethod.value || null },
-      { headers: headers() }
-    )
-    newTreatmentId.value = ''
-    newPayMethod.value = ''
-    await fetchReceipts()
-    if (res.data?.data?.receipt_id) {
-      await openReceipt(res.data.data)
-    }
-  } catch (err) {
-    alert(err.response?.data?.message || 'สร้างใบเสร็จไม่สำเร็จ')
   }
 }
 
@@ -308,35 +273,21 @@ const printReceipt = () => {
   printWindow.close()
 }
 
-onMounted(fetchReceipts)
+onMounted(async () => {
+  await fetchReceipts()
+  const receiptId = String(route.query.receipt_id || '').trim()
+  if (!receiptId) return
+
+  searchQuery.value = receiptId
+  const receipt = receipts.value.find((item) => item.receipt_id === receiptId)
+  if (receipt) await openReceipt(receipt)
+})
 </script>
 
 <style scoped>
 .receipts-admin-page {
   display: grid;
   gap: 20px;
-}
-
-.create-panel {
-  padding: 20px 22px;
-}
-
-.create-panel h2 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 20px;
-}
-
-.create-panel p {
-  margin: 8px 0 0;
-  color: #64748b;
-}
-
-.create-form {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-top: 18px;
 }
 
 .toolbar select {

@@ -31,9 +31,10 @@
             <tr>
               <th width="14%">รหัสบริการ</th>
               <th width="16%">รูป</th>
-              <th width="30%">รายการบริการ</th>
-              <th width="18%" class="text-right">ราคา (บาท)</th>
-              <th width="22%" class="text-center">จัดการ</th>
+              <th width="26%">รายการบริการ</th>
+              <th width="18%">ใช้กับสัตว์</th>
+              <th width="14%" class="text-right">ราคา (บาท)</th>
+              <th width="12%" class="text-center">จัดการ</th>
             </tr>
           </thead>
           <tbody>
@@ -59,6 +60,12 @@
                   {{ svc.service_image }}
                 </div>
               </td>
+              <td>
+                <div class="applicability-tags">
+                  <span class="applicability-tag">{{ svc.applicable_pet_type || 'ทั้งหมด' }}</span>
+                  <span class="applicability-tag secondary">{{ svc.applicable_pet_gender || 'ทุกเพศ' }}</span>
+                </div>
+              </td>
               <td class="text-right font-bold text-emerald-600">
                 {{ formatPrice(svc.service_price) }}
               </td>
@@ -70,7 +77,7 @@
               </td>
             </tr>
             <tr v-if="filteredServices.length === 0">
-              <td colspan="5" class="empty-state">
+              <td colspan="6" class="empty-state">
                 <div class="empty-icon">⋯</div>
                 <h3>ไม่มีรายการบริการในระบบ</h3>
                 <p>กดปุ่ม "เพิ่มบริการใหม่" เพื่อเริ่มต้นสร้างบริการพร้อมรูปประกอบ</p>
@@ -121,6 +128,28 @@
               required
               placeholder="0.00"
             >
+          </div>
+
+          <div class="applicability-grid">
+            <div class="form-group">
+              <label>ใช้กับสัตว์ประเภท <span class="required">*</span></label>
+              <select v-model="form.applicable_pet_type" class="custom-input" required>
+                <option value="ทั้งหมด">ทั้งหมด</option>
+                <option value="สุนัข">สุนัข</option>
+                <option value="แมว">แมว</option>
+              </select>
+              <small class="field-help">หน้าการรักษาจะแสดงเฉพาะบริการที่เหมาะกับสัตว์</small>
+            </div>
+
+            <div class="form-group">
+              <label>ใช้กับเพศ <span class="required">*</span></label>
+              <select v-model="form.applicable_pet_gender" class="custom-input" required>
+                <option value="ทั้งหมด">ทุกเพศ</option>
+                <option value="ผู้">ผู้</option>
+                <option value="เมีย">เมีย</option>
+              </select>
+              <small class="field-help">เช่น บริการทำหมันที่แยกตามเพศ</small>
+            </div>
           </div>
 
           <div class="form-group">
@@ -200,7 +229,9 @@ const openAddModal = () => {
     service_name: '',
     service_price: '',
     service_desc: '',
-    service_image: ''
+    service_image: '',
+    applicable_pet_type: 'ทั้งหมด',
+    applicable_pet_gender: 'ทั้งหมด'
   }
   isModalOpen.value = true
 }
@@ -209,7 +240,9 @@ const openEditModal = (svc) => {
   modalMode.value = 'edit'
   form.value = {
     ...svc,
-    service_image: svc.service_image || ''
+    service_image: svc.service_image || '',
+    applicable_pet_type: svc.applicable_pet_type || 'ทั้งหมด',
+    applicable_pet_gender: svc.applicable_pet_gender || 'ทั้งหมด'
   }
   isModalOpen.value = true
 }
@@ -218,7 +251,9 @@ const buildPayload = () => ({
   service_name: form.value.service_name,
   service_price: form.value.service_price,
   service_desc: form.value.service_desc,
-  service_image: form.value.service_image?.trim() || null
+  service_image: form.value.service_image?.trim() || null,
+  applicable_pet_type: form.value.applicable_pet_type || 'ทั้งหมด',
+  applicable_pet_gender: form.value.applicable_pet_gender || 'ทั้งหมด'
 })
 
 const handleSubmit = async () => {
@@ -310,6 +345,9 @@ onMounted(() => {
 .service-thumb { width: 84px; height: 64px; border-radius: 12px; object-fit: cover; background: #f8fafc; border: 1px solid #e2e8f0; display: block; }
 .service-thumb-empty { display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 12px; font-weight: 600; }
 .service-path { margin-top: 6px; font-size: 12px; color: #94a3b8; word-break: break-all; }
+.applicability-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.applicability-tag { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 10px; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 700; }
+.applicability-tag.secondary { background: #f1f5f9; color: #475569; }
 
 .action-buttons { display: flex; justify-content: center; gap: 8px; }
 .btn-action { background: #ffffff; border: 1px solid #e2e8f0; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; }
@@ -331,6 +369,7 @@ onMounted(() => {
 .close-btn:hover { background: #fee2e2; color: #ef4444; }
 
 .form-group { margin-bottom: 20px; }
+.applicability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .form-group label { display: block; font-size: 14px; font-weight: 700; color: #334155; margin-bottom: 8px; }
 .required { color: #ef4444; }
 .custom-input { width: 100%; padding: 14px 16px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; outline: none; font-family: inherit; transition: 0.2s; box-sizing: border-box; }
@@ -346,4 +385,10 @@ textarea.custom-input { resize: none; }
 .btn-cancel:hover { background-color: #e2e8f0; color: #1e293b; }
 .btn-submit { padding: 12px 28px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; font-family: inherit; box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.3); }
 .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4); }
+
+@media (max-width: 640px) {
+  .service-page { padding: 14px; }
+  .custom-modal-box { width: calc(100% - 20px); max-height: calc(100vh - 20px); overflow-y: auto; padding: 20px; border-radius: 16px; }
+  .applicability-grid { grid-template-columns: 1fr; gap: 0; }
+}
 </style>
