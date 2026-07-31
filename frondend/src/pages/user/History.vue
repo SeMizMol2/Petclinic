@@ -237,6 +237,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import { resolveApiAssetUrl } from '../../api'
 import AppIcon from '../../components/AppIcon.vue'
 
 const route = useRoute()
@@ -333,9 +334,7 @@ const getPetIcon = (type) => {
 }
 
 const resolveImageUrl = (value) => {
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
-  return value.startsWith('/') ? value : `/${value}`
+  return resolveApiAssetUrl(value)
 }
 
 const formatAppointmentSummary = (item) => {

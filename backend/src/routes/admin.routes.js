@@ -79,6 +79,8 @@ router.get('/users', auth, async (req, res) => {
 });
 
 router.post('/users', auth, async (req, res) => {
+  const client = await pool.connect();
+  let transactionStarted = false;
   try {
     const { owner_name, email, tel } = req.body;
     const normalizedEmail = normalizeEmail(email);
@@ -97,25 +99,32 @@ router.post('/users', auth, async (req, res) => {
     const mockUsername = `guest_${time}`;
     const mockPassword = await bcrypt.hash('123456', 10);
 
-    await pool.query(
+    await client.query('BEGIN');
+    transactionStarted = true;
+    await client.query(
       `INSERT INTO tb_user (user_id, username, email, password, user_role)
        VALUES ($1, $2, $3, $4, $5)`,
       [userId, mockUsername, normalizedEmail || null, mockPassword, 'user']
     );
 
-    await pool.query(
+    await client.query(
       `INSERT INTO tb_owner (owner_id, user_id, owner_name, owner_email, owner_tel)
        VALUES ($1, $2, $3, $4, $5)`,
       [ownerId, userId, owner_name, normalizedEmail || null, tel]
     );
+    await client.query('COMMIT');
+    transactionStarted = false;
 
     res.json({ message: 'เพิ่มสมาชิกสำเร็จ', username: mockUsername });
   } catch (err) {
+    if (transactionStarted) await client.query('ROLLBACK');
     console.error(err);
     if (err.code === '23505') {
       return res.status(400).json({ message: 'Email already exists' });
     }
     res.status(500).json({ message: 'เพิ่มสมาชิกไม่สำเร็จ' });
+  } finally {
+    client.release();
   }
 });
 

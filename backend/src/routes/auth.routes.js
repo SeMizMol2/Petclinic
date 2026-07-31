@@ -12,6 +12,7 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ================= REGISTER =================
 router.post('/register', async (req, res) => {
+  let client;
   try {
     const { username, email, password } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -46,22 +47,32 @@ router.post('/register', async (req, res) => {
     const userId = 'U' + time;
     const ownerId = 'O' + time;
 
-    await pool.query(
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    await client.query(
       `INSERT INTO tb_user (user_id, username, email, password, user_role)
        VALUES ($1,$2,$3,$4,$5)`,
       [userId, username, normalizedEmail, hashedPassword, 'user']
     );
 
-    await pool.query(
+    await client.query(
       `INSERT INTO tb_owner (owner_id, user_id, owner_name, owner_email)
        VALUES ($1,$2,$3,$4)`,
       [ownerId, userId, username, normalizedEmail]
     );
 
+    await client.query('COMMIT');
     res.json({ message: 'สมัครสมาชิกสำเร็จ' });
   } catch (err) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error(err);
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'ชื่อผู้ใช้หรืออีเมลนี้ถูกใช้งานแล้ว' });
+    }
     res.status(500).json({ message: 'สมัครไม่สำเร็จ' });
+  } finally {
+    if (client) client.release();
   }
 });
 

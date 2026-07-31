@@ -3,31 +3,29 @@ import Home from '../pages/Home.vue'
 import Login from '../pages/Login.vue'
 import Register from '../pages/Register.vue'
 
-// User Components
-import UserLayout from '../pages/user/UserLayout.vue'
-import Profile from '../pages/user/Profile.vue'
-import Pets from '../pages/user/Pets.vue'
-import AddPet from '../pages/user/Addpet.vue'
-import Receipts from '../pages/user/Receipts.vue'
-import Appointments from '../pages/user/Appointments.vue'
+const UserLayout = () => import('../pages/user/UserLayout.vue')
+const Profile = () => import('../pages/user/Profile.vue')
+const Pets = () => import('../pages/user/Pets.vue')
+const AddPet = () => import('../pages/user/Addpet.vue')
+const Receipts = () => import('../pages/user/Receipts.vue')
+const Appointments = () => import('../pages/user/Appointments.vue')
+const History = () => import('../pages/user/History.vue')
 
-// Admin Components
-import AdminLayout from '../pages/admin/AdminLayout.vue'
-import AdminDashboard from '../pages/admin/Dashboard.vue'
-import AdminUsers from '../pages/admin/Users.vue'
-import AdminAppointments from '../pages/admin/Appointments.vue'
-import Services from '../pages/admin/Services.vue'
-import Treatments from '../pages/admin/Treatments.vue'
-import Expenses from '../pages/admin/Expenses.vue'
-import AdminOwners from '../pages/admin/Owners.vue'
-import AdminPets from '../pages/admin/Pets.vue'
-import AdminReceipts from '../pages/admin/Receipts.vue'
-import AdminVeterinarians from '../pages/admin/Veterinarians.vue'
-import AdminClinic from '../pages/admin/Clinic.vue'
-import AdminSurgeries from '../pages/admin/Surgeries.vue'
-import AdminVaccines from '../pages/admin/Vaccines.vue'
-import AdminReports from '../pages/admin/Reports.vue'
-import History from '../pages/user/History.vue'
+const AdminLayout = () => import('../pages/admin/AdminLayout.vue')
+const AdminDashboard = () => import('../pages/admin/Dashboard.vue')
+const AdminUsers = () => import('../pages/admin/Users.vue')
+const AdminAppointments = () => import('../pages/admin/Appointments.vue')
+const Services = () => import('../pages/admin/Services.vue')
+const Treatments = () => import('../pages/admin/Treatments.vue')
+const Expenses = () => import('../pages/admin/Expenses.vue')
+const AdminOwners = () => import('../pages/admin/Owners.vue')
+const AdminPets = () => import('../pages/admin/Pets.vue')
+const AdminReceipts = () => import('../pages/admin/Receipts.vue')
+const AdminVeterinarians = () => import('../pages/admin/Veterinarians.vue')
+const AdminClinic = () => import('../pages/admin/Clinic.vue')
+const AdminSurgeries = () => import('../pages/admin/Surgeries.vue')
+const AdminVaccines = () => import('../pages/admin/Vaccines.vue')
+const AdminReports = () => import('../pages/admin/Reports.vue')
 
 const routes = [
   { path: '/', component: Home },
@@ -81,7 +79,6 @@ const router = createRouter({
   routes
 })
 
-// Navigation Guard (แก้ไขแล้ว: ป้องกันจอขาว 100%)
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token');
   const userStr = localStorage.getItem('user');
@@ -90,17 +87,15 @@ router.beforeEach((to, from, next) => {
   try {
     user = userStr ? JSON.parse(userStr) : null;
     
-    // 👈 บรรทัดนี้สำคัญ: ถ้ามีข้อมูล user แต่ไม่มี role ให้เติมให้ทันที!
     if (user && !user.role) {
       user.role = 'user'; 
-      localStorage.setItem('user', JSON.stringify(user)); // อัปเดตข้อมูลที่เติม role ลงไปเลย
+      localStorage.setItem('user', JSON.stringify(user));
     }
   } catch (e) {
     localStorage.clear();
     return next('/login');
   }
 
-  // --- ที่เหลือเหมือนเดิม ---
   if (to.meta.requiresAuth) {
     if (!token || !user) return next('/login');
     if (to.meta.role && user.role !== to.meta.role) return next(user.role === 'admin' ? '/admin' : '/user');

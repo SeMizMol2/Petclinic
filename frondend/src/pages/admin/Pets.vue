@@ -152,6 +152,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
+import { resolveApiAssetUrl } from '../../api'
 
 const pets = ref([])
 const owners = ref([])
@@ -165,9 +166,7 @@ const form = ref({})
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
 const resolveImageUrl = (value) => {
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
-  return value.startsWith('/') ? value : `/${value}`
+  return resolveApiAssetUrl(value)
 }
 
 const getPetInitial = (name) => String(name || '?').trim().charAt(0).toUpperCase()

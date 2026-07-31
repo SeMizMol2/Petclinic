@@ -3,6 +3,14 @@ const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
 
+const ensureAdmin = (req, res) => {
+    if (req.user.role !== 'admin') {
+        res.status(403).json({ message: 'ไม่มีสิทธิ์ทำรายการนี้' });
+        return false;
+    }
+    return true;
+};
+
 const PET_TYPE_VALUES = new Map([
     ['all', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'],
     ['\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14', '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'],
@@ -54,6 +62,8 @@ router.get('/public', async (req, res) => {
 
 router.get('/', auth, async (req, res) => {
     try {
+        if (!ensureAdmin(req, res)) return;
+
         const services = await pool.query(
             'SELECT * FROM tb_service ORDER BY service_id ASC'
         );
@@ -68,6 +78,8 @@ router.get('/', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
     try {
+        if (!ensureAdmin(req, res)) return;
+
         const {
             service_name,
             service_desc,
@@ -77,6 +89,14 @@ router.post('/', auth, async (req, res) => {
             applicable_pet_gender
         } = req.body;
         const applicability = normalizeApplicability(applicable_pet_type, applicable_pet_gender);
+        const normalizedName = String(service_name || '').trim();
+        const normalizedPrice = Number(service_price);
+
+        if (!normalizedName || !Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
+            return res.status(400).json({
+                message: 'กรุณาระบุชื่อบริการและราคาที่ไม่ติดลบให้ถูกต้อง'
+            });
+        }
 
         if (!applicability) {
             return res.status(400).json({
@@ -110,9 +130,9 @@ router.post('/', auth, async (req, res) => {
             `,
             [
                 newId,
-                service_name,
-                service_desc,
-                service_price,
+                normalizedName,
+                String(service_desc || '').trim() || null,
+                normalizedPrice,
                 service_image || null,
                 applicability.type,
                 applicability.gender
@@ -133,6 +153,8 @@ router.post('/', auth, async (req, res) => {
 
 router.put('/:id', auth, async (req, res) => {
     try {
+        if (!ensureAdmin(req, res)) return;
+
         const { id } = req.params;
         const {
             service_name,
@@ -143,6 +165,14 @@ router.put('/:id', auth, async (req, res) => {
             applicable_pet_gender
         } = req.body;
         const applicability = normalizeApplicability(applicable_pet_type, applicable_pet_gender);
+        const normalizedName = String(service_name || '').trim();
+        const normalizedPrice = Number(service_price);
+
+        if (!normalizedName || !Number.isFinite(normalizedPrice) || normalizedPrice < 0) {
+            return res.status(400).json({
+                message: 'กรุณาระบุชื่อบริการและราคาที่ไม่ติดลบให้ถูกต้อง'
+            });
+        }
 
         if (!applicability) {
             return res.status(400).json({
@@ -163,9 +193,9 @@ router.put('/:id', auth, async (req, res) => {
             WHERE service_id = $7
             `,
             [
-                service_name,
-                service_desc,
-                service_price,
+                normalizedName,
+                String(service_desc || '').trim() || null,
+                normalizedPrice,
                 service_image || null,
                 applicability.type,
                 applicability.gender,
@@ -190,6 +220,8 @@ router.put('/:id', auth, async (req, res) => {
 
 router.delete('/:id', auth, async (req, res) => {
     try {
+        if (!ensureAdmin(req, res)) return;
+
         const { id } = req.params;
         const result = await pool.query(
             'DELETE FROM tb_service WHERE service_id = $1',

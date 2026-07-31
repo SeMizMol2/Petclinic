@@ -292,7 +292,8 @@ h1 { margin: 0; font-size: 28px; font-weight: 800; }
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .card-title { padding: 16px 18px; font-weight: 800; border-bottom: 1px solid #e5e7eb; }
 table { width: 100%; border-collapse: collapse; min-width: 720px; }

@@ -192,6 +192,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
+import { resolveApiAssetUrl } from '../../api'
 
 const services = ref([])
 const searchQuery = ref('')
@@ -206,9 +207,7 @@ const formatPrice = (val) =>
   })
 
 const getImagePreview = (value) => {
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value) || value.startsWith('/')) return value
-  return `/${value.replace(/^\/+/, '')}`
+  return resolveApiAssetUrl(value)
 }
 
 const fetchServices = async () => {

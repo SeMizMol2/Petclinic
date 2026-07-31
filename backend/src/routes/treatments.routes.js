@@ -207,6 +207,8 @@ const syncUnpaidReceipt = async (dbClient, receipt, treatmentId, petId, totalAmo
 
 router.get('/pets', auth, async (req, res) => {
     try {
+        if (!ensureAdmin(req, res)) return;
+
         const pets = await pool.query(`
             SELECT p.pet_id, p.pet_name, p.pet_type, p.pet_gender, o.owner_name
             FROM tb_pet p
@@ -222,6 +224,8 @@ router.get('/pets', auth, async (req, res) => {
 
 router.get('/services', auth, async (req, res) => {
     try {
+        if (!ensureAdmin(req, res)) return;
+
         const services = await pool.query(
             `
             SELECT
@@ -573,6 +577,8 @@ router.delete('/:id', auth, async (req, res) => {
 
 router.get('/', auth, async (req, res) => {
     try {
+        if (!ensureAdmin(req, res)) return;
+
         const history = await pool.query(`
             SELECT
                 t.treatment_id,

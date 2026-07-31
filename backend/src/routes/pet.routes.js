@@ -34,7 +34,7 @@ const upload = multer({
 });
 
 const getUploadedPetImageUrl = (req) =>
-  req.file ? `http://localhost:3000/uploads/pets/${req.file.filename}` : null;
+  req.file ? `/uploads/pets/${req.file.filename}` : null;
 
 const getOwnerIdByUserId = async (userId) => {
   const ownerResult = await pool.query(

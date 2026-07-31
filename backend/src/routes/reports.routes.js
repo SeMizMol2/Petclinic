@@ -9,20 +9,19 @@ const isPaidReceiptStatus = (status) => {
   const text = normalizeText(status);
   return (
     text === 'ชำระเสร็จสิ้น' ||
-    text.includes('เสร็จ') ||
-    text.includes('à¹€à¸ªà¸£à¹‡à¸ˆ') ||
-    text.includes('à¸Šà¸³à¸£à¸°à¹à¸¥à¹‰à¸§')
+    text.includes('ชำระแล้ว') ||
+    text.includes('เสร็จ')
   );
 };
 
 const isConfirmedAppointmentStatus = (status) => {
   const text = normalizeText(status);
-  return text.includes('ยืนยัน') || text.includes('à¸¢à¸·à¸™à¸¢à¸±à¸™');
+  return text.includes('ยืนยัน');
 };
 
 const isCanceledAppointmentStatus = (status) => {
   const text = normalizeText(status);
-  return text.includes('ยกเลิก') || text.includes('à¸¢à¸à¹€à¸¥à¸´à¸');
+  return text.includes('ยกเลิก');
 };
 
 const requireAdmin = (req, res) => {

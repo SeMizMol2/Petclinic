@@ -58,7 +58,10 @@ router.post('/categories', auth, requireAdmin, async (req, res) => {
 
 router.delete('/categories/:id', auth, requireAdmin, async (req, res) => {
   try {
-    await pool.query('DELETE FROM tb_category WHERE category_id = $1', [req.params.id]);
+    const result = await pool.query('DELETE FROM tb_category WHERE category_id = $1', [req.params.id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'ไม่พบหมวดหมู่ที่ต้องการลบ' });
+    }
     res.json({ message: 'ลบหมวดหมู่สำเร็จ' });
   } catch (err) {
     console.error(err.message);
@@ -96,9 +99,11 @@ router.get('/', auth, requireAdmin, async (req, res) => {
 router.post('/', auth, requireAdmin, async (req, res) => {
   try {
     const { exp_title, exp_amount, exp_date, category_id } = req.body;
+    const normalizedTitle = String(exp_title || '').trim();
+    const normalizedAmount = Number(exp_amount);
 
-    if (!exp_title || !exp_amount || !exp_date) {
-      return res.status(400).json({ message: 'กรุณากรอกชื่อรายจ่าย จำนวนเงิน และวันที่ให้ครบ' });
+    if (!normalizedTitle || !Number.isFinite(normalizedAmount) || normalizedAmount <= 0 || !exp_date) {
+      return res.status(400).json({ message: 'กรุณากรอกชื่อรายจ่าย จำนวนเงินที่มากกว่า 0 และวันที่ให้ถูกต้อง' });
     }
 
     const exp_id = 'EX' + Date.now();
@@ -106,7 +111,7 @@ router.post('/', auth, requireAdmin, async (req, res) => {
     await pool.query(
       `INSERT INTO tb_expense (exp_id, exp_title, exp_amount, exp_date, category_id, user_id)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [exp_id, exp_title, exp_amount, exp_date, category_id || null, req.user.user_id]
+      [exp_id, normalizedTitle, normalizedAmount, exp_date, category_id || null, req.user.user_id]
     );
 
     res.status(201).json({ message: 'เพิ่มรายจ่ายสำเร็จ', exp_id });
@@ -120,13 +125,23 @@ router.put('/:id', auth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { exp_title, exp_amount, exp_date, category_id } = req.body;
+    const normalizedTitle = String(exp_title || '').trim();
+    const normalizedAmount = Number(exp_amount);
 
-    await pool.query(
+    if (!normalizedTitle || !Number.isFinite(normalizedAmount) || normalizedAmount <= 0 || !exp_date) {
+      return res.status(400).json({ message: 'กรุณากรอกชื่อรายจ่าย จำนวนเงินที่มากกว่า 0 และวันที่ให้ถูกต้อง' });
+    }
+
+    const result = await pool.query(
       `UPDATE tb_expense
        SET exp_title = $1, exp_amount = $2, exp_date = $3, category_id = $4, update_datetime = CURRENT_TIMESTAMP
        WHERE exp_id = $5`,
-      [exp_title, exp_amount, exp_date, category_id || null, id]
+      [normalizedTitle, normalizedAmount, exp_date, category_id || null, id]
     );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'ไม่พบรายจ่ายที่ต้องการแก้ไข' });
+    }
 
     res.json({ message: 'แก้ไขรายจ่ายสำเร็จ' });
   } catch (err) {
@@ -137,7 +152,10 @@ router.put('/:id', auth, requireAdmin, async (req, res) => {
 
 router.delete('/:id', auth, requireAdmin, async (req, res) => {
   try {
-    await pool.query('DELETE FROM tb_expense WHERE exp_id = $1', [req.params.id]);
+    const result = await pool.query('DELETE FROM tb_expense WHERE exp_id = $1', [req.params.id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'ไม่พบรายจ่ายที่ต้องการลบ' });
+    }
     res.json({ message: 'ลบรายจ่ายสำเร็จ' });
   } catch (err) {
     console.error(err.message);

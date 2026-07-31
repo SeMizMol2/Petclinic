@@ -104,7 +104,19 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+const imageFileFilter = (_req, file, cb) => {
+  if (file.mimetype && file.mimetype.startsWith('image/')) {
+    cb(null, true);
+    return;
+  }
+  cb(new Error('Only image files are allowed'));
+};
+
+const upload = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 router.post('/upload-profile', auth, upload.single('profileImage'), async (req, res) => {
   try {
@@ -112,7 +124,7 @@ router.post('/upload-profile', auth, upload.single('profileImage'), async (req, 
       return res.status(400).json({ message: 'ไม่พบไฟล์' });
     }
 
-    const imageUrl = `http://localhost:3000/uploads/profiles/${req.file.filename}`;
+    const imageUrl = `/uploads/profiles/${req.file.filename}`;
 
     await pool.query(
       'UPDATE tb_owner SET profile_pic = $1 WHERE user_id = $2',

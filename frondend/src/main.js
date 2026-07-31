@@ -2,9 +2,21 @@ import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
 import './index.css'
-import router from './router' // นำเข้า router
+import axios from 'axios'
+import router from './router'
+import { API_BASE_URL } from './api'
 
-const app = createApp(App) // สร้าง App instance แค่ตัวเดียว
+axios.interceptors.request.use((config) => {
+  if (typeof config.url === 'string') {
+    config.url = config.url.replace(
+      /^http:\/\/(?:localhost|127\.0\.0\.1):3000/,
+      API_BASE_URL
+    )
+  }
+  return config
+})
 
-app.use(router)            // ติดตั้ง router
-app.mount('#app')          // สั่ง mount เข้ากับหน้าเว็บแค่ครั้งเดียว
+const app = createApp(App)
+
+app.use(router)
+app.mount('#app')

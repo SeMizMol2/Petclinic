@@ -26,16 +26,14 @@ const normalizeReceiptStatus = (value) => {
     if (
         text === RECEIPT_STATUS_UNPAID ||
         text === 'unpaid' ||
-        text.includes('\u0e04\u0e49\u0e32\u0e07') ||
-        text.includes('à¸„à¹‰à¸²à¸‡')
+        text.includes('\u0e04\u0e49\u0e32\u0e07')
     ) {
         return RECEIPT_STATUS_UNPAID;
     }
     if (
         text === RECEIPT_STATUS_PAID ||
         text === 'paid' ||
-        text.includes('\u0e40\u0e2a\u0e23\u0e47\u0e08') ||
-        text.includes('à¹€à¸ªà¸£à¹‡à¸ˆ')
+        text.includes('\u0e40\u0e2a\u0e23\u0e47\u0e08')
     ) {
         return RECEIPT_STATUS_PAID;
     }
@@ -48,7 +46,6 @@ const normalizePayMethod = (value) => {
     if (
         text === PAY_METHOD_CASH ||
         text.includes('เงินสด') ||
-        text.includes('à¹€à¸‡à¸´à¸™à¸ªà¸”') ||
         text === 'cash'
     ) {
         return PAY_METHOD_CASH;
@@ -56,7 +53,6 @@ const normalizePayMethod = (value) => {
     if (
         text === PAY_METHOD_TRANSFER ||
         text.includes('โอนเงิน') ||
-        text.includes('à¹‚à¸­à¸™à¹€à¸‡à¸´à¸™') ||
         text === 'transfer'
     ) {
         return PAY_METHOD_TRANSFER;
@@ -419,7 +415,7 @@ router.put('/:id/status', auth, async (req, res) => {
         }
 
         const payDate = normalizedStatus === RECEIPT_STATUS_PAID ? new Date() : null;
-        await pool.query(
+        const result = await pool.query(
             `
             UPDATE tb_receipt
             SET payment_status = $1,
@@ -430,6 +426,13 @@ router.put('/:id/status', auth, async (req, res) => {
             `,
             [normalizedStatus, normalizedPayMethod, payDate, id]
         );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'ไม่พบใบเสร็จที่ต้องการแก้ไข'
+            });
+        }
 
         res.json({
             success: true,

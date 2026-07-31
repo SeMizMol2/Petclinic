@@ -14,7 +14,7 @@
     <section class="profile-grid">
       <div class="profile-summary">
         <div class="avatar-panel" @click="triggerFileInput">
-          <img v-if="previewImage || user.profile_pic" :src="previewImage || user.profile_pic" class="avatar-img" />
+          <img v-if="previewImage || user.profile_pic" :src="previewImage || resolveApiAssetUrl(user.profile_pic)" class="avatar-img" />
           <div v-else class="avatar-text">{{ user.username?.charAt(0).toUpperCase() || 'U' }}</div>
           <div class="avatar-overlay">
             <AppIcon name="upload" :size="18" />
@@ -61,6 +61,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import axios from 'axios'
+import { resolveApiAssetUrl } from '../../api'
 import AppIcon from '../../components/AppIcon.vue'
 
 const user = ref({})

@@ -211,6 +211,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import axios from 'axios'
+import { resolveApiAssetUrl } from '../../api'
 import AppIcon from '../../components/AppIcon.vue'
 
 const pets = ref([])
@@ -272,11 +273,7 @@ const getPetIcon = (type) => {
 }
 
 const resolveImageUrl = (value) => {
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
-  if (value.startsWith('/uploads/')) return `http://localhost:3000${value}`
-  if (value.startsWith('uploads/')) return `http://localhost:3000/${value}`
-  return value.startsWith('/') ? value : `/${value}`
+  return resolveApiAssetUrl(value)
 }
 
 const openPetImage = (pet) => {

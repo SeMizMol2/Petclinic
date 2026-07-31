@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
 const app = express();
 
 // รวม Route ทั้งหมด
@@ -49,6 +50,20 @@ app.use('/api', routes);
 
 app.get('/', (req, res) => {
   res.send('Muang Loei Animal Hospital API is running');
+});
+
+app.use((err, _req, res, _next) => {
+  if (err instanceof multer.MulterError) {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'ไฟล์รูปภาพต้องมีขนาดไม่เกิน 5 MB'
+      : 'อัปโหลดรูปภาพไม่สำเร็จ';
+    return res.status(400).json({ message });
+  }
+  if (err?.message === 'Only image files are allowed') {
+    return res.status(400).json({ message: 'รองรับเฉพาะไฟล์รูปภาพเท่านั้น' });
+  }
+  console.error('Unhandled request error:', err);
+  return res.status(500).json({ message: 'เกิดข้อผิดพลาดของเซิร์ฟเวอร์' });
 });
 
 const port = Number(process.env.PORT || 3000);

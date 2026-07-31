@@ -237,6 +237,7 @@
 
 <script setup>
 import axios from 'axios'
+import { resolveApiAssetUrl } from '../api'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
 
@@ -295,25 +296,7 @@ const serviceCards = computed(() =>
 )
 
 function resolveServiceImage(service) {
-  if (service.service_image) {
-    if (/^https?:\/\//i.test(service.service_image)) {
-      return service.service_image
-    }
-
-    if (service.service_image.startsWith('/uploads/')) {
-      return `http://localhost:3000${service.service_image}`
-    }
-
-    if (service.service_image.startsWith('uploads/')) {
-      return `http://localhost:3000/${service.service_image}`
-    }
-
-    if (service.service_image.startsWith('/')) {
-      return service.service_image
-    }
-
-    return `/${String(service.service_image).replace(/^\/+/, '')}`
-  }
+  if (service.service_image) return resolveApiAssetUrl(service.service_image)
 
   const name = String(service.service_name || '').toLowerCase()
 

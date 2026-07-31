@@ -57,6 +57,7 @@
               <td class="center">
                 <div class="row-actions">
                   <button class="ghost-btn mini-btn" @click="openEditModal(t.treatment_id)">แก้ไข</button>
+                  <button class="followup-btn mini-btn" @click="openFollowUpModal(t)">นัดติดตาม</button>
                   <button class="danger-btn mini-btn" @click="deleteTreatment(t)">ลบ</button>
                 </div>
               </td>
@@ -93,6 +94,65 @@
                 กำลังเลือกบริการสำหรับ {{ selectedPet.pet_name }} · {{ selectedPet.pet_type || 'ไม่ระบุประเภท' }} · {{ selectedPet.pet_gender || 'ไม่ระบุเพศ' }}
               </small>
             </label>
+
+            <section v-if="form.pet_id" class="clinical-context full-width" aria-live="polite">
+              <div v-if="isPetSummaryLoading" class="clinical-state">กำลังโหลดข้อมูลสุขภาพสัตว์เลี้ยง...</div>
+              <div v-else-if="petSummaryError" class="clinical-state error">{{ petSummaryError }}</div>
+              <template v-else-if="selectedPetSummary">
+                <div class="clinical-head">
+                  <div class="clinical-pet">
+                    <img
+                      v-if="selectedPetSummary.pet.pet_image"
+                      :src="resolveApiAssetUrl(selectedPetSummary.pet.pet_image)"
+                      :alt="`รูป ${selectedPetSummary.pet.pet_name}`"
+                    />
+                    <span v-else class="clinical-avatar">{{ getPetInitial(selectedPetSummary.pet.pet_name) }}</span>
+                    <div>
+                      <span class="clinical-kicker">ข้อมูลก่อนการรักษา</span>
+                      <strong>{{ selectedPetSummary.pet.pet_name }}</strong>
+                      <small>เจ้าของ คุณ{{ selectedPetSummary.owner.owner_name || '-' }}</small>
+                    </div>
+                  </div>
+                  <span :class="['allergy-badge', { danger: hasDrugAllergy }]">
+                    {{ hasDrugAllergy ? 'มีประวัติแพ้ยา' : 'ไม่พบประวัติแพ้ยา' }}
+                  </span>
+                </div>
+
+                <div class="clinical-facts">
+                  <div><span>ประเภท / เพศ</span><strong>{{ selectedPetSummary.pet.pet_type || '-' }} / {{ selectedPetSummary.pet.pet_gender || '-' }}</strong></div>
+                  <div><span>อายุ</span><strong>{{ formatPetAge(selectedPetSummary.pet.pet_birthdate) }}</strong></div>
+                  <div><span>สายพันธุ์</span><strong>{{ selectedPetSummary.pet.pet_breed || 'ไม่ระบุ' }}</strong></div>
+                  <div><span>ทำหมัน</span><strong>{{ selectedPetSummary.pet.sterile_status || 'ไม่ระบุ' }}</strong></div>
+                </div>
+
+                <div :class="['allergy-notice', { danger: hasDrugAllergy }]">
+                  <span>ประวัติแพ้ยา</span>
+                  <strong>{{ selectedPetSummary.pet.drug_allergy || 'ไม่มีข้อมูลการแพ้ยา' }}</strong>
+                </div>
+
+                <div class="clinical-counts">
+                  <span>รักษา <strong>{{ selectedPetSummary.overview.treatment_count || 0 }}</strong></span>
+                  <span>วัคซีน <strong>{{ selectedPetSummary.overview.vaccine_count || 0 }}</strong></span>
+                  <span>ผ่าตัด <strong>{{ selectedPetSummary.overview.surgery_count || 0 }}</strong></span>
+                  <span>นัดหมาย <strong>{{ selectedPetSummary.overview.appointment_count || 0 }}</strong></span>
+                </div>
+
+                <div class="recent-treatment-list">
+                  <div class="recent-treatment-head">
+                    <strong>การรักษาล่าสุด</strong>
+                    <button type="button" class="history-link" @click="viewPetHistory(form.pet_id)">ดูประวัติทั้งหมด</button>
+                  </div>
+                  <article v-for="item in recentPetTreatments" :key="item.treatment_id">
+                    <time>{{ formatShortDate(item.treatment_date) }}</time>
+                    <div>
+                      <strong>{{ item.diagnosis || 'ยังไม่ระบุคำวินิจฉัย' }}</strong>
+                      <span>{{ item.symptom || 'ไม่ระบุอาการ' }} · {{ item.doctor_name || 'ไม่ระบุสัตวแพทย์' }}</span>
+                    </div>
+                  </article>
+                  <p v-if="recentPetTreatments.length === 0" class="no-history">ยังไม่มีประวัติการรักษา</p>
+                </div>
+              </template>
+            </section>
 
             <label class="full-width">
               <span>สัตวแพทย์</span>
@@ -238,6 +298,78 @@
       </section>
     </div>
 
+    <div v-if="followUpTarget" class="modal-overlay" @click.self="dismissFollowUpModal">
+      <section class="modal followup-appointment-modal" role="dialog" aria-modal="true" aria-labelledby="appointment-followup-title">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Follow-up appointment</p>
+            <h2 id="appointment-followup-title">นัดติดตามผลการรักษา</h2>
+            <p>
+              {{ followUpTarget.pet_name || 'สัตว์เลี้ยง' }}
+              · การรักษา {{ followUpTarget.treatment_id }}
+            </p>
+          </div>
+          <button @click="dismissFollowUpModal" class="close-btn" type="button">ปิด</button>
+        </div>
+
+        <div class="followup-appointment-grid">
+          <label>
+            <span>สัตวแพทย์ *</span>
+            <select v-model="followUpForm.vet_id" required>
+              <option value="" disabled>-- เลือกสัตวแพทย์ --</option>
+              <option v-for="vet in vetsList" :key="vet.vet_id" :value="vet.vet_id">
+                {{ vet.vet_name }}
+              </option>
+            </select>
+          </label>
+
+          <label>
+            <span>วันที่ติดตามผล *</span>
+            <input v-model="followUpForm.appt_date" type="date" :min="todayInputValue()" required />
+          </label>
+
+          <label>
+            <span>เวลานัดหมาย *</span>
+            <input v-model="followUpForm.appt_time" type="time" required />
+          </label>
+
+          <div :class="['schedule-context', followUpScheduleStateClass]">
+            <strong>ตารางเวรสัตวแพทย์</strong>
+            <span>{{ followUpScheduleText }}</span>
+          </div>
+
+          <label class="full-width">
+            <span>เหตุผลการติดตาม *</span>
+            <textarea
+              v-model.trim="followUpForm.appt_reason"
+              rows="3"
+              maxlength="500"
+              placeholder="เช่น ตรวจแผลและประเมินอาการหลังการรักษา"
+              required
+            ></textarea>
+          </label>
+        </div>
+
+        <p class="followup-help">
+          นัดหมายที่สร้างจะอยู่ในสถานะ “รอเจ้าของยืนยัน” และระบบจะใช้การแจ้งอีเมลเดิมของการนัดหมาย
+        </p>
+
+        <div class="modal-actions">
+          <button @click="dismissFollowUpModal" class="ghost-btn" type="button">
+            {{ followUpTarget.fromPostSave ? 'ไม่ต้องติดตามผล' : 'ยกเลิก' }}
+          </button>
+          <button
+            @click="createFollowUpAppointment"
+            :disabled="isCreatingFollowUp || !canCreateFollowUp"
+            class="primary-btn"
+            type="button"
+          >
+            {{ isCreatingFollowUp ? 'กำลังสร้างนัด...' : 'ส่งนัดให้เจ้าของยืนยัน' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
     <div v-if="specialtyFollowUps.length > 0" class="modal-overlay" @click.self="dismissSpecialtyFollowUps">
       <section class="modal specialty-followup-modal" role="dialog" aria-modal="true" aria-labelledby="followup-title">
         <div class="modal-head">
@@ -276,12 +408,17 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import { resolveApiAssetUrl } from '../../api'
 
 const router = useRouter()
 const treatments = ref([])
 const petsList = ref([])
 const servicesList = ref([])
 const vetsList = ref([])
+const schedulesList = ref([])
+const selectedPetSummary = ref(null)
+const isPetSummaryLoading = ref(false)
+const petSummaryError = ref('')
 const isModalOpen = ref(false)
 const isSubmitting = ref(false)
 const isEditing = ref(false)
@@ -293,6 +430,15 @@ const receiptIssueTarget = ref(null)
 const receiptIssuePayMethod = ref('เงินสด')
 const receiptIssueStatus = ref('ยังไม่ได้ชำระ')
 const isIssuingReceipt = ref(false)
+const followUpTarget = ref(null)
+const isCreatingFollowUp = ref(false)
+const pendingPostSaveFlow = ref(null)
+const followUpForm = ref({
+  vet_id: '',
+  appt_date: '',
+  appt_time: '',
+  appt_reason: ''
+})
 
 const paidStatus = 'ชำระเสร็จสิ้น'
 const unpaidStatus = 'ยังไม่ได้ชำระ'
@@ -319,6 +465,25 @@ const formatPrice = (val) =>
   Number(val || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const formatDateTime = (d) => (d ? new Date(d).toLocaleString('th-TH') : '-')
+const formatShortDate = (value) => value
+  ? new Date(value).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+  : '-'
+
+const formatPetAge = (birthdate) => {
+  if (!birthdate) return 'ไม่ทราบอายุ'
+  const born = new Date(birthdate)
+  if (Number.isNaN(born.getTime())) return 'ไม่ทราบอายุ'
+  const now = new Date()
+  let months = (now.getFullYear() - born.getFullYear()) * 12 + now.getMonth() - born.getMonth()
+  if (now.getDate() < born.getDate()) months -= 1
+  if (months < 0) return 'วันเกิดไม่ถูกต้อง'
+  if (months < 12) return `${months} เดือน`
+  const years = Math.floor(months / 12)
+  const remainingMonths = months % 12
+  return remainingMonths ? `${years} ปี ${remainingMonths} เดือน` : `${years} ปี`
+}
+
+const getPetInitial = (name) => String(name || '?').trim().charAt(0).toUpperCase()
 
 const isReceiptPaid = (treatment) => {
   const status = String(treatment?.payment_status || '').trim()
@@ -330,17 +495,19 @@ const isFinancialLocked = computed(() =>
 )
 
 const fetchAllData = async () => {
-  const [tRes, pRes, sRes, vRes] = await Promise.all([
+  const [tRes, pRes, sRes, vRes, scheduleRes] = await Promise.all([
     axios.get('http://localhost:3000/api/treatments', { headers: headers() }),
     axios.get('http://localhost:3000/api/treatments/pets', { headers: headers() }),
     axios.get('http://localhost:3000/api/treatments/services', { headers: headers() }),
-    axios.get('http://localhost:3000/api/admin/veterinarians', { headers: headers() })
+    axios.get('http://localhost:3000/api/admin/veterinarians', { headers: headers() }),
+    axios.get('http://localhost:3000/api/appointments/vet-schedules', { headers: headers() })
   ])
 
   treatments.value = tRes.data || []
   petsList.value = pRes.data || []
   servicesList.value = sRes.data || []
   vetsList.value = vRes.data || []
+  schedulesList.value = scheduleRes.data || []
 }
 
 const openAddModal = () => {
@@ -385,6 +552,12 @@ const closeModal = () => {
   isModalOpen.value = false
 }
 
+const viewPetHistory = (petId) => {
+  if (!petId) return
+  closeModal()
+  router.push(`/admin/history/${petId}`)
+}
+
 const viewReceipt = (receiptId) =>
   router.push({ path: '/admin/receipts', query: { receipt_id: receiptId } })
 
@@ -420,6 +593,156 @@ const openReceiptIssueModal = (treatment) => {
 const closeReceiptIssueModal = () => {
   if (isIssuingReceipt.value) return
   receiptIssueTarget.value = null
+}
+
+const todayInputValue = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const normalizeScheduleDate = (value) => String(value || '').slice(0, 10)
+const normalizeScheduleTime = (value) => String(value || '').slice(0, 5)
+
+const fetchFollowUpSchedules = async (date) => {
+  if (!date) return
+  try {
+    const response = await axios.get('http://localhost:3000/api/appointments/vet-schedules', {
+      headers: headers(),
+      params: { from: date, to: date }
+    })
+    schedulesList.value = response.data || []
+  } catch (error) {
+    schedulesList.value = []
+    console.error('Load follow-up vet schedules failed:', error)
+  }
+}
+
+const matchingFollowUpSchedules = computed(() => {
+  if (!followUpForm.value.vet_id || !followUpForm.value.appt_date) return []
+  return schedulesList.value.filter((schedule) =>
+    schedule.vet_id === followUpForm.value.vet_id
+    && normalizeScheduleDate(schedule.work_date) === followUpForm.value.appt_date
+  )
+})
+
+const followUpScheduleText = computed(() => {
+  if (!followUpForm.value.vet_id || !followUpForm.value.appt_date) {
+    return 'เลือกสัตวแพทย์และวันที่เพื่อดูช่วงเวลาที่เข้าเวร'
+  }
+  if (matchingFollowUpSchedules.value.length === 0) {
+    return 'ไม่พบตารางเวรของสัตวแพทย์ในวันที่เลือก'
+  }
+  const shiftText = matchingFollowUpSchedules.value
+    .map((schedule) => `${normalizeScheduleTime(schedule.start_time)}-${normalizeScheduleTime(schedule.end_time)} น.`)
+    .join(', ')
+  if (followUpForm.value.appt_time && !isFollowUpTimeWithinSchedule.value) {
+    return `ช่วงเข้าเวร: ${shiftText} · เวลาที่เลือกอยู่นอกช่วงเข้าเวร`
+  }
+  return `ช่วงเข้าเวร: ${shiftText}`
+})
+
+const isFollowUpTimeWithinSchedule = computed(() => {
+  const selectedTime = normalizeScheduleTime(followUpForm.value.appt_time)
+  if (!selectedTime) return false
+  return matchingFollowUpSchedules.value.some((schedule) => {
+    const start = normalizeScheduleTime(schedule.start_time)
+    const end = normalizeScheduleTime(schedule.end_time)
+    return selectedTime >= start && selectedTime < end
+  })
+})
+
+const followUpScheduleStateClass = computed(() => {
+  if (matchingFollowUpSchedules.value.length === 0) return 'unavailable'
+  if (followUpForm.value.appt_time && !isFollowUpTimeWithinSchedule.value) return 'unavailable'
+  return 'available'
+})
+
+const canCreateFollowUp = computed(() =>
+  Boolean(
+    followUpTarget.value?.pet_id
+    && followUpForm.value.vet_id
+    && followUpForm.value.appt_date
+    && followUpForm.value.appt_time
+    && followUpForm.value.appt_reason
+    && isFollowUpTimeWithinSchedule.value
+  )
+)
+
+const openFollowUpModal = (treatment, fromPostSave = false) => {
+  const vet = vetsList.value.find((item) => item.vet_id === treatment.vet_id)
+  followUpTarget.value = {
+    treatment_id: treatment.treatment_id,
+    pet_id: treatment.pet_id,
+    pet_name: treatment.pet_name || selectedPet.value?.pet_name || '',
+    vet_id: treatment.vet_id || '',
+    vet_name: treatment.vet_name || vet?.vet_name || '',
+    fromPostSave
+  }
+  followUpForm.value = {
+    vet_id: treatment.vet_id || '',
+    appt_date: '',
+    appt_time: '',
+    appt_reason: `นัดติดตามผลจากการรักษา ${treatment.treatment_id}`
+  }
+}
+
+const continuePostSaveFlow = async () => {
+  const nextStep = pendingPostSaveFlow.value
+  pendingPostSaveFlow.value = null
+  if (!nextStep) return
+
+  if (nextStep.specialtyFollowUps.length > 0) {
+    specialtyTreatmentId.value = nextStep.treatmentId
+    specialtyFollowUps.value = nextStep.specialtyFollowUps
+    return
+  }
+
+  if (nextStep.receiptId) {
+    await viewReceipt(nextStep.receiptId)
+  }
+}
+
+const dismissFollowUpModal = async () => {
+  if (isCreatingFollowUp.value) return
+  const shouldContinue = Boolean(followUpTarget.value?.fromPostSave)
+  followUpTarget.value = null
+  if (shouldContinue) await continuePostSaveFlow()
+}
+
+const createFollowUpAppointment = async () => {
+  if (!canCreateFollowUp.value || !followUpTarget.value) return
+
+  isCreatingFollowUp.value = true
+  const shouldContinue = Boolean(followUpTarget.value.fromPostSave)
+  try {
+    const response = await axios.post(
+      'http://localhost:3000/api/appointments',
+      {
+        pet_id: followUpTarget.value.pet_id,
+        vet_id: followUpForm.value.vet_id,
+        appt_date: followUpForm.value.appt_date,
+        appt_time: followUpForm.value.appt_time,
+        appt_reason: followUpForm.value.appt_reason
+      },
+      { headers: headers() }
+    )
+
+    const emailQueued = response.data?.email_notification?.queued !== false
+    alert(
+      emailQueued
+        ? 'สร้างนัดติดตามสำเร็จ และส่งให้เจ้าของยืนยันแล้ว'
+        : 'สร้างนัดติดตามสำเร็จ แต่ระบบอีเมลยังไม่พร้อมใช้งาน'
+    )
+    followUpTarget.value = null
+    if (shouldContinue) await continuePostSaveFlow()
+  } catch (err) {
+    alert(err.response?.data?.message || 'สร้างนัดติดตามผลไม่สำเร็จ')
+  } finally {
+    isCreatingFollowUp.value = false
+  }
 }
 
 const issueLegacyReceipt = async () => {
@@ -495,6 +818,42 @@ const selectedPet = computed(() =>
   petsList.value.find((pet) => pet.pet_id === form.value.pet_id) || null
 )
 
+const recentPetTreatments = computed(() =>
+  (selectedPetSummary.value?.treatments || []).slice(0, 3)
+)
+
+const hasDrugAllergy = computed(() => {
+  const value = String(selectedPetSummary.value?.pet?.drug_allergy || '').trim().toLowerCase()
+  return Boolean(value && !['-', 'ไม่มี', 'ไม่แพ้', 'ไม่มีข้อมูล', 'none', 'no'].includes(value))
+})
+
+let petSummaryRequestId = 0
+const loadPetClinicalSummary = async (petId) => {
+  const requestId = ++petSummaryRequestId
+  selectedPetSummary.value = null
+  petSummaryError.value = ''
+  if (!petId) {
+    isPetSummaryLoading.value = false
+    return
+  }
+
+  isPetSummaryLoading.value = true
+  try {
+    const response = await axios.get(`http://localhost:3000/api/history/pet-summary/${petId}`, {
+      headers: headers()
+    })
+    if (requestId === petSummaryRequestId) {
+      selectedPetSummary.value = response.data?.data || null
+    }
+  } catch (error) {
+    if (requestId === petSummaryRequestId) {
+      petSummaryError.value = error.response?.data?.message || 'โหลดข้อมูลสุขภาพสัตว์เลี้ยงไม่สำเร็จ'
+    }
+  } finally {
+    if (requestId === petSummaryRequestId) isPetSummaryLoading.value = false
+  }
+}
+
 const serviceMatchesPet = (service, pet) => {
   if (!pet) return false
   const typeMatches = isAllApplicability(service.applicable_pet_type)
@@ -519,9 +878,15 @@ const incompatibleSelectedServices = computed(() => {
 
 watch(
   () => form.value.pet_id,
-  () => {
+  (petId) => {
     selectedServiceId.value = ''
+    loadPetClinicalSummary(petId)
   }
+)
+
+watch(
+  () => followUpForm.value.appt_date,
+  (date) => fetchFollowUpSchedules(date)
 )
 
 const getSpecialtyType = (item) => {
@@ -579,6 +944,7 @@ const submitTreatment = async () => {
   isSubmitting.value = true
   let treatmentSaved = false
   try {
+    const wasEditing = isEditing.value
     const followUps = getSpecialtyFollowUps()
     const payload = {
       pet_id: form.value.pet_id,
@@ -613,13 +979,26 @@ const submitTreatment = async () => {
       )
     }
 
+    const treatmentContext = {
+      treatment_id: savedTreatmentId,
+      pet_id: form.value.pet_id,
+      pet_name: selectedPet.value?.pet_name || '',
+      vet_id: form.value.vet_id || '',
+      vet_name: vetsList.value.find((vet) => vet.vet_id === form.value.vet_id)?.vet_name || ''
+    }
+
     closeModal()
     await fetchAllData()
-    if (followUps.length > 0) {
+    if (!wasEditing) {
+      pendingPostSaveFlow.value = {
+        treatmentId: savedTreatmentId,
+        specialtyFollowUps: followUps,
+        receiptId: receipt?.receipt_id || ''
+      }
+      openFollowUpModal(treatmentContext, true)
+    } else if (followUps.length > 0) {
       specialtyTreatmentId.value = savedTreatmentId
       specialtyFollowUps.value = followUps
-    } else if (receipt?.receipt_id) {
-      await viewReceipt(receipt.receipt_id)
     }
   } catch (err) {
     const fallback = treatmentSaved
@@ -696,6 +1075,7 @@ onMounted(fetchAllData)
 
 .row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
 }
@@ -704,6 +1084,19 @@ onMounted(fetchAllData)
   min-height: 36px;
   padding: 0 12px;
   border-radius: 10px;
+}
+
+.followup-btn {
+  border: 1px solid #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.followup-btn:hover {
+  border-color: #5eead4;
+  background: #ccfbf1;
 }
 
 .danger-btn {
@@ -805,6 +1198,236 @@ onMounted(fetchAllData)
   color: #047857;
   font-size: 12px;
   font-weight: 600;
+}
+
+.clinical-context {
+  overflow: hidden;
+  border: 1px solid #cfe3df;
+  border-radius: 14px;
+  background: #f8fcfb;
+}
+
+.clinical-state {
+  padding: 18px;
+  color: #64748b;
+  text-align: center;
+}
+
+.clinical-state.error {
+  color: #b91c1c;
+  background: #fff7f7;
+}
+
+.clinical-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid #dbe9e6;
+}
+
+.clinical-pet {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.clinical-pet img,
+.clinical-avatar {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 10px;
+}
+
+.clinical-pet img {
+  object-fit: cover;
+}
+
+.clinical-avatar {
+  display: grid;
+  place-items: center;
+  background: #dff5ef;
+  color: #0f766e;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.clinical-pet div {
+  display: grid;
+  min-width: 0;
+}
+
+.clinical-pet strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clinical-pet small {
+  color: #64748b;
+}
+
+.clinical-kicker {
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.allergy-badge {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.allergy-badge.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.clinical-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: #dbe9e6;
+}
+
+.clinical-facts div {
+  display: grid;
+  gap: 3px;
+  padding: 11px 14px;
+  background: #fff;
+}
+
+.clinical-facts span,
+.allergy-notice span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.clinical-facts strong,
+.allergy-notice strong {
+  color: #1e293b;
+  font-size: 13px;
+}
+
+.allergy-notice {
+  display: grid;
+  gap: 3px;
+  margin: 12px 14px 0;
+  padding: 10px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  background: #f0fdf4;
+}
+
+.allergy-notice.danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.allergy-notice.danger span,
+.allergy-notice.danger strong {
+  color: #991b1b;
+}
+
+.clinical-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 12px 14px;
+}
+
+.clinical-counts span {
+  padding: 5px 8px;
+  border: 1px solid #dbe3ec;
+  border-radius: 7px;
+  background: #fff;
+  color: #475569;
+  font-size: 11px;
+}
+
+.clinical-counts strong {
+  margin-left: 3px;
+  color: #0f766e;
+}
+
+.recent-treatment-list {
+  display: grid;
+  gap: 7px;
+  padding: 0 14px 14px;
+}
+
+.recent-treatment-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.recent-treatment-head > strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.history-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #0f766e;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.recent-treatment-list article {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.recent-treatment-list time {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.recent-treatment-list article div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.recent-treatment-list article strong,
+.recent-treatment-list article span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-treatment-list article strong {
+  color: #1e293b;
+  font-size: 12px;
+}
+
+.recent-treatment-list article span,
+.no-history {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
 }
 
 .service-message {
@@ -947,6 +1570,58 @@ onMounted(fetchAllData)
   width: min(620px, 100%);
 }
 
+.followup-appointment-modal {
+  width: min(720px, 100%);
+}
+
+.followup-appointment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.followup-appointment-grid label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.schedule-context {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-height: 72px;
+  padding: 11px 13px;
+  border: 1px solid;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.schedule-context.available {
+  border-color: #a7f3d0;
+  background: #f0fdf8;
+  color: #065f46;
+}
+
+.schedule-context.unavailable {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.followup-help {
+  margin: 16px 0 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .price-edit-input {
   width: 78px;
   padding: 4px 8px;
@@ -1021,6 +1696,10 @@ onMounted(fetchAllData)
     grid-template-columns: 1fr;
   }
 
+  .followup-appointment-grid {
+    grid-template-columns: 1fr;
+  }
+
   .followup-item {
     align-items: stretch;
     flex-direction: column;
@@ -1028,6 +1707,19 @@ onMounted(fetchAllData)
 
   .followup-item .primary-btn {
     width: 100%;
+  }
+
+  .clinical-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .clinical-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-treatment-list article {
+    grid-template-columns: 1fr;
   }
 }
 </style>
