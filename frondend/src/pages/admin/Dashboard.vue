@@ -1,10 +1,22 @@
 <template>
-  <div class="dashboard-page">
+  <div class="dashboard-page" :aria-busy="loading">
+    <section v-if="dashboardError" class="dashboard-alert" role="alert">
+      <div>
+        <strong>ยังอัปเดตข้อมูลไม่ได้</strong>
+        <p>{{ dashboardError }}</p>
+      </div>
+      <button type="button" @click="fetchDashboardData">ลองอีกครั้ง</button>
+    </section>
+
+    <div v-else-if="lastUpdatedLabel" class="dashboard-freshness" role="status">
+      ข้อมูลล่าสุดเมื่อ {{ lastUpdatedLabel }}
+    </div>
+
     <section class="overview-grid">
       <article class="overview-card overview-card-main">
         <div class="overview-head">
           <div>
-            <p class="eyebrow">Monthly overview</p>
+            <p class="eyebrow">สรุปประจำเดือน</p>
             <h1>ภาพรวมของคลินิก</h1>
           </div>
           <div class="period-card">
@@ -28,49 +40,49 @@
         </p>
 
         <div class="metric-grid">
-          <button type="button" class="metric-card" @click="openDetailModal('appointment')">
+          <button type="button" class="metric-card" :disabled="!hasDashboardData" @click="openDetailModal('appointment', $event)">
             <div class="metric-top">
-              <span class="metric-code">AP</span>
+              <span class="metric-code"><AppIcon name="calendar" :size="17" /></span>
               <span class="metric-label">นัดหมาย</span>
             </div>
-            <strong>{{ summary.totalAppointments }}</strong>
+            <strong>{{ formatCount(summary?.totalAppointments) }}</strong>
             <small>จำนวนคิวที่ถูกบันทึกในเดือนนี้</small>
           </button>
 
-          <button type="button" class="metric-card" @click="openDetailModal('revenue')">
+          <button type="button" class="metric-card" :disabled="!hasDashboardData" @click="openDetailModal('revenue', $event)">
             <div class="metric-top">
-              <span class="metric-code revenue">RV</span>
+              <span class="metric-code revenue"><AppIcon name="receipt" :size="17" /></span>
               <span class="metric-label">รายรับรวม</span>
             </div>
-            <strong>{{ formatPrice(summary.totalRevenue) }}</strong>
+            <strong>{{ formatMoney(summary?.totalRevenue) }}</strong>
             <small>รวมจากใบเสร็จที่ชำระเรียบร้อยแล้ว</small>
           </button>
 
-          <button type="button" class="metric-card" @click="openDetailModal('expense')">
+          <button type="button" class="metric-card" :disabled="!hasDashboardData" @click="openDetailModal('expense', $event)">
             <div class="metric-top">
-              <span class="metric-code expense">EX</span>
+              <span class="metric-code expense"><AppIcon name="expense" :size="17" /></span>
               <span class="metric-label">รายจ่ายรวม</span>
             </div>
-            <strong>{{ formatPrice(summary.totalExpense) }}</strong>
+            <strong>{{ formatMoney(summary?.totalExpense) }}</strong>
             <small>ต้นทุนและค่าใช้จ่ายทั้งหมดของคลินิก</small>
           </button>
         </div>
       </article>
 
       <article class="overview-card overview-card-side">
-        <p class="eyebrow">Net result</p>
+        <p class="eyebrow">ผลประกอบการ</p>
         <h2>กำไรสุทธิ</h2>
-        <strong class="net-profit">{{ formatPrice(summary.netProfit) }}</strong>
+        <strong class="net-profit">{{ formatMoney(summary?.netProfit) }}</strong>
         <p class="side-text">คำนวณจากรายรับหักรายจ่ายของช่วงเวลาที่เลือก</p>
 
         <div class="mini-breakdown">
           <div>
             <span>รายรับ</span>
-            <strong class="positive">{{ formatPrice(summary.totalRevenue) }}</strong>
+            <strong class="positive">{{ formatMoney(summary?.totalRevenue) }}</strong>
           </div>
           <div>
             <span>รายจ่าย</span>
-            <strong class="negative">{{ formatPrice(summary.totalExpense) }}</strong>
+            <strong class="negative">{{ formatMoney(summary?.totalExpense) }}</strong>
           </div>
         </div>
       </article>
@@ -80,7 +92,7 @@
       <article class="panel-card">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Daily activity</p>
+            <p class="eyebrow">แนวโน้มนัดหมาย</p>
             <h3>สถิติการนัดหมายรายวัน</h3>
           </div>
           <span class="panel-chip">{{ months[selectedMonth - 1] }} {{ selectedYear }}</span>
@@ -88,9 +100,13 @@
         <p class="panel-text">ดูความหนาแน่นของคิวในแต่ละวันเพื่อช่วยวางแผนงานหน้าร้านและทีมรักษา</p>
 
         <div class="chart-frame">
-          <div v-if="loading" class="empty-state">กำลังโหลดข้อมูล...</div>
+          <div v-if="loading" class="empty-state loading-state" role="status">กำลังโหลดข้อมูล...</div>
+          <div v-else-if="dashboardError" class="empty-state error-state">
+            <strong>ไม่สามารถแสดงกราฟได้</strong>
+            <p>ลองโหลดข้อมูลอีกครั้งเมื่อการเชื่อมต่อพร้อม</p>
+          </div>
           <div v-else-if="hasAppointmentData" class="chart-box">
-            <Line :data="apptChartData" :options="lineChartOptions" />
+            <Line :data="apptChartData" :options="lineChartOptions" role="img" aria-label="กราฟจำนวนการนัดหมายรายวัน" />
           </div>
           <div v-else class="empty-state">
             <strong>ยังไม่มีข้อมูลนัดหมาย</strong>
@@ -102,7 +118,7 @@
       <article class="panel-card">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Cash flow</p>
+            <p class="eyebrow">กระแสเงินสด</p>
             <h3>รายรับและรายจ่ายรายวัน</h3>
           </div>
           <span class="panel-chip">สรุปประจำเดือน</span>
@@ -110,9 +126,13 @@
         <p class="panel-text">เปรียบเทียบกระแสเงินเข้าออกในแต่ละวันเพื่อมองเห็นช่วงที่ต้นทุนสูงหรือรายรับเด่น</p>
 
         <div class="chart-frame">
-          <div v-if="loading" class="empty-state">กำลังโหลดข้อมูล...</div>
+          <div v-if="loading" class="empty-state loading-state" role="status">กำลังโหลดข้อมูล...</div>
+          <div v-else-if="dashboardError" class="empty-state error-state">
+            <strong>ไม่สามารถแสดงกราฟได้</strong>
+            <p>ลองโหลดข้อมูลอีกครั้งเมื่อการเชื่อมต่อพร้อม</p>
+          </div>
           <div v-else-if="hasFinancialData" class="chart-box">
-            <Bar :data="financialChartData" :options="barChartOptions" />
+            <Bar :data="financialChartData" :options="barChartOptions" role="img" aria-label="กราฟรายรับและรายจ่ายรายวัน" />
           </div>
           <div v-else class="empty-state">
             <strong>ยังไม่มีข้อมูลการเงินในช่วงนี้</strong>
@@ -122,34 +142,15 @@
       </article>
     </section>
 
-    <section class="summary-row">
-      <div class="summary-card">
-        <span>จำนวนคิว</span>
-        <strong>{{ summary.totalAppointments }}</strong>
-      </div>
-      <div class="summary-card">
-        <span>รายรับ</span>
-        <strong class="positive">{{ formatPrice(summary.totalRevenue) }}</strong>
-      </div>
-      <div class="summary-card">
-        <span>รายจ่าย</span>
-        <strong class="negative">{{ formatPrice(summary.totalExpense) }}</strong>
-      </div>
-      <div class="summary-card">
-        <span>กำไรสุทธิ</span>
-        <strong>{{ formatPrice(summary.netProfit) }}</strong>
-      </div>
-    </section>
-
-    <div v-if="isModalOpen" class="modal-overlay" @click.self="isModalOpen = false">
-      <div class="modal-card">
+    <div v-if="isModalOpen" class="modal-overlay" @click.self="closeDetailModal" @keydown.esc="closeDetailModal">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="dashboard-detail-title">
         <div class="modal-header">
           <div>
-            <p class="eyebrow">Detail view</p>
-            <h3>{{ getModalTitle() }}</h3>
+            <p class="eyebrow">ข้อมูลรายละเอียด</p>
+            <h3 id="dashboard-detail-title">{{ getModalTitle() }}</h3>
             <p class="modal-subtitle">{{ months[selectedMonth - 1] }} {{ selectedYear }}</p>
           </div>
-          <button class="close-btn" type="button" @click="isModalOpen = false">ปิด</button>
+          <button ref="modalCloseButton" class="close-btn" type="button" @click="closeDetailModal">ปิด</button>
         </div>
 
         <div class="table-wrap">
@@ -189,7 +190,7 @@
                 <td>{{ formatDateTime(item.pay_date) }}</td>
                 <td>{{ item.receipt_id }}</td>
                 <td>{{ item.owner_name || 'ลูกค้าทั่วไป' }}</td>
-                <td class="right positive">+{{ formatPrice(item.total_amount) }}</td>
+                <td class="right positive">+{{ formatMoney(item.total_amount) }}</td>
               </tr>
               <tr v-if="details.revenue.length === 0">
                 <td colspan="4" class="table-empty">ไม่มีข้อมูลรายรับในเดือนนี้</td>
@@ -211,7 +212,7 @@
                 <td>{{ formatDate(item.exp_date) }}</td>
                 <td>{{ item.exp_title }}</td>
                 <td>{{ item.category_name || 'ทั่วไป' }}</td>
-                <td class="right negative">-{{ formatPrice(item.exp_amount) }}</td>
+                <td class="right negative">-{{ formatMoney(item.exp_amount) }}</td>
               </tr>
               <tr v-if="details.expense.length === 0">
                 <td colspan="4" class="table-empty">ไม่มีข้อมูลรายจ่ายในเดือนนี้</td>
@@ -225,8 +226,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
+import AppIcon from '../../components/AppIcon.vue'
 import {
   BarElement,
   CategoryScale,
@@ -247,6 +249,8 @@ const currentDate = new Date()
 const selectedMonth = ref(currentDate.getMonth() + 1)
 const selectedYear = ref(currentDate.getFullYear())
 const loading = ref(true)
+const dashboardError = ref('')
+const lastUpdatedAt = ref(null)
 
 const months = [
   'มกราคม',
@@ -268,7 +272,7 @@ const years = computed(() => {
   return [current - 2, current - 1, current, current + 1]
 })
 
-const summary = ref({ totalRevenue: 0, totalExpense: 0, netProfit: 0, totalAppointments: 0 })
+const summary = ref(null)
 const rawApptData = ref([])
 const rawRevData = ref([])
 const rawExpData = ref([])
@@ -276,9 +280,21 @@ const details = ref({ appointments: [], revenue: [], expense: [] })
 
 const isModalOpen = ref(false)
 const modalType = ref('')
+const modalCloseButton = ref(null)
+let modalTrigger = null
 
 const formatPrice = (value) =>
-  Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const formatMoney = (value) => value == null ? '—' : `${formatPrice(value)} บาท`
+const formatCount = (value) => value == null ? '—' : Number(value).toLocaleString('th-TH')
+
+const hasDashboardData = computed(() => Boolean(summary.value) && !loading.value)
+const lastUpdatedLabel = computed(() =>
+  lastUpdatedAt.value
+    ? lastUpdatedAt.value.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+    : ''
+)
 
 const formatDate = (dateStr) =>
   dateStr ? new Date(dateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
@@ -298,6 +314,12 @@ const formatTime = (timeStr) => (timeStr ? String(timeStr).substring(0, 5) : '-'
 
 const fetchDashboardData = async () => {
   loading.value = true
+  dashboardError.value = ''
+  summary.value = null
+  rawApptData.value = []
+  rawRevData.value = []
+  rawExpData.value = []
+  details.value = { appointments: [], revenue: [], expense: [] }
   try {
     const token = localStorage.getItem('token')
     const res = await axios.get('http://localhost:3000/api/dashboard', {
@@ -310,17 +332,33 @@ const fetchDashboardData = async () => {
     rawRevData.value = res.data.charts.revenue
     rawExpData.value = res.data.charts.expense
     details.value = res.data.details
+    lastUpdatedAt.value = new Date()
   } catch (err) {
-    console.error('Dashboard Fetch Error:', err)
+    dashboardError.value = err.code === 'ECONNABORTED'
+      ? 'การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองอีกครั้ง'
+      : (err.response?.data?.message || 'ไม่สามารถเชื่อมต่อข้อมูล Dashboard ได้ กรุณาตรวจสอบการเข้าสู่ระบบแล้วลองอีกครั้ง')
   } finally {
     loading.value = false
   }
 }
 
-const openDetailModal = (type) => {
+const openDetailModal = (type, event) => {
+  if (!hasDashboardData.value) return
   modalType.value = type
+  modalTrigger = event?.currentTarget || null
   isModalOpen.value = true
 }
+
+const closeDetailModal = () => {
+  isModalOpen.value = false
+  nextTick(() => modalTrigger?.focus())
+}
+
+watch(isModalOpen, async (open) => {
+  if (!open) return
+  await nextTick()
+  modalCloseButton.value?.focus()
+})
 
 const getModalTitle = () => {
   if (modalType.value === 'appointment') return 'รายละเอียดการนัดหมาย'

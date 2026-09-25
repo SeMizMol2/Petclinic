@@ -49,7 +49,8 @@ CREATE TABLE tb_appointment (
     appt_time TIME NOT NULL,
     appt_reason TEXT,
     cancel_reason TEXT,
-    appt_status VARCHAR(20) CHECK (appt_status IN ('รอ', 'ยืนยัน', 'ยกเลิก')) DEFAULT 'รอ',
+    appt_status VARCHAR(20) CHECK (appt_status IN ('รอ', 'รอคลินิกยืนยัน', 'ยืนยัน', 'ยกเลิก', 'เสร็จสิ้น', 'ไม่มาตามนัด')) DEFAULT 'รอ',
+    request_source VARCHAR(10) NOT NULL DEFAULT 'clinic' CHECK (request_source IN ('clinic', 'owner')),
     pet_id VARCHAR(20) NOT NULL,
     vet_id VARCHAR(10),
     create_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,6 +61,10 @@ CREATE TABLE tb_appointment (
       REFERENCES tb_pet(pet_id)
       ON DELETE CASCADE
 );
+
+CREATE UNIQUE INDEX tb_appointment_active_vet_slot_idx
+    ON tb_appointment (vet_id, appt_date, appt_time)
+    WHERE appt_status IN ('รอ', 'ยืนยัน');
 
 CREATE TABLE tb_category (
     category_id VARCHAR(5) PRIMARY KEY,

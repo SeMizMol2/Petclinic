@@ -46,11 +46,11 @@
         <h2>ข้อมูลสุขภาพเบื้องต้น</h2>
         <div class="form-grid">
           <label>
-            <span>เพศ</span>
+            <span>เพศสัตว์</span>
             <select v-model="pet.pet_gender" class="input-field" required>
               <option value="" disabled>เลือกเพศ</option>
-              <option value="ผู้">ผู้</option>
-              <option value="เมีย">เมีย</option>
+              <option value="ผู้">เพศผู้</option>
+              <option value="เมีย">เพศเมีย</option>
             </select>
           </label>
           <label>

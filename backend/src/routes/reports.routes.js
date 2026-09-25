@@ -16,7 +16,7 @@ const isPaidReceiptStatus = (status) => {
 
 const isConfirmedAppointmentStatus = (status) => {
   const text = normalizeText(status);
-  return text.includes('ยืนยัน');
+  return text === 'ยืนยัน';
 };
 
 const isCanceledAppointmentStatus = (status) => {
@@ -102,7 +102,7 @@ router.get('/', auth, async (req, res) => {
       `
         SELECT
           a.appt_id,
-          a.appt_date,
+          a.appt_date::text AS appt_date,
           a.appt_time,
           a.appt_reason,
           a.appt_status,

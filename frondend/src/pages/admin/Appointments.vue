@@ -1,5 +1,6 @@
 <template>
   <div class="admin-page appointments-admin-page">
+    <p v-if="reviewMessage" class="review-feedback" role="status">{{ reviewMessage }}</p>
     <section class="page-header">
       <div>
         <p class="eyebrow">Appointment management</p>
@@ -9,6 +10,30 @@
         </p>
       </div>
       <button @click="openAddModal" class="primary-btn" type="button">เพิ่มการนัดหมาย</button>
+    </section>
+
+    <section v-if="clinicRequests.length" class="request-queue" aria-labelledby="request-queue-title">
+      <div class="request-queue-head">
+        <h2 id="request-queue-title">คำขอนัดจากเจ้าของสัตว์เลี้ยง</h2>
+        <span>{{ clinicRequests.length }} รายการรอตรวจสอบ</span>
+      </div>
+      <p v-if="reviewError" class="review-error" role="alert">{{ reviewError }}</p>
+      <article v-for="request in clinicRequests" :key="request.appt_id" class="request-row">
+        <div>
+          <strong>{{ request.pet_name }} · คุณ{{ request.owner_name }}</strong>
+          <p>{{ formatFullDate(request.appt_date) }} เวลา {{ formatTime(request.appt_time) }} น. · {{ request.vet_name || 'ให้คลินิกจัดสัตวแพทย์' }}</p>
+          <small>เวลาที่เจ้าของขอ · ตรวจตารางเวรและคิวก่อนยืนยัน</small>
+          <small>{{ request.appt_reason }}</small>
+        </div>
+        <div class="request-actions">
+          <button type="button" class="primary-btn mini-btn" :disabled="reviewingId === request.appt_id" @click="reviewRequest(request, 'approve')">ยืนยันนัด</button>
+          <button type="button" class="ghost-btn mini-btn" :disabled="reviewingId === request.appt_id" @click="rejectionId = rejectionId === request.appt_id ? '' : request.appt_id; rejectionReason = ''">ไม่รับคำขอ</button>
+        </div>
+        <form v-if="rejectionId === request.appt_id" class="rejection-form" @submit.prevent="reviewRequest(request, 'reject')">
+          <label>เหตุผลที่ไม่รับนัด <input v-model.trim="rejectionReason" maxlength="500" required placeholder="เช่น คลินิกไม่สามารถรับนัดช่วงเวลานี้ได้" /></label>
+          <button type="submit" class="danger-btn mini-btn" :disabled="reviewingId === request.appt_id || !rejectionReason">ยืนยันไม่รับนัด</button>
+        </form>
+      </article>
     </section>
 
     <section class="shift-panel">
@@ -103,7 +128,7 @@
       <article class="alert-panel" :class="{ 'alert-panel-danger': overdueAppointments.length > 0 }">
         <span class="alert-kicker">overdue</span>
         <strong>{{ overdueAppointments.length }}</strong>
-        <p>รายการที่ผ่านเวลานัดแต่ยังไม่ยกเลิก</p>
+        <p>รายการที่ผ่านเวลานัดและยังไม่ได้ปิดงาน</p>
       </article>
     </section>
 
@@ -163,7 +188,7 @@
                     {{ getStatusLabel(apt.appt_status) }}
                   </span>
                   <span v-if="apt.cancel_reason" class="cancel-reason">
-                    {{ apt.appt_status === APPT_STATUS_CANCELED ? 'เหตุผลยกเลิก' : 'คำขอเดิม' }}:
+                    {{ apt.appt_status === APPT_STATUS_CANCELED ? (apt.request_source === 'owner' ? 'เหตุผลที่ไม่รับ/ยกเลิก' : 'เหตุผลยกเลิก') : 'คำขอเดิม' }}:
                     {{ apt.cancel_reason }}
                   </span>
                 </div>
@@ -178,7 +203,7 @@
                   >
                     จัดนัดใหม่
                   </button>
-                  <button v-else @click="openEditModal(apt)" class="ghost-btn mini-btn" type="button">แก้ไข</button>
+                  <button v-else-if="apt.appt_status !== APPT_STATUS_CLINIC_PENDING" @click="openEditModal(apt)" class="ghost-btn mini-btn" type="button">แก้ไข</button>
                   <button @click="deleteAppointment(apt.appt_id)" class="danger-btn mini-btn" type="button">ลบ</button>
                 </div>
               </td>
@@ -270,9 +295,11 @@
               <select v-model="form.appt_status">
                 <option :value="APPT_STATUS_PENDING">รอยืนยัน</option>
                 <option :value="APPT_STATUS_CONFIRMED">ยืนยัน</option>
+                <option :value="APPT_STATUS_COMPLETED">เสร็จสิ้น</option>
+                <option :value="APPT_STATUS_MISSED">ไม่มาตามนัด</option>
                 <option :value="APPT_STATUS_CANCELED">ยกเลิก</option>
               </select>
-              <small class="field-hint">นัดใหม่จะเป็น “รอยืนยัน” และให้เจ้าของสัตว์เลี้ยงตอบรับจากบัญชีของตนเอง</small>
+              <small class="field-hint">สถานะ “เสร็จสิ้น” และ “ไม่มาตามนัด” เลือกได้เมื่อผ่านเวลานัดแล้ว</small>
             </label>
           </div>
 
@@ -327,14 +354,22 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import axios from 'axios'
 
 const APPT_STATUS_PENDING = 'รอ'
+const APPT_STATUS_CLINIC_PENDING = 'รอคลินิกยืนยัน'
 const APPT_STATUS_CONFIRMED = 'ยืนยัน'
 const APPT_STATUS_CANCELED = 'ยกเลิก'
+const APPT_STATUS_COMPLETED = 'เสร็จสิ้น'
+const APPT_STATUS_MISSED = 'ไม่มาตามนัด'
 
 const appointments = ref([])
 const petsList = ref([])
 const veterinarians = ref([])
 const schedules = ref([])
 const statusFilter = ref('all')
+const reviewingId = ref('')
+const rejectionId = ref('')
+const rejectionReason = ref('')
+const reviewError = ref('')
+const reviewMessage = ref('')
 const isModalOpen = ref(false)
 const modalMode = ref('add')
 const form = ref({})
@@ -393,6 +428,9 @@ const normalizeAppointmentStatus = (status) => {
   const text = String(status || '').trim()
   if (text === APPT_STATUS_CANCELED) return APPT_STATUS_CANCELED
   if (text === APPT_STATUS_PENDING) return APPT_STATUS_PENDING
+  if (text === APPT_STATUS_CLINIC_PENDING) return APPT_STATUS_CLINIC_PENDING
+  if (text === APPT_STATUS_COMPLETED) return APPT_STATUS_COMPLETED
+  if (text === APPT_STATUS_MISSED) return APPT_STATUS_MISSED
   return APPT_STATUS_CONFIRMED
 }
 
@@ -400,13 +438,19 @@ const getStatusClass = (status) => {
   const normalized = normalizeAppointmentStatus(status)
   if (normalized === APPT_STATUS_CANCELED) return 'is-danger'
   if (normalized === APPT_STATUS_PENDING) return 'is-pending'
-  return 'is-success'
+  if (normalized === APPT_STATUS_CLINIC_PENDING) return 'is-pending'
+  if (normalized === APPT_STATUS_COMPLETED) return 'is-completed'
+  if (normalized === APPT_STATUS_MISSED) return 'is-missed'
+  return 'is-confirmed'
 }
 
 const getStatusLabel = (status) => {
   const normalized = normalizeAppointmentStatus(status)
   if (normalized === APPT_STATUS_CANCELED) return 'ยกเลิก'
   if (normalized === APPT_STATUS_PENDING) return 'รอยืนยัน'
+  if (normalized === APPT_STATUS_CLINIC_PENDING) return 'รอคลินิกยืนยัน'
+  if (normalized === APPT_STATUS_COMPLETED) return 'เสร็จสิ้น'
+  if (normalized === APPT_STATUS_MISSED) return 'ไม่มาตามนัด'
   return 'ยืนยันแล้ว'
 }
 
@@ -422,10 +466,36 @@ const waitForRender = () => new Promise((resolve) => setTimeout(resolve, 50))
 
 const filters = computed(() => [
   { label: 'ทั้งหมด', value: 'all' },
+  { label: `รอคลินิก (${clinicRequests.value.length})`, value: APPT_STATUS_CLINIC_PENDING },
   { label: 'รอยืนยัน', value: APPT_STATUS_PENDING },
   { label: 'ยืนยันแล้ว', value: APPT_STATUS_CONFIRMED },
+  { label: 'เสร็จสิ้น', value: APPT_STATUS_COMPLETED },
+  { label: 'ไม่มาตามนัด', value: APPT_STATUS_MISSED },
   { label: 'ยกเลิก', value: APPT_STATUS_CANCELED }
 ])
+
+const clinicRequests = computed(() => appointments.value.filter((item) => item.appt_status === APPT_STATUS_CLINIC_PENDING))
+
+const reviewRequest = async (request, action) => {
+  if (action === 'approve' && !window.confirm(`ยืนยันนัดของ ${request.pet_name} วันที่ ${formatFullDate(request.appt_date)} เวลา ${formatTime(request.appt_time)} น. หรือไม่?`)) return
+  reviewingId.value = request.appt_id
+  reviewError.value = ''
+  reviewMessage.value = ''
+  try {
+    await axios.patch(`http://localhost:3000/api/appointments/requests/${request.appt_id}/review`, {
+      action,
+      reason: action === 'reject' ? rejectionReason.value : ''
+    }, authHeaders())
+    rejectionId.value = ''
+    rejectionReason.value = ''
+    await fetchAppointments()
+    reviewMessage.value = action === 'approve' ? 'ยืนยันคำขอนัดหมายแล้ว' : 'ไม่รับคำขอนัดหมายแล้ว เจ้าของจะเห็นเหตุผลในรายการนัดหมาย'
+  } catch (error) {
+    reviewError.value = error.response?.data?.message || 'จัดการคำขอนัดหมายไม่สำเร็จ'
+  } finally {
+    reviewingId.value = ''
+  }
+}
 
 const modalTitle = computed(() => {
   if (modalMode.value === 'add') return 'เพิ่มการนัดหมายใหม่'
@@ -504,7 +574,10 @@ const matchingShiftText = computed(() => {
     .join(', ')}`
 })
 
-const isActiveAppointment = (item) => normalizeAppointmentStatus(item.appt_status) !== APPT_STATUS_CANCELED
+const isActiveAppointment = (item) => {
+  const status = normalizeAppointmentStatus(item.appt_status)
+  return status === APPT_STATUS_PENDING || status === APPT_STATUS_CONFIRMED
+}
 
 const todayAppointments = computed(() => {
   const today = startOfLocalToday().getTime()
@@ -865,6 +938,42 @@ onMounted(async () => {
   gap: 22px;
 }
 
+.request-queue {
+  padding: 22px 24px;
+  border: 1px solid #a7d9cf;
+  border-radius: 14px;
+  background: #f5fbf9;
+}
+.review-feedback {
+  margin: 0; padding: 11px 14px;
+  border: 1px solid #a7d9cf; border-radius: 10px;
+  background: #effaf6; color: #0b5f59; font-weight: 700;
+}
+.request-queue-head,
+.request-row,
+.request-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.request-queue-head { margin-bottom: 12px; }
+.request-queue-head h2 { margin: 0; font-size: 1.2rem; }
+.request-queue-head span { color: #0b5f59; font-weight: 700; }
+.request-row { flex-wrap: wrap; padding: 14px 0; border-top: 1px solid #cee6df; }
+.request-row p { margin: 4px 0; color: #334155; }
+.request-row small { color: #526273; }
+.request-actions { justify-content: flex-start; }
+.rejection-form { display: flex; flex-basis: 100%; align-items: end; gap: 12px; }
+.rejection-form label { flex: 1; display: grid; gap: 5px; font-weight: 700; }
+.rejection-form input { width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid #c4d2db; border-radius: 10px; }
+.review-error { color: #991b1b; }
+@media (max-width: 720px) {
+  .request-row,
+  .request-queue-head,
+  .rejection-form { align-items: stretch; flex-direction: column; }
+}
+
 .page-header,
 .shift-panel,
 .toolbar,
@@ -1191,9 +1300,9 @@ th {
   font-weight: 800;
 }
 
-.status-chip.is-success {
-  background: #dcfce7;
-  color: #166534;
+.status-chip.is-confirmed {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .status-chip.is-pending {
@@ -1204,6 +1313,16 @@ th {
 .status-chip.is-danger {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.status-chip.is-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-chip.is-missed {
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .cancel-reason {

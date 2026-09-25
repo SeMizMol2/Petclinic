@@ -63,7 +63,7 @@
               <td>
                 <div class="applicability-tags">
                   <span class="applicability-tag">{{ svc.applicable_pet_type || 'ทั้งหมด' }}</span>
-                  <span class="applicability-tag secondary">{{ svc.applicable_pet_gender || 'ทุกเพศ' }}</span>
+                  <span class="applicability-tag secondary">{{ formatApplicableGender(svc.applicable_pet_gender) }}</span>
                 </div>
               </td>
               <td class="text-right font-bold text-emerald-600">
@@ -145,8 +145,8 @@
               <label>ใช้กับเพศ <span class="required">*</span></label>
               <select v-model="form.applicable_pet_gender" class="custom-input" required>
                 <option value="ทั้งหมด">ทุกเพศ</option>
-                <option value="ผู้">ผู้</option>
-                <option value="เมีย">เมีย</option>
+                <option value="ผู้">เพศผู้</option>
+                <option value="เมีย">เพศเมีย</option>
               </select>
               <small class="field-help">เช่น บริการทำหมันที่แยกตามเพศ</small>
             </div>
@@ -199,6 +199,12 @@ const searchQuery = ref('')
 const isModalOpen = ref(false)
 const modalMode = ref('add')
 const form = ref({})
+
+const formatApplicableGender = (value) => {
+  if (value === 'ผู้') return 'เพศผู้'
+  if (value === 'เมีย') return 'เพศเมีย'
+  return 'ทุกเพศ'
+}
 
 const formatPrice = (val) =>
   Number(val || 0).toLocaleString('th-TH', {

@@ -17,7 +17,7 @@ ALTER TABLE tb_appointment
 
 ALTER TABLE tb_appointment
   ADD CONSTRAINT tb_appointment_appt_status_check
-  CHECK (appt_status IN ('รอ', 'ยืนยัน', 'ยกเลิก'));
+  CHECK (appt_status IN ('รอ', 'ยืนยัน', 'ยกเลิก', 'เสร็จสิ้น', 'ไม่มาตามนัด'));
 
 ALTER TABLE tb_appointment
   ALTER COLUMN appt_status SET DEFAULT 'รอ';

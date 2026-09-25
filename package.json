@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "test:e2e": "node scripts/playwright-full-flow.cjs"
+  },
   "devDependencies": {
     "autoprefixer": "^10.4.24",
     "playwright": "^1.61.1",

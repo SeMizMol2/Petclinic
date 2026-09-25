@@ -2,7 +2,7 @@
   <div class="auth-page">
     <div class="auth-card">
       <div class="card-header">
-        <p class="eyebrow">Welcome back</p>
+        <p class="eyebrow">ยินดีต้อนรับกลับ</p>
         <h1>เข้าสู่ระบบ</h1>
         <p class="subtitle">เข้าสู่ระบบเพื่อจัดการข้อมูลสัตว์เลี้ยง ประวัติการรักษา และบริการของคลินิก</p>
       </div>
@@ -72,19 +72,17 @@ const login = async () => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 28%),
-    linear-gradient(180deg, #f4f7fb 0%, #eef4f8 100%);
+  background: #eef3f5;
 }
 
 .auth-card {
   width: 100%;
   max-width: 460px;
-  padding: 36px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(217, 226, 236, 0.92);
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+  padding: 34px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid var(--pc-border);
+  box-shadow: var(--pc-shadow-lg);
 }
 
 .eyebrow {
@@ -92,14 +90,13 @@ const login = async () => {
   color: #0f766e;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .card-header h1 {
   margin: 0;
   color: #0f172a;
-  font-size: 36px;
+  font-size: 32px;
 }
 
 .subtitle {
@@ -129,7 +126,7 @@ const login = async () => {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid #d9e2ec;
   background: #ffffff;
   color: #0f172a;
@@ -145,12 +142,16 @@ const login = async () => {
 .submit-btn {
   min-height: 48px;
   border: 0;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  border-radius: 10px;
+  background: var(--pc-primary);
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.submit-btn:hover {
+  background: var(--pc-primary-hover);
 }
 
 .auth-footer {
@@ -178,5 +179,20 @@ const login = async () => {
   border: 1px solid #fecaca;
   color: #b91c1c;
   text-align: center;
+}
+
+@media (max-width: 520px) {
+  .auth-page {
+    align-items: flex-start;
+    padding: 18px 14px;
+  }
+
+  .auth-card {
+    padding: 26px 20px;
+  }
+
+  .card-header h1 {
+    font-size: 28px;
+  }
 }
 </style>

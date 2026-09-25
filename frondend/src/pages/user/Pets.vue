@@ -1,10 +1,12 @@
 <template>
   <div class="pets-page">
-    <section class="hero-section">
-      <div>
-        <p class="eyebrow">Pet records</p>
-        <h1>สัตว์เลี้ยงของฉัน</h1>
-        <p class="hero-text">ดูรายละเอียด แก้ไขข้อมูล และเปิดประวัติการรักษาของสัตว์เลี้ยงแต่ละตัวได้จากหน้านี้</p>
+    <section class="pets-heading" aria-labelledby="pets-list-title">
+      <div class="hero-copy">
+        <div class="hero-title-line">
+          <h1 id="pets-list-title">รายชื่อสัตว์เลี้ยง</h1>
+          <span v-if="!loading" class="pet-count">{{ pets.length }} ตัว</span>
+        </div>
+        <p class="hero-text">ข้อมูลสำคัญและประวัติการรักษาของสัตว์เลี้ยงแต่ละตัว</p>
       </div>
       <router-link to="/user/pets/add" class="primary-link">เพิ่มสัตว์เลี้ยง</router-link>
     </section>
@@ -17,9 +19,29 @@
       <router-link to="/user/pets/add" class="primary-link">เพิ่มสัตว์เลี้ยงตัวแรก</router-link>
     </section>
 
-    <section v-else class="pets-grid">
-      <article v-for="pet in pets" :key="pet.pet_id" class="pet-card">
-        <div class="pet-header">
+    <template v-else>
+      <section v-if="pets.length > 1" class="pet-filter-panel" aria-label="กรองสัตว์เลี้ยงตามเพศ">
+        <div>
+          <strong>กรองตามเพศ</strong>
+          <span>แสดง {{ visiblePets.length }} จาก {{ pets.length }} ตัว</span>
+        </div>
+        <div class="gender-filter" role="group" aria-label="เลือกเพศสัตว์เลี้ยง">
+          <button
+            v-for="option in genderOptions"
+            :key="option.value"
+            type="button"
+            :class="{ active: genderFilter === option.value }"
+            :aria-pressed="genderFilter === option.value"
+            @click="genderFilter = option.value"
+          >
+            {{ option.label }} <span>{{ option.count }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section v-if="visiblePets.length" class="pets-grid" aria-label="รายชื่อสัตว์เลี้ยง">
+      <article v-for="pet in visiblePets" :key="pet.pet_id" class="pet-card">
+        <header class="pet-header">
           <div class="pet-identity">
             <button
               type="button"
@@ -34,11 +56,15 @@
                 :src="resolveImageUrl(pet.pet_image)"
                 :alt="`รูปสัตว์เลี้ยง ${pet.pet_name}`"
               />
-              <AppIcon v-else :name="getPetIcon(pet.pet_type)" :size="58" />
+              <AppIcon v-else :name="getPetIcon(pet.pet_type)" :size="42" />
             </button>
-            <div>
+            <div class="pet-title">
               <h2>{{ pet.pet_name }}</h2>
-              <p>{{ pet.pet_breed || 'ไม่ระบุสายพันธุ์' }}</p>
+              <p>{{ pet.pet_type || 'ไม่ระบุประเภท' }} · {{ pet.pet_breed || 'ไม่ระบุสายพันธุ์' }}</p>
+              <div class="pet-quickfacts">
+                <span class="age-chip">อายุ {{ calculateAge(pet.pet_birthdate) }}</span>
+                <span class="identity-gender" :class="genderClass(pet.pet_gender)">{{ formatPetGender(pet.pet_gender) }}</span>
+              </div>
             </div>
           </div>
 
@@ -50,45 +76,25 @@
               <AppIcon name="trash" :size="16" /> ลบ
             </button>
           </div>
-        </div>
+        </header>
 
-        <div class="metric-grid">
-          <div class="metric-item">
-            <span>ประเภท</span>
-            <strong>{{ pet.pet_type || '-' }}</strong>
+        <dl class="detail-grid">
+          <div class="detail-item"><dt>วันเกิด</dt><dd>{{ formatPetBirthdate(pet.pet_birthdate) }}</dd></div>
+          <div class="detail-item"><dt>ลักษณะ / สี</dt><dd>{{ pet.pet_color || 'ไม่ระบุ' }}</dd></div>
+          <div class="detail-item">
+            <dt>สถานะทำหมัน</dt>
+            <dd>{{ pet.sterile_status === 'ทำแล้ว' ? 'ทำหมันแล้ว' : 'ยังไม่ได้ทำหมัน' }}</dd>
           </div>
-          <div class="metric-item">
-            <span>เพศ</span>
-            <strong>{{ pet.pet_gender || '-' }}</strong>
-          </div>
-          <div class="metric-item">
-            <span>ลักษณะ/สี</span>
-            <strong>{{ pet.pet_color || '-' }}</strong>
-          </div>
-          <div class="metric-item">
-            <span>วันเกิด</span>
-            <strong>{{ formatPetBirthdate(pet.pet_birthdate) }}</strong>
-          </div>
-        </div>
+        </dl>
 
-        <div class="status-row">
-          <span class="status-badge" :class="pet.sterile_status === 'ทำแล้ว' ? 'status-success' : 'status-warn'">
-            {{ pet.sterile_status === 'ทำแล้ว' ? 'ทำหมันแล้ว' : 'ยังไม่ได้ทำหมัน' }}
-          </span>
-          <span class="age-chip">อายุ {{ calculateAge(pet.pet_birthdate) }}</span>
-        </div>
-
-        <div class="note-box">
-          <span>ประวัติแพ้ยา</span>
+        <div class="note-box" :class="{ 'has-allergy': pet.drug_allergy }">
+          <span>ข้อมูลแพ้ยา</span>
           <p>{{ pet.drug_allergy || 'ไม่มีข้อมูลการแพ้ยา' }}</p>
         </div>
 
         <div class="history-panel">
           <div class="history-header">
-            <h3>ประวัติการรักษาล่าสุด</h3>
-            <router-link :to="`/user/history/${pet.pet_id}`" class="history-link">
-              <AppIcon name="history" :size="15" /> ดูทั้งหมด
-            </router-link>
+            <h3>การรักษาล่าสุด</h3>
           </div>
 
           <div v-if="getRecentHistory(pet.pet_id).length === 0" class="history-empty">
@@ -106,8 +112,20 @@
             </div>
           </div>
         </div>
+        <div class="pet-footer">
+          <router-link :to="`/user/history/${pet.pet_id}`" class="history-link">
+            <AppIcon name="history" :size="17" /> ดูประวัติการรักษา
+          </router-link>
+        </div>
       </article>
-    </section>
+      </section>
+
+      <section v-else class="state-section empty-filter-state">
+        <h2>ไม่พบสัตว์เลี้ยงในตัวกรองนี้</h2>
+        <p>ลองเลือกทุกเพศเพื่อดูสัตว์เลี้ยงทั้งหมด</p>
+        <button type="button" class="secondary-btn" @click="genderFilter = 'all'">แสดงทั้งหมด</button>
+      </section>
+    </template>
 
     <Teleport to="body">
       <div v-if="showEdit" class="modal-overlay" @click.self="showEdit = false">
@@ -154,10 +172,10 @@
 
             <div class="form-grid">
               <label>
-                <span>เพศ</span>
+                <span>เพศสัตว์</span>
                 <select v-model="editPet.pet_gender" class="input-field">
-                  <option value="ผู้">ผู้</option>
-                  <option value="เมีย">เมีย</option>
+                  <option value="ผู้">เพศผู้</option>
+                  <option value="เมีย">เพศเมีย</option>
                 </select>
               </label>
               <label>
@@ -209,7 +227,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { resolveApiAssetUrl } from '../../api'
 import AppIcon from '../../components/AppIcon.vue'
@@ -223,6 +241,42 @@ const editImagePreview = ref('')
 const historyByPet = ref({})
 const selectedPetImage = ref('')
 const selectedPetName = ref('')
+const genderFilter = ref('all')
+
+const normalizePetGender = (value) => {
+  const gender = String(value || '').trim().toLowerCase()
+  if (['ผู้', 'เพศผู้', 'male'].includes(gender)) return 'ผู้'
+  if (['เมีย', 'เพศเมีย', 'female'].includes(gender)) return 'เมีย'
+  return ''
+}
+
+const formatPetGender = (value, withSymbol = true) => {
+  const gender = normalizePetGender(value)
+  if (gender === 'ผู้') return `${withSymbol ? '♂ ' : ''}เพศผู้`
+  if (gender === 'เมีย') return `${withSymbol ? '♀ ' : ''}เพศเมีย`
+  return 'ไม่ระบุเพศ'
+}
+
+const genderClass = (value) => {
+  const gender = normalizePetGender(value)
+  return gender === 'ผู้' ? 'gender-male' : gender === 'เมีย' ? 'gender-female' : 'gender-unknown'
+}
+
+const genderCounts = computed(() => ({
+  male: pets.value.filter((pet) => normalizePetGender(pet.pet_gender) === 'ผู้').length,
+  female: pets.value.filter((pet) => normalizePetGender(pet.pet_gender) === 'เมีย').length
+}))
+
+const genderOptions = computed(() => [
+  { value: 'all', label: 'ทุกเพศ', count: pets.value.length },
+  { value: 'ผู้', label: 'เพศผู้', count: genderCounts.value.male },
+  { value: 'เมีย', label: 'เพศเมีย', count: genderCounts.value.female }
+])
+
+const visiblePets = computed(() => {
+  if (genderFilter.value === 'all') return pets.value
+  return pets.value.filter((pet) => normalizePetGender(pet.pet_gender) === genderFilter.value)
+})
 
 const getHeaders = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -386,37 +440,43 @@ onMounted(loadPets)
 <style scoped>
 .pets-page {
   display: grid;
-  gap: 20px;
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto;
 }
 
-.hero-section {
+.pets-heading {
   display: flex;
   justify-content: space-between;
-  align-items: start;
-  gap: 16px;
-  padding: 28px;
+  align-items: center;
+  gap: 20px;
+  padding: 4px 2px 2px;
 }
 
-.hero-section,
 .state-section,
 .pet-card,
 .modal-card {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(217, 226, 236, 0.92);
-  border-radius: 22px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 16px;
 }
 
-.eyebrow {
-  margin: 0 0 8px;
+.hero-copy { min-width: 0; }
+
+.hero-title-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pet-count {
   color: #0f766e;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-.hero-section h1,
+.pets-heading h1,
 .pet-card h2,
 .history-header h3,
 .modal-header h2,
@@ -425,11 +485,16 @@ onMounted(loadPets)
   color: #0f172a;
 }
 
+.pets-heading h1 {
+  font-size: clamp(23px, 2vw, 28px);
+  line-height: 1.3;
+}
+
 .hero-text {
-  margin: 8px 0 0;
+  margin: 5px 0 0;
   max-width: 620px;
-  color: #64748b;
-  line-height: 1.65;
+  color: #526277;
+  line-height: 1.55;
 }
 
 .primary-link,
@@ -444,19 +509,23 @@ onMounted(loadPets)
   text-decoration: none;
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid transparent;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
 .primary-link,
 .primary-btn {
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  background: #0f766e;
   color: #ffffff;
-  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.18);
 }
+
+.primary-link:hover,
+.primary-btn:hover { background: #0b5e57; }
+
+.primary-link { flex: 0 0 auto; }
 
 .secondary-btn,
 .ghost-btn {
@@ -469,6 +538,86 @@ onMounted(loadPets)
   padding: 36px 24px;
   text-align: center;
   color: #475569;
+}
+
+.state-section h2 { margin: 0; color: #0f172a; }
+
+.pet-filter-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 2px 12px;
+  border-bottom: 1px solid #d9e2ec;
+}
+
+.pet-filter-panel > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.pet-filter-panel > div:first-child strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.pet-filter-panel > div:first-child span {
+  color: #526277;
+  font-size: 12px;
+}
+
+.gender-filter {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gender-filter button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d9e2ec;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gender-filter button span {
+  margin-left: 4px;
+  color: #64748b;
+}
+
+.gender-filter button:hover {
+  border-color: #94a3b8;
+}
+
+.gender-filter button:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.18);
+  outline-offset: 2px;
+}
+
+.gender-filter button.active {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.gender-filter button.active span {
+  color: #ccfbf1;
+}
+
+.empty-filter-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.empty-filter-state h2,
+.empty-filter-state p {
+  margin: 0;
 }
 
 .empty-state {
@@ -485,38 +634,39 @@ onMounted(loadPets)
 
 .pets-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr));
+  gap: 16px;
+  align-items: start;
 }
 
 .pet-card {
+  min-width: 0;
   padding: 22px;
 }
 
 .pet-header {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 218px;
-  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+  margin-bottom: 18px;
 }
 
 .pet-identity {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
   min-width: 0;
-  text-align: center;
 }
 
 .pet-avatar {
-  width: 156px;
-  height: 156px;
+  width: 88px;
+  height: 88px;
   padding: 0;
-  border: 1px solid rgba(20, 184, 166, 0.18);
-  border-radius: 18px;
-  background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
+  border: 0;
+  border-radius: 14px;
+  background: #e9f7f4;
   color: #0f766e;
   display: flex;
   align-items: center;
@@ -531,7 +681,7 @@ onMounted(loadPets)
 }
 
 .pet-avatar:focus-visible {
-  outline: 3px solid rgba(20, 184, 166, 0.32);
+  outline: 3px solid #0f766e;
   outline-offset: 3px;
 }
 
@@ -541,122 +691,143 @@ onMounted(loadPets)
   object-fit: cover;
 }
 
-.pet-identity p {
-  margin: 6px 0 0;
-  color: #64748b;
+.pet-title { min-width: 0; }
+
+.pet-title h2 {
+  font-size: 22px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
-.pet-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
+.pet-title p {
+  margin: 4px 0 0;
+  color: #526277;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.pet-quickfacts {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
 }
 
-.ghost-btn {
-  background: #f0fdfa;
-  color: #0f766e;
-  border: 1px solid rgba(20, 184, 166, 0.15);
-}
-
-.danger-btn {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid rgba(220, 38, 38, 0.12);
-}
-
-.primary-link:hover,
-.primary-btn:hover,
-.secondary-btn:hover,
-.ghost-btn:hover,
-.danger-btn:hover,
-.close-btn:hover {
-  transform: translateY(-1px);
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.metric-item,
-.note-box,
-.history-item {
-  background: #f8fafc;
-  border-radius: 16px;
-  border: 1px solid #e8eef5;
-}
-
-.metric-item {
-  padding: 14px;
-}
-
-.metric-item span,
-.note-box span,
-.modal-body span {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.metric-item strong,
-.note-box p {
-  color: #0f172a;
-}
-
-.status-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.status-badge,
+.identity-gender,
 .age-chip {
   display: inline-flex;
   align-items: center;
+  min-height: 26px;
+  padding: 2px 9px;
   border-radius: 999px;
-  padding: 7px 11px;
   font-size: 12px;
   font-weight: 700;
 }
 
-.status-success {
-  background: #dcfce7;
-  color: #166534;
+.age-chip { background: #f1f5f9; color: #475569; }
+
+.gender-male {
+  background: #eaf2ff;
+  color: #1d4ed8;
 }
 
-.status-warn {
-  background: #fef3c7;
-  color: #92400e;
+.gender-female {
+  background: #fdf0f6;
+  color: #9d174d;
 }
 
-.age-chip {
+.gender-unknown {
   background: #f1f5f9;
   color: #475569;
 }
 
-.note-box {
-  padding: 14px;
-  margin-bottom: 18px;
+.pet-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
 }
 
-.note-box p {
+.ghost-btn {
+  background: transparent;
+  color: #0f766e;
+  border-color: transparent;
+}
+
+.danger-btn {
+  background: transparent;
+  color: #b91c1c;
+  border-color: transparent;
+}
+
+.secondary-btn:hover,
+.ghost-btn:hover,
+.danger-btn:hover,
+.close-btn:hover { background: #f1f5f9; }
+
+.pet-actions button { min-height: 40px; padding: 0 9px; font-size: 13px; }
+
+.ghost-btn:hover { background: #e9f7f4; }
+.danger-btn:hover { background: #fef2f2; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
   margin: 0;
-  line-height: 1.6;
+  padding: 15px 0;
+  border-top: 1px solid #e3ebf1;
+  border-bottom: 1px solid #e3ebf1;
+}
+
+.detail-item { min-width: 0; }
+
+.detail-item dt,
+.note-box span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #526277;
+}
+
+.detail-item dd {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.note-box {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f4f7fa;
+}
+
+.note-box.has-allergy {
+  background: #fff7ed;
+}
+
+.note-box.has-allergy span,
+.note-box.has-allergy p { color: #9a3412; }
+
+.note-box span { margin: 0; }
+
+.note-box p {
+  color: #334155;
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .history-panel {
-  border-top: 1px solid #e5edf5;
-  padding-top: 16px;
+  padding-top: 18px;
 }
 
 .history-header,
@@ -675,8 +846,15 @@ onMounted(loadPets)
   text-decoration: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #e9f7f4;
 }
+
+.history-link:hover { background: #d6eee8; }
 
 .history-empty {
   color: #64748b;
@@ -685,11 +863,12 @@ onMounted(loadPets)
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
 }
 
 .history-item {
-  padding: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf1f5;
 }
 
 .history-meta {
@@ -707,6 +886,19 @@ onMounted(loadPets)
 .history-item p {
   margin: 0;
   color: #475569;
+}
+
+.history-header h3 { font-size: 15px; }
+
+.pet-footer {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+
+.pets-page :is(a, button):focus-visible {
+  outline: 3px solid #0f766e;
+  outline-offset: 3px;
 }
 
 .image-viewer-overlay {
@@ -888,22 +1080,36 @@ textarea.input-field {
 }
 
 @media (max-width: 720px) {
-  .hero-section,
-  .history-header,
+  .pet-filter-panel,
   .modal-header,
   .modal-footer {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .metric-grid,
+  .pets-heading { gap: 12px; }
+  .pets-heading h1 { font-size: 22px; }
+  .pets-heading .hero-text { display: none; }
+  .pets-heading .primary-link { min-height: 40px; padding: 0 12px; }
+  .pet-filter-panel { padding-top: 2px; }
+  .pet-filter-panel > div:first-child { display: none; }
+
+  .gender-filter {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .gender-filter button {
+    padding: 0 8px;
+  }
+
   .form-grid,
   .edit-image-row {
     grid-template-columns: 1fr;
   }
 
   .edit-image-preview {
-    width: 100%;
+    width: 104px;
   }
 
   .pet-card {
@@ -911,43 +1117,39 @@ textarea.input-field {
   }
 
   .pet-header {
-    min-height: 0;
-    gap: 14px;
-    margin-bottom: 18px;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 14px;
   }
 
   .pet-avatar {
-    width: 124px;
-    height: 124px;
-    border-radius: 16px;
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
   }
 
   .pet-actions {
-    position: static;
     width: 100%;
-    justify-content: center;
+    justify-content: flex-end;
   }
 
-  .pet-actions button {
-    flex: 1 1 0;
+  .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
   }
 
-  .status-row {
-    justify-content: center;
+  .note-box {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .history-meta {
     flex-wrap: wrap;
+    gap: 2px 10px;
   }
 
-  .status-badge,
-  .age-chip {
-    justify-content: center;
-  }
-
-  .history-header {
-    gap: 10px;
-  }
-
-  .history-link {
-    min-height: 40px;
+  .pet-footer .history-link {
+    width: 100%;
   }
 
   .image-viewer-overlay {
@@ -956,6 +1158,21 @@ textarea.input-field {
 
   .image-viewer-card > img {
     max-height: 70vh;
+  }
+}
+
+@media (max-width: 400px) {
+  .pet-identity { gap: 10px; }
+  .pet-title h2 { font-size: 20px; }
+  .pet-quickfacts { margin-top: 7px; }
+  .gender-filter button { font-size: 12px; }
+  .detail-grid { grid-template-columns: 1fr 1fr; }
+  .detail-item:last-child { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pets-page :is(a, button) {
+    transition: none;
   }
 }
 </style>

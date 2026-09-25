@@ -10,9 +10,25 @@
     </section>
 
     <section class="toolbar">
-      <input v-model="searchQuery" class="search-input" placeholder="ค้นหาชื่อสัตว์ ประเภท สายพันธุ์ หรือเจ้าของ" />
+      <div class="search-field">
+        <label for="pet-search">ค้นหาสัตว์เลี้ยง</label>
+        <input id="pet-search" v-model="searchQuery" class="search-input" placeholder="ชื่อสัตว์ ประเภท สายพันธุ์ หรือเจ้าของ" />
+      </div>
+      <div class="filter-field">
+        <label for="gender-filter">เพศ</label>
+        <select id="gender-filter" v-model="genderFilter" class="filter-select">
+          <option value="all">ทุกเพศ ({{ pets.length }})</option>
+          <option value="ผู้">เพศผู้ ({{ genderCounts.male }})</option>
+          <option value="เมีย">เพศเมีย ({{ genderCounts.female }})</option>
+        </select>
+      </div>
+      <button v-if="hasActiveFilters" class="clear-btn" type="button" @click="clearFilters">ล้างตัวกรอง</button>
       <button class="ghost-btn" @click="reloadAll">รีเฟรช</button>
     </section>
+
+    <p v-if="!loading && !error" class="result-summary" aria-live="polite">
+      แสดง {{ filteredPets.length }} จาก {{ pets.length }} ตัว
+    </p>
 
     <section class="table-panel">
       <div v-if="loading" class="state">กำลังโหลดข้อมูล...</div>
@@ -48,7 +64,10 @@
               </td>
               <td data-label="ข้อมูลทั่วไป">
                 <div>{{ pet.pet_type || '-' }} / {{ pet.pet_breed || '-' }}</div>
-                <span class="muted">{{ pet.pet_gender || '-' }} · {{ pet.pet_color || '-' }}</span>
+                <div class="pet-meta">
+                  <span class="gender-badge" :class="genderClass(pet.pet_gender)">{{ formatPetGender(pet.pet_gender) }}</span>
+                  <span class="muted">{{ pet.pet_color || 'ไม่ระบุสี' }}</span>
+                </div>
               </td>
               <td data-label="สุขภาพ">
                 <div>{{ pet.sterile_status || '-' }}</div>
@@ -114,8 +133,8 @@
             เพศ
             <select v-model="form.pet_gender" required>
               <option value="" disabled>เลือกเพศ</option>
-              <option value="ผู้">ผู้</option>
-              <option value="เมีย">เมีย</option>
+              <option value="ผู้">เพศผู้</option>
+              <option value="เมีย">เพศเมีย</option>
             </select>
           </label>
           <label>
@@ -159,6 +178,7 @@ const owners = ref([])
 const loading = ref(false)
 const error = ref('')
 const searchQuery = ref('')
+const genderFilter = ref('all')
 const isModalOpen = ref(false)
 const modalMode = ref('add')
 const form = ref({})
@@ -170,6 +190,25 @@ const resolveImageUrl = (value) => {
 }
 
 const getPetInitial = (name) => String(name || '?').trim().charAt(0).toUpperCase()
+
+const normalizePetGender = (value) => {
+  const gender = String(value || '').trim().toLowerCase()
+  if (['ผู้', 'เพศผู้', 'male'].includes(gender)) return 'ผู้'
+  if (['เมีย', 'เพศเมีย', 'female'].includes(gender)) return 'เมีย'
+  return ''
+}
+
+const formatPetGender = (value) => {
+  const gender = normalizePetGender(value)
+  if (gender === 'ผู้') return '♂ เพศผู้'
+  if (gender === 'เมีย') return '♀ เพศเมีย'
+  return 'ไม่ระบุเพศ'
+}
+
+const genderClass = (value) => {
+  const gender = normalizePetGender(value)
+  return gender === 'ผู้' ? 'gender-male' : gender === 'เมีย' ? 'gender-female' : 'gender-unknown'
+}
 
 const normalizeDate = (value) => {
   if (!value) return ''
@@ -205,12 +244,24 @@ const reloadAll = async () => {
 
 const filteredPets = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return pets.value
   return pets.value.filter((pet) =>
-    [pet.pet_name, pet.pet_type, pet.pet_breed, pet.pet_gender, pet.owner_name, pet.pet_id]
-      .some((value) => String(value || '').toLowerCase().includes(q))
+    (genderFilter.value === 'all' || normalizePetGender(pet.pet_gender) === genderFilter.value)
+    && (!q || [pet.pet_name, pet.pet_type, pet.pet_breed, pet.pet_gender, pet.owner_name, pet.pet_id]
+      .some((value) => String(value || '').toLowerCase().includes(q)))
   )
 })
+
+const genderCounts = computed(() => ({
+  male: pets.value.filter((pet) => normalizePetGender(pet.pet_gender) === 'ผู้').length,
+  female: pets.value.filter((pet) => normalizePetGender(pet.pet_gender) === 'เมีย').length
+}))
+
+const hasActiveFilters = computed(() => searchQuery.value.trim() !== '' || genderFilter.value !== 'all')
+
+const clearFilters = () => {
+  searchQuery.value = ''
+  genderFilter.value = 'all'
+}
 
 const emptyForm = () => ({
   owner_id: '',
@@ -329,6 +380,29 @@ h1 {
   gap: 12px;
   padding: 14px;
   margin-bottom: 18px;
+  align-items: flex-end;
+}
+
+.search-field,
+.filter-field {
+  display: grid;
+  gap: 6px;
+}
+
+.search-field {
+  flex: 1;
+  min-width: 220px;
+}
+
+.filter-field {
+  flex: 0 0 190px;
+}
+
+.search-field label,
+.filter-field label {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .search-input,
@@ -347,8 +421,29 @@ select {
 }
 
 .search-input {
-  flex: 1;
-  min-width: 220px;
+  min-width: 0;
+}
+
+.clear-btn {
+  min-height: 46px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #0f766e;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clear-btn:hover {
+  color: #115e59;
+  text-decoration: underline;
+}
+
+.result-summary {
+  margin: -8px 4px 12px;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .search-input:focus,
@@ -425,6 +520,44 @@ th {
 strong,
 .muted {
   display: block;
+}
+
+.pet-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  flex-wrap: wrap;
+}
+
+.pet-meta .muted {
+  margin-top: 0;
+}
+
+.gender-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gender-male {
+  background: #eaf2ff;
+  color: #1d4ed8;
+}
+
+.gender-female {
+  background: #fdf0f6;
+  color: #9d174d;
+}
+
+.gender-unknown {
+  background: #f1f5f9;
+  color: #475569;
 }
 
 strong {
@@ -598,7 +731,11 @@ textarea {
   .primary-btn,
   .ghost-btn,
   .close-btn,
-  .search-input {
+  .search-field,
+  .filter-field,
+  .search-input,
+  .filter-select,
+  .clear-btn {
     width: 100%;
   }
 

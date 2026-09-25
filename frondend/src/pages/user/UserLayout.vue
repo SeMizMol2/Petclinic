@@ -8,7 +8,6 @@
         <div class="brand-copy">
           <span class="brand-kicker">Owner Portal</span>
           <h1>โรงพยาบาลสัตว์เมืองเลย</h1>
-          <p>พื้นที่สำหรับเจ้าของสัตว์เลี้ยงเพื่อติดตามข้อมูลส่วนตัว สัตว์เลี้ยง นัดหมาย และใบเสร็จ</p>
         </div>
       </div>
 
@@ -47,7 +46,7 @@
           <span class="nav-icon-wrap"><AppIcon name="calendar" :size="18" /></span>
           <span class="nav-text">
             <strong>การนัดหมาย</strong>
-            <small>ติดตามคิวและสถานะการนัดหมายที่คลินิกบันทึกไว้</small>
+            <small>ขอนัดหมายและติดตามสถานะจากคลินิก</small>
           </span>
         </router-link>
 
@@ -114,7 +113,7 @@ const titleMap = {
   '/user/pets': ['สัตว์เลี้ยงของฉัน', 'ดูข้อมูลสัตว์เลี้ยงแต่ละตัวและเปิดดูประวัติการรักษา'],
   '/user/pets/add': ['เพิ่มสัตว์เลี้ยง', 'กรอกข้อมูลสัตว์เลี้ยงตัวใหม่เพื่อเริ่มต้นใช้งานระบบ'],
   '/user/receipts': ['การชำระเงิน', 'ติดตามใบเสร็จ ยอดค่าใช้จ่าย และสถานะการชำระเงิน'],
-  '/user/appointments': ['การนัดหมาย', 'ตรวจสอบวันเวลาและสถานะของนัดหมายที่คลินิกบันทึกไว้']
+  '/user/appointments': ['การนัดหมายของฉัน', 'ขอนัดหมาย ตรวจสอบสถานะ และดูประวัตินัดหมายของสัตว์เลี้ยง']
 }
 
 const currentUserName = computed(() => {
@@ -223,13 +222,6 @@ watch(
   color: #0f172a;
   font-size: 24px;
   line-height: 1.1;
-}
-
-.brand-copy p {
-  margin: 8px 0 0;
-  color: #64748b;
-  font-size: 13px;
-  line-height: 1.6;
 }
 
 .workspace-nav {
@@ -499,9 +491,8 @@ watch(
     font-size: 1.08rem;
   }
 
-  .brand-copy p,
-  .nav-text small,
-  .workspace-label {
+.nav-text small,
+.workspace-label {
     display: none;
   }
 
@@ -532,6 +523,250 @@ watch(
 
 @media (max-width: 420px) {
   .workspace-nav {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<style scoped>
+/* Clinical Calm workspace layer */
+.workspace-shell {
+  grid-template-columns: 284px minmax(0, 1fr);
+  background: var(--pc-surface-alt);
+}
+
+.workspace-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 22px 16px;
+  gap: 18px;
+  border-right: 0;
+  background: var(--pc-navy);
+}
+
+.workspace-brand,
+.workspace-nav,
+.workspace-footer {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.workspace-brand {
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  padding: 4px 6px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.brand-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.user-brand-badge {
+  background: var(--pc-primary);
+}
+
+.brand-kicker {
+  margin-bottom: 2px;
+  color: #8dd8cf;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.brand-copy h1 {
+  color: #fff;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.workspace-nav {
+  padding: 0;
+  gap: 5px;
+}
+
+.nav-link,
+.logout-button {
+  min-height: 52px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: #cbd8df;
+}
+
+.nav-link:hover,
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.075);
+  color: #fff;
+}
+
+.nav-link.active {
+  background: var(--pc-primary);
+  color: #fff;
+  box-shadow: none;
+}
+
+.nav-icon-wrap,
+.nav-link.active .nav-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-link.active .nav-icon-wrap {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.nav-text strong {
+  font-size: 13.5px;
+}
+
+.nav-text small {
+  color: #8ea5b2;
+  font-size: 10.5px;
+}
+
+.nav-link.active .nav-text small {
+  color: #d4f5f0;
+}
+
+.workspace-footer {
+  padding: 14px 6px 0;
+  margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.workspace-note {
+  display: none;
+}
+
+.logout-button {
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+}
+
+.workspace-main {
+  padding: 22px 26px 40px;
+}
+
+.workspace-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 14px 0 16px;
+  margin-bottom: 18px;
+  border: 0;
+  border-bottom: 1px solid var(--pc-border);
+  border-radius: 0;
+  background: rgba(243, 246, 248, 0.94);
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+}
+
+.workspace-label {
+  margin-bottom: 3px;
+  color: var(--pc-primary);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.workspace-header h2 {
+  font-size: 24px;
+}
+
+.workspace-subtitle {
+  margin-top: 5px;
+  color: var(--pc-text-sub);
+  font-size: 13px;
+}
+
+.workspace-user {
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--pc-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.header-logout-button {
+  min-height: 34px;
+  padding-inline: 10px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.user-content {
+  max-width: 1320px;
+}
+
+@media (max-width: 1024px) {
+  .workspace-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-sidebar {
+    position: sticky;
+    height: auto;
+    overflow: visible;
+    padding: 12px 16px;
+    border-bottom: 0;
+    background: var(--pc-navy);
+    backdrop-filter: none;
+  }
+
+  .workspace-brand {
+    padding-bottom: 10px;
+  }
+
+  .workspace-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    padding: 0;
+  }
+
+  .nav-link {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+@media (max-width: 760px) {
+  .mobile-menu-button {
+    min-height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+    box-shadow: none;
+  }
+
+  .menu-count {
+    background: rgba(20, 184, 166, 0.2);
+    color: #c7f4ed;
+  }
+
+  .workspace-main {
+    padding: 0 14px 28px;
+  }
+
+  .workspace-header {
+    padding: 14px 0;
+  }
+
+  .workspace-user {
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .workspace-nav.open {
     grid-template-columns: 1fr;
   }
 }

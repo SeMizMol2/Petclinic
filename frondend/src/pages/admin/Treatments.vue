@@ -58,7 +58,7 @@
                 <div class="row-actions">
                   <button class="ghost-btn mini-btn" @click="openEditModal(t.treatment_id)">แก้ไข</button>
                   <button class="followup-btn mini-btn" @click="openFollowUpModal(t)">นัดติดตาม</button>
-                  <button class="danger-btn mini-btn" @click="deleteTreatment(t)">ลบ</button>
+                  <button v-if="!t.receipt_id" class="danger-btn mini-btn" type="button" @click="deleteTreatment(t)">ลบ</button>
                 </div>
               </td>
             </tr>
@@ -82,18 +82,49 @@
 
         <div class="form-layout">
           <div class="form-grid left-panel">
-            <label class="full-width">
-              <span>เลือกสัตว์เลี้ยง *</span>
-              <select v-model="form.pet_id" :disabled="isFinancialLocked" required>
-                <option value="" disabled>-- กรุณาเลือกสัตว์เลี้ยง --</option>
-                <option v-for="p in petsList" :key="p.pet_id" :value="p.pet_id">
-                  {{ p.pet_name }} (คุณ{{ p.owner_name }}) · {{ p.pet_type || 'ไม่ระบุประเภท' }} / {{ p.pet_gender || 'ไม่ระบุเพศ' }}
-                </option>
-              </select>
+            <div class="pet-picker full-width" @focusout="onPetPickerFocusOut">
+              <label for="treatment-pet-search">เลือกสัตว์เลี้ยง *</label>
+              <div class="pet-search-wrap">
+                <input
+                  id="treatment-pet-search"
+                  :value="petSearchQuery"
+                  type="search"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  :aria-expanded="isPetPickerOpen"
+                  aria-controls="treatment-pet-options"
+                  :aria-activedescendant="isPetPickerOpen && matchedPets.length ? `treatment-pet-option-${activePetIndex}` : undefined"
+                  autocomplete="off"
+                  placeholder="พิมพ์ชื่อสัตว์ ชื่อเจ้าของ หรือรหัสสัตว์"
+                  :disabled="isFinancialLocked"
+                  @focus="openPetPicker"
+                  @input="onPetSearchInput"
+                  @keydown.down.prevent="moveActivePet(1)"
+                  @keydown.up.prevent="moveActivePet(-1)"
+                  @keydown.enter.prevent="chooseActivePet"
+                  @keydown.esc.stop.prevent="closePetPicker"
+                />
+                <div v-if="isPetPickerOpen" id="treatment-pet-options" class="pet-suggestions" role="listbox" aria-label="ผลการค้นหาสัตว์เลี้ยง">
+                  <button
+                    v-for="(pet, index) in matchedPets"
+                    :id="`treatment-pet-option-${index}`"
+                    :key="pet.pet_id"
+                    type="button"
+                    role="option"
+                    :aria-selected="index === activePetIndex"
+                    :class="['pet-suggestion', { active: index === activePetIndex }]"
+                    @click="selectPet(pet)"
+                  >
+                    <strong>{{ pet.pet_name }}</strong>
+                    <span>คุณ{{ pet.owner_name || '-' }} · {{ pet.pet_id }}</span>
+                  </button>
+                  <p v-if="matchedPets.length === 0" class="pet-search-empty" role="status">ไม่พบสัตว์เลี้ยงที่ตรงกับคำค้น</p>
+                </div>
+              </div>
               <small v-if="selectedPet" class="pet-context">
-                กำลังเลือกบริการสำหรับ {{ selectedPet.pet_name }} · {{ selectedPet.pet_type || 'ไม่ระบุประเภท' }} · {{ selectedPet.pet_gender || 'ไม่ระบุเพศ' }}
+                เลือกแล้ว: {{ selectedPet.pet_name }} (คุณ{{ selectedPet.owner_name || '-' }}) · {{ selectedPet.pet_id }}
               </small>
-            </label>
+            </div>
 
             <section v-if="form.pet_id" class="clinical-context full-width" aria-live="polite">
               <div v-if="isPetSummaryLoading" class="clinical-state">กำลังโหลดข้อมูลสุขภาพสัตว์เลี้ยง...</div>
@@ -119,7 +150,7 @@
                 </div>
 
                 <div class="clinical-facts">
-                  <div><span>ประเภท / เพศ</span><strong>{{ selectedPetSummary.pet.pet_type || '-' }} / {{ selectedPetSummary.pet.pet_gender || '-' }}</strong></div>
+                  <div><span>ประเภท / เพศ</span><strong>{{ selectedPetSummary.pet.pet_type || '-' }} / {{ formatPetGender(selectedPetSummary.pet.pet_gender) }}</strong></div>
                   <div><span>อายุ</span><strong>{{ formatPetAge(selectedPetSummary.pet.pet_birthdate) }}</strong></div>
                   <div><span>สายพันธุ์</span><strong>{{ selectedPetSummary.pet.pet_breed || 'ไม่ระบุ' }}</strong></div>
                   <div><span>ทำหมัน</span><strong>{{ selectedPetSummary.pet.sterile_status || 'ไม่ระบุ' }}</strong></div>
@@ -422,6 +453,9 @@ const petSummaryError = ref('')
 const isModalOpen = ref(false)
 const isSubmitting = ref(false)
 const isEditing = ref(false)
+const petSearchQuery = ref('')
+const isPetPickerOpen = ref(false)
+const activePetIndex = ref(0)
 const selectedServiceId = ref('')
 const originalServiceIds = ref(new Set())
 const specialtyFollowUps = ref([])
@@ -494,6 +528,55 @@ const isFinancialLocked = computed(() =>
   isEditing.value && Boolean(form.value.receipt_id) && isReceiptPaid(form.value)
 )
 
+const matchedPets = computed(() => {
+  const query = petSearchQuery.value.trim().toLocaleLowerCase('th-TH')
+  if (!query) return petsList.value
+  return petsList.value.filter((pet) =>
+    [pet.pet_name, pet.owner_name, pet.pet_id].some((value) =>
+      String(value || '').toLocaleLowerCase('th-TH').includes(query)
+    )
+  )
+})
+
+const openPetPicker = () => {
+  if (isFinancialLocked.value) return
+  isPetPickerOpen.value = true
+  activePetIndex.value = 0
+}
+
+const closePetPicker = () => { isPetPickerOpen.value = false }
+
+const onPetPickerFocusOut = (event) => {
+  if (!event.currentTarget.contains(event.relatedTarget)) closePetPicker()
+}
+
+const onPetSearchInput = (event) => {
+  petSearchQuery.value = event.target.value
+  form.value.pet_id = ''
+  isPetPickerOpen.value = true
+  activePetIndex.value = 0
+}
+
+const moveActivePet = (direction) => {
+  if (!isPetPickerOpen.value) {
+    openPetPicker()
+    return
+  }
+  if (matchedPets.value.length) {
+    activePetIndex.value = (activePetIndex.value + direction + matchedPets.value.length) % matchedPets.value.length
+  }
+}
+
+const selectPet = (pet) => {
+  form.value.pet_id = pet.pet_id
+  petSearchQuery.value = pet.pet_name
+  closePetPicker()
+}
+
+const chooseActivePet = () => {
+  if (isPetPickerOpen.value && matchedPets.value.length) selectPet(matchedPets.value[activePetIndex.value])
+}
+
 const fetchAllData = async () => {
   const [tRes, pRes, sRes, vRes, scheduleRes] = await Promise.all([
     axios.get('http://localhost:3000/api/treatments', { headers: headers() }),
@@ -513,6 +596,8 @@ const fetchAllData = async () => {
 const openAddModal = () => {
   isEditing.value = false
   form.value = emptyForm()
+  petSearchQuery.value = ''
+  closePetPicker()
   originalServiceIds.value = new Set()
   selectedServiceId.value = ''
   isModalOpen.value = true
@@ -539,6 +624,8 @@ const openEditModal = async (treatmentId) => {
         price: Number(item.price || 0)
       }))
     }
+    petSearchQuery.value = petsList.value.find((pet) => pet.pet_id === form.value.pet_id)?.pet_name || data.pet_name || ''
+    closePetPicker()
     selectedServiceId.value = ''
     originalServiceIds.value = new Set(form.value.services.map((item) => item.service_id))
     isEditing.value = true
@@ -550,6 +637,7 @@ const openEditModal = async (treatmentId) => {
 
 const closeModal = () => {
   isModalOpen.value = false
+  closePetPicker()
 }
 
 const viewPetHistory = (petId) => {
@@ -809,6 +897,13 @@ const normalizePetGender = (value) => {
   return normalized ? `other:${normalized}` : ''
 }
 
+const formatPetGender = (value) => {
+  const gender = normalizePetGender(value)
+  if (gender === 'male') return 'เพศผู้'
+  if (gender === 'female') return 'เพศเมีย'
+  return 'ไม่ระบุเพศ'
+}
+
 const isAllApplicability = (value) => {
   const normalized = String(value || '').trim().toLowerCase()
   return !normalized || ['all', 'ทั้งหมด', 'ทุกประเภท', 'ทุกเพศ'].includes(normalized)
@@ -939,6 +1034,10 @@ const continueToSpecialty = async (item) => {
 }
 
 const submitTreatment = async () => {
+  if (!form.value.pet_id) {
+    alert('กรุณาเลือกสัตว์เลี้ยงจากรายการค้นหา')
+    return
+  }
   if (form.value.services.length === 0 && !confirm('ยังไม่มีรายการค่ารักษา ต้องการบันทึกหรือไม่?')) return
 
   isSubmitting.value = true
@@ -1015,6 +1114,7 @@ const submitTreatment = async () => {
 }
 
 const deleteTreatment = async (treatment) => {
+  if (treatment.receipt_id) return
   if (!confirm(`ต้องการลบการรักษา ${treatment.treatment_id} หรือไม่?`)) return
   try {
     await axios.delete(`http://localhost:3000/api/treatments/${treatment.treatment_id}`, { headers: headers() })
@@ -1078,6 +1178,7 @@ onMounted(fetchAllData)
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
+  align-items: center;
 }
 
 .mini-btn {
@@ -1199,6 +1300,40 @@ onMounted(fetchAllData)
   font-size: 12px;
   font-weight: 600;
 }
+
+.pet-picker { display: grid; gap: 7px; min-width: 0; }
+.pet-picker > label { color: #334155; font-weight: 700; }
+.pet-search-wrap { position: relative; min-width: 0; }
+.pet-search-wrap > input { width: 100%; box-sizing: border-box; }
+.pet-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+.pet-suggestion {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #0f172a;
+  text-align: left;
+}
+.pet-suggestion span { color: #475569; font-size: 12px; }
+.pet-suggestion:hover,
+.pet-suggestion.active { background: #eaf6f3; }
+.pet-search-empty { margin: 0; padding: 12px; color: #9a3412; font-size: 13px; }
 
 .clinical-context {
   overflow: hidden;

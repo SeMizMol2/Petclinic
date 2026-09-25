@@ -5,8 +5,19 @@ const auth = require('./auth.middleware');
 const { queueAppointmentNotification } = require('../services/mail.service');
 
 const APPT_STATUS_PENDING = '\u0e23\u0e2d';
+const APPT_STATUS_CLINIC_PENDING = 'รอคลินิกยืนยัน';
 const APPT_STATUS_CONFIRMED = '\u0e22\u0e37\u0e19\u0e22\u0e31\u0e19';
 const APPT_STATUS_CANCELED = '\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01';
+const APPT_STATUS_COMPLETED = '\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e2a\u0e34\u0e49\u0e19';
+const APPT_STATUS_MISSED = '\u0e44\u0e21\u0e48\u0e21\u0e32\u0e15\u0e32\u0e21\u0e19\u0e31\u0e14';
+const APPT_STATUSES = new Set([
+    APPT_STATUS_PENDING,
+    APPT_STATUS_CLINIC_PENDING,
+    APPT_STATUS_CONFIRMED,
+    APPT_STATUS_CANCELED,
+    APPT_STATUS_COMPLETED,
+    APPT_STATUS_MISSED
+]);
 
 const ensureAdmin = (req, res) => {
     if (req.user.role !== 'admin') {
@@ -20,9 +31,20 @@ const normalizeStatus = (apptStatus, fallback = APPT_STATUS_CONFIRMED) => {
     const text = String(apptStatus || '').trim();
     if (text === APPT_STATUS_CANCELED) return APPT_STATUS_CANCELED;
     if (text === APPT_STATUS_PENDING) return APPT_STATUS_PENDING;
+    if (text === APPT_STATUS_CLINIC_PENDING) return APPT_STATUS_CLINIC_PENDING;
     if (text === APPT_STATUS_CONFIRMED) return APPT_STATUS_CONFIRMED;
+    if (text === APPT_STATUS_COMPLETED) return APPT_STATUS_COMPLETED;
+    if (text === APPT_STATUS_MISSED) return APPT_STATUS_MISSED;
     return fallback;
 };
+
+const isActiveStatus = (status) => (
+    status === APPT_STATUS_PENDING || status === APPT_STATUS_CLINIC_PENDING || status === APPT_STATUS_CONFIRMED
+);
+
+const isClosedStatus = (status) => (
+    status === APPT_STATUS_COMPLETED || status === APPT_STATUS_MISSED
+);
 
 const normalizeAppointmentDate = (value) => {
     const raw = String(value || '').trim();
@@ -53,7 +75,8 @@ const normalizeAppointmentDate = (value) => {
 
 const normalizeAppointmentTime = (value) => {
     const raw = String(value || '').trim();
-    return /^\d{2}:\d{2}(:\d{2})?$/.test(raw) ? raw : null;
+    const match = raw.match(/^([01]\d|2[0-3]):([0-5]\d)(?::00)?$/);
+    return match ? `${match[1]}:${match[2]}` : null;
 };
 
 const isAppointmentInPast = (apptDate, apptTime) => {
@@ -63,8 +86,8 @@ const isAppointmentInPast = (apptDate, apptTime) => {
     return Number.isNaN(appointmentDateTime.getTime()) || appointmentDateTime.getTime() < Date.now();
 };
 
-const findConflictingAppointment = async ({ apptDate, apptTime, vetId, excludeId = null }) => {
-    const result = await pool.query(
+const findConflictingAppointment = async ({ apptDate, apptTime, vetId, excludeId = null, db = pool }) => {
+    const result = await db.query(
         `
         SELECT
             a.appt_id,
@@ -74,9 +97,10 @@ const findConflictingAppointment = async ({ apptDate, apptTime, vetId, excludeId
         LEFT JOIN tb_pet p ON a.pet_id = p.pet_id
         LEFT JOIN tb_owner o ON p.owner_id = o.owner_id
         WHERE a.appt_date = $1
-          AND a.appt_time = $2
+          AND a.appt_time < ($2::time + INTERVAL '30 minutes')
+          AND (a.appt_time + INTERVAL '30 minutes') > $2::time
           AND a.vet_id = $3
-          AND COALESCE(TRIM(a.appt_status), '') NOT LIKE '%ยกเลิก%'
+          AND COALESCE(TRIM(a.appt_status), '') IN ('รอ', 'ยืนยัน')
           AND ($4::varchar IS NULL OR a.appt_id <> $4)
         ORDER BY a.appt_id ASC
         LIMIT 1
@@ -109,10 +133,11 @@ const getAppointmentNotificationData = async (appointmentId) => {
         `
         SELECT
             a.appt_id,
-            a.appt_date,
+            a.appt_date::text AS appt_date,
             a.appt_time,
             a.appt_reason,
             a.appt_status,
+            a.request_source,
             a.cancel_reason,
             a.vet_id,
             v.vet_name,
@@ -190,7 +215,7 @@ router.get('/vet-schedules', auth, async (req, res) => {
                 s.vet_id,
                 v.vet_name,
                 v.license_no,
-                s.work_date,
+                s.work_date::text AS work_date,
                 s.start_time,
                 s.end_time,
                 s.schedule_note
@@ -273,7 +298,7 @@ router.delete('/vet-schedules/:id', auth, async (req, res) => {
              AND a.appt_date = s.work_date
              AND a.appt_time >= s.start_time
              AND a.appt_time < s.end_time
-             AND COALESCE(TRIM(a.appt_status), '') NOT LIKE '%ยกเลิก%'
+             AND COALESCE(TRIM(a.appt_status), '') IN ('รอ', 'ยืนยัน')
             WHERE s.schedule_id = $1
             LIMIT 1
             `,
@@ -324,10 +349,11 @@ router.get('/', auth, async (req, res) => {
         const appointments = await pool.query(`
             SELECT
                 a.appt_id,
-                a.appt_date,
+                a.appt_date::text AS appt_date,
                 a.appt_time,
                 a.appt_reason,
                 a.appt_status,
+                a.request_source,
                 a.cancel_reason,
                 a.pet_id,
                 a.vet_id,
@@ -425,11 +451,12 @@ router.post('/', auth, async (req, res) => {
 
         res.status(201).json({
             message: '\u0e2a\u0e23\u0e49\u0e32\u0e07\u0e01\u0e32\u0e23\u0e19\u0e31\u0e14\u0e2b\u0e21\u0e32\u0e22\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08',
-            appointment: newAppointment.rows[0],
+            appointment: { ...newAppointment.rows[0], appt_date: normalizedDate },
             email_notification: emailNotification
         });
     } catch (err) {
         console.error('Error Add Appointment:', err);
+        if (err.code === '23505') return res.status(409).json({ message: 'ช่วงเวลานี้เพิ่งถูกจอง กรุณาเลือกเวลาใหม่' });
         if (err.code === '23503') {
             return res.status(400).json({
                 message: '\u0e44\u0e21\u0e48\u0e1e\u0e1a pet_id \u0e2b\u0e23\u0e37\u0e2d\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e2d\u0e49\u0e32\u0e07\u0e2d\u0e34\u0e07\u0e17\u0e35\u0e48\u0e40\u0e01\u0e35\u0e48\u0e22\u0e27\u0e02\u0e49\u0e2d\u0e07'
@@ -438,6 +465,178 @@ router.post('/', auth, async (req, res) => {
         res.status(500).json({
             message: '\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e01\u0e32\u0e23\u0e19\u0e31\u0e14\u0e2b\u0e21\u0e32\u0e22\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
         });
+    }
+});
+
+router.get('/available-slots', auth, async (req, res) => {
+    try {
+        if (req.user.role === 'admin') return res.status(403).json({ message: 'สำหรับเจ้าของสัตว์เลี้ยงเท่านั้น' });
+        const date = normalizeAppointmentDate(req.query.date);
+        const vetId = String(req.query.vet_id || '').trim();
+        if (!date) return res.status(400).json({ message: 'กรุณาเลือกวันที่ให้ถูกต้อง' });
+
+        const [schedules, appointments] = await Promise.all([
+            pool.query(
+                `SELECT s.vet_id, v.vet_name, s.start_time::text AS start_time, s.end_time::text AS end_time
+                 FROM tb_vet_schedule s JOIN tb_veterinarian v ON v.vet_id = s.vet_id
+                 WHERE s.work_date = $1 AND ($2::text = '' OR s.vet_id = $2)
+                 ORDER BY v.vet_name, s.start_time`,
+                [date, vetId]
+            ),
+            pool.query(
+                `SELECT vet_id, appt_time::text AS appt_time FROM tb_appointment
+                 WHERE appt_date = $1 AND ($2::text = '' OR vet_id = $2)
+                   AND appt_status IN ('รอ', 'ยืนยัน')`,
+                [date, vetId]
+            )
+        ]);
+        const busyByVet = new Map();
+        for (const appointment of appointments.rows) {
+            if (!busyByVet.has(appointment.vet_id)) busyByVet.set(appointment.vet_id, []);
+            busyByVet.get(appointment.vet_id).push(Number(appointment.appt_time.slice(0, 2)) * 60 + Number(appointment.appt_time.slice(3, 5)));
+        }
+        const slots = new Map();
+        for (const schedule of schedules.rows) {
+            let minute = Number(schedule.start_time.slice(0, 2)) * 60 + Number(schedule.start_time.slice(3, 5));
+            minute = Math.ceil(minute / 30) * 30;
+            const end = Number(schedule.end_time.slice(0, 2)) * 60 + Number(schedule.end_time.slice(3, 5));
+            while (minute + 30 <= end) {
+                const time = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+                if (!isAppointmentInPast(date, time)) {
+                    const busy = (busyByVet.get(schedule.vet_id) || []).some((start) => minute < start + 30 && start < minute + 30);
+                    if (!busy) {
+                        if (!slots.has(time)) slots.set(time, []);
+                        if (!slots.get(time).some((vet) => vet.vet_id === schedule.vet_id)) {
+                            slots.get(time).push({ vet_id: schedule.vet_id, vet_name: schedule.vet_name });
+                        }
+                    }
+                }
+                minute += 30;
+            }
+        }
+        res.json({ date, slots: [...slots].sort(([a], [b]) => a.localeCompare(b)).map(([time, vets]) => ({ time, vets })) });
+    } catch (err) {
+        console.error('Get Available Appointment Slots Error:', err);
+        res.status(500).json({ message: 'โหลดเวลานัดที่ว่างไม่สำเร็จ' });
+    }
+});
+
+router.post('/request', auth, async (req, res) => {
+    if (req.user.role === 'admin') return res.status(403).json({ message: 'สำหรับเจ้าของสัตว์เลี้ยงเท่านั้น' });
+    const { pet_id, appt_date, appt_time, appt_reason } = req.body;
+    const date = normalizeAppointmentDate(appt_date);
+    const time = normalizeAppointmentTime(appt_time);
+    const preferredVetId = String(req.body.vet_id || '').trim();
+    const reason = String(appt_reason || '').trim();
+    if (!pet_id || !date || !time || !reason || reason.length > 500) {
+        return res.status(400).json({ message: 'กรุณาเลือกสัตว์เลี้ยง กรอกวัน เวลา และเหตุผลนัดหมายให้ถูกต้อง' });
+    }
+    if (isAppointmentInPast(date, time)) return res.status(400).json({ message: 'ไม่สามารถขอนัดหมายย้อนหลังได้' });
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const pet = await client.query(
+            `SELECT p.pet_id FROM tb_pet p JOIN tb_owner o ON o.owner_id = p.owner_id
+             WHERE p.pet_id = $1 AND o.user_id = $2 LIMIT 1`,
+            [pet_id, req.user.user_id]
+        );
+        if (!pet.rowCount) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ message: 'เลือกนัดหมายได้เฉพาะสัตว์เลี้ยงของคุณ' });
+        }
+        if (preferredVetId) {
+            const vet = await client.query('SELECT vet_id FROM tb_veterinarian WHERE vet_id = $1 LIMIT 1', [preferredVetId]);
+            if (!vet.rowCount) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'ไม่พบสัตวแพทย์ที่เลือก กรุณาเลือกใหม่' });
+            }
+        }
+        const apptId = createAppointmentId();
+        const result = await client.query(
+            `INSERT INTO tb_appointment
+             (appt_id, pet_id, vet_id, appt_date, appt_time, appt_reason, appt_status, request_source, create_datetime)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'owner', NOW())
+             RETURNING appt_id, appt_date::text AS appt_date, appt_time, appt_status, request_source, vet_id`,
+            [apptId, pet_id, preferredVetId || null, date, time, reason, APPT_STATUS_CLINIC_PENDING]
+        );
+        await client.query('COMMIT');
+        res.status(201).json({ message: 'ส่งคำขอนัดหมายแล้ว รอคลินิกยืนยัน', appointment: result.rows[0] });
+    } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('Create Owner Appointment Request Error:', err);
+        res.status(err.code === '23505' ? 409 : 500).json({ message: err.code === '23505' ? 'มีคำขอเวลาเดียวกันอยู่แล้ว กรุณาลองอีกครั้งหลังอัปเดตฐานข้อมูล' : 'ส่งคำขอนัดหมายไม่สำเร็จ' });
+    } finally {
+        client.release();
+    }
+});
+
+router.patch('/requests/:id/review', auth, async (req, res) => {
+    if (!ensureAdmin(req, res)) return;
+    const action = String(req.body.action || '').trim();
+    const reason = String(req.body.reason || '').trim();
+    if (!['approve', 'reject'].includes(action) || (action === 'reject' && (!reason || reason.length > 500))) {
+        return res.status(400).json({ message: 'กรุณาเลือกอนุมัติหรือระบุเหตุผลที่ไม่รับนัด' });
+    }
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const current = await client.query(
+            `SELECT appt_id, appt_date::text AS appt_date, appt_time::text AS appt_time, vet_id
+             FROM tb_appointment WHERE appt_id = $1 AND request_source = 'owner' AND appt_status = $2 FOR UPDATE`,
+            [req.params.id, APPT_STATUS_CLINIC_PENDING]
+        );
+        if (!current.rowCount) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'คำขอนี้ถูกจัดการไปแล้วหรือไม่พบรายการ' });
+        }
+        const appointment = current.rows[0];
+        let confirmedVetId = appointment.vet_id;
+        if (action === 'approve') {
+            if (isAppointmentInPast(appointment.appt_date, appointment.appt_time)) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ message: 'เวลาที่ขอนัดผ่านไปแล้ว กรุณาไม่รับคำขอและแจ้งเจ้าของให้นัดใหม่' });
+            }
+            await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`appointment:${appointment.appt_date}`]);
+            const shifts = await client.query(
+                `SELECT DISTINCT vet_id FROM tb_vet_schedule
+                 WHERE work_date = $1 AND start_time <= $2::time
+                   AND end_time >= ($2::time + INTERVAL '30 minutes')
+                   AND ($3::text = '' OR vet_id = $3)
+                 ORDER BY vet_id`,
+                [appointment.appt_date, appointment.appt_time, confirmedVetId || '']
+            );
+            confirmedVetId = null;
+            for (const shift of shifts.rows) {
+                const conflict = await findConflictingAppointment({
+                    apptDate: appointment.appt_date,
+                    apptTime: appointment.appt_time,
+                    vetId: shift.vet_id,
+                    excludeId: appointment.appt_id,
+                    db: client
+                });
+                if (!conflict) { confirmedVetId = shift.vet_id; break; }
+            }
+            if (!confirmedVetId) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ message: 'เวลานี้ไม่มีสัตวแพทย์ที่เลือกว่างหรืออยู่นอกตารางเวร กรุณาไม่รับคำขอและแจ้งเวลาใหม่' });
+            }
+        }
+        await client.query(
+            `UPDATE tb_appointment SET vet_id = $1, appt_status = $2, cancel_reason = $3, update_datetime = NOW()
+             WHERE appt_id = $4`,
+            [confirmedVetId, action === 'approve' ? APPT_STATUS_CONFIRMED : APPT_STATUS_CANCELED, action === 'reject' ? reason : null, req.params.id]
+        );
+        await client.query('COMMIT');
+        const notificationAppointment = await getAppointmentNotificationData(req.params.id);
+        const emailNotification = queueAppointmentNotification({ type: action === 'reject' ? 'canceled' : 'updated', appointment: notificationAppointment });
+        res.json({ message: action === 'approve' ? 'ยืนยันคำขอนัดหมายแล้ว' : 'ไม่รับคำขอนัดหมายแล้ว', email_notification: emailNotification });
+    } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('Review Owner Appointment Request Error:', err);
+        res.status(500).json({ message: 'จัดการคำขอนัดหมายไม่สำเร็จ' });
+    } finally {
+        client.release();
     }
 });
 
@@ -472,24 +671,29 @@ router.patch('/:id/respond', auth, async (req, res) => {
         if (appointment.rows.length === 0) {
             return res.status(404).json({ message: 'ไม่พบนัดหมายหรือไม่มีสิทธิ์ตอบรับรายการนี้' });
         }
-        if (normalizeStatus(appointment.rows[0].appt_status, APPT_STATUS_PENDING) !== APPT_STATUS_PENDING) {
+        const currentStatus = normalizeStatus(appointment.rows[0].appt_status, APPT_STATUS_PENDING);
+        if (![APPT_STATUS_PENDING, APPT_STATUS_CLINIC_PENDING].includes(currentStatus)) {
             return res.status(409).json({ message: 'นัดหมายนี้ได้รับการตอบกลับแล้ว' });
+        }
+        if (currentStatus === APPT_STATUS_CLINIC_PENDING && action === 'accept') {
+            return res.status(409).json({ message: 'คำขอนี้กำลังรอคลินิกยืนยัน คุณสามารถยกเลิกได้' });
         }
         if (action === 'accept' && isAppointmentInPast(appointment.rows[0].appt_date, appointment.rows[0].appt_time)) {
             return res.status(409).json({ message: 'ไม่สามารถยืนยันนัดหมายที่ผ่านเวลาแล้วได้' });
         }
 
         const nextStatus = action === 'accept' ? APPT_STATUS_CONFIRMED : APPT_STATUS_CANCELED;
-        await pool.query(
+        const updateResult = await pool.query(
             `
             UPDATE tb_appointment
             SET appt_status = $1,
                 cancel_reason = $2,
                 update_datetime = NOW()
-            WHERE appt_id = $3
+            WHERE appt_id = $3 AND appt_status = $4
             `,
-            [nextStatus, action === 'cancel' ? responseNote : null, req.params.id]
+            [nextStatus, action === 'cancel' ? responseNote : null, req.params.id, currentStatus]
         );
+        if (!updateResult.rowCount) return res.status(409).json({ message: 'สถานะนัดหมายเปลี่ยนไปแล้ว กรุณาโหลดรายการใหม่' });
 
         const appointmentForMail = await getAppointmentNotificationData(req.params.id);
         const emailNotification = queueAppointmentNotification({
@@ -515,6 +719,10 @@ router.put('/:id', auth, async (req, res) => {
         const { vet_id, appt_date, appt_time, appt_reason, appt_status, cancel_reason, reschedule } = req.body;
         const normalizedDate = normalizeAppointmentDate(appt_date);
         const normalizedTime = normalizeAppointmentTime(appt_time);
+        const requestedStatus = String(appt_status || '').trim();
+        if (!APPT_STATUSES.has(requestedStatus) || requestedStatus === APPT_STATUS_CLINIC_PENDING) {
+            return res.status(400).json({ message: 'สถานะนัดหมายไม่ถูกต้อง' });
+        }
         const normalizedStatus = normalizeStatus(appt_status, APPT_STATUS_CONFIRMED);
         const wantsReschedule = reschedule === true;
 
@@ -552,13 +760,16 @@ router.put('/:id', auth, async (req, res) => {
             : requestedTimeValue;
         const slotChanged = currentDate !== normalizedDate || currentTime !== requestedTime || currentAppointment.rows[0].vet_id !== vet_id;
         const currentStatus = normalizeStatus(currentAppointment.rows[0].appt_status, APPT_STATUS_PENDING);
+        if (currentStatus === APPT_STATUS_CLINIC_PENDING) {
+            return res.status(409).json({ message: 'กรุณาอนุมัติหรือไม่รับคำขอจากเจ้าของก่อนแก้ไขนัดหมาย' });
+        }
         const nextStatus = wantsReschedule
             ? APPT_STATUS_PENDING
-            : normalizedStatus === APPT_STATUS_CANCELED
-            ? APPT_STATUS_CANCELED
+            : normalizedStatus === APPT_STATUS_CANCELED || isClosedStatus(normalizedStatus)
+                ? normalizedStatus
             : slotChanged
                 ? APPT_STATUS_PENDING
-                : currentStatus;
+                : normalizedStatus;
 
         if (wantsReschedule && currentStatus !== APPT_STATUS_CANCELED) {
             return res.status(409).json({
@@ -573,7 +784,7 @@ router.put('/:id', auth, async (req, res) => {
         }
 
         if (
-            normalizedStatus !== APPT_STATUS_CANCELED &&
+            isActiveStatus(nextStatus) &&
             slotChanged &&
             isAppointmentInPast(normalizedDate, normalizedTime)
         ) {
@@ -582,7 +793,13 @@ router.put('/:id', auth, async (req, res) => {
             });
         }
 
-        if (normalizedStatus !== APPT_STATUS_CANCELED) {
+        if (isClosedStatus(nextStatus) && !isAppointmentInPast(normalizedDate, normalizedTime)) {
+            return res.status(409).json({
+                message: 'เปลี่ยนเป็นเสร็จสิ้นหรือไม่มาตามนัดได้หลังผ่านเวลานัดแล้วเท่านั้น'
+            });
+        }
+
+        if (isActiveStatus(nextStatus)) {
             const withinSchedule = await isWithinVetSchedule({
                 vetId: vet_id,
                 apptDate: normalizedDate,
@@ -661,6 +878,7 @@ router.put('/:id', auth, async (req, res) => {
         });
     } catch (err) {
         console.error('Error Update Appointment:', err);
+        if (err.code === '23505') return res.status(409).json({ message: 'ช่วงเวลานี้เพิ่งถูกจอง กรุณาเลือกเวลาใหม่' });
         res.status(500).json({
             message: '\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
         });
@@ -679,12 +897,26 @@ router.put('/:id/status', auth, async (req, res) => {
             });
         }
 
+        const requestedStatus = String(appt_status || '').trim();
+        if (!APPT_STATUSES.has(requestedStatus) || requestedStatus === APPT_STATUS_CLINIC_PENDING) {
+            return res.status(400).json({ message: 'สถานะนัดหมายไม่ถูกต้อง' });
+        }
+        const pendingOwnerRequest = await pool.query(
+            'SELECT 1 FROM tb_appointment WHERE appt_id = $1 AND appt_status = $2 LIMIT 1',
+            [id, APPT_STATUS_CLINIC_PENDING]
+        );
+        if (pendingOwnerRequest.rowCount) {
+            return res.status(409).json({ message: 'กรุณาจัดการคำขอนัดหมายผ่านปุ่มอนุมัติหรือไม่รับคำขอ' });
+        }
         const normalizedStatus = normalizeStatus(appt_status, APPT_STATUS_CONFIRMED);
 
-        if (normalizedStatus !== APPT_STATUS_CANCELED) {
+        if (isActiveStatus(normalizedStatus) || isClosedStatus(normalizedStatus)) {
             const currentAppointment = await pool.query(
                 `
-                SELECT appt_date, appt_time, vet_id, appt_status
+                SELECT appt_date::text AS appt_date,
+                       appt_time::text AS appt_time,
+                       vet_id,
+                       appt_status
                 FROM tb_appointment
                 WHERE appt_id = $1
                 LIMIT 1
@@ -706,18 +938,35 @@ router.put('/:id/status', auth, async (req, res) => {
                     message: 'นัดหมายนี้ต้องให้เจ้าของสัตว์เลี้ยงเป็นผู้ยืนยัน'
                 });
             }
+            if (normalizeStatus(currentAppointment.rows[0].appt_status) === APPT_STATUS_CLINIC_PENDING) {
+                return res.status(409).json({ message: 'กรุณาจัดการคำขอนัดหมายผ่านปุ่มอนุมัติหรือไม่รับคำขอ' });
+            }
 
-            const conflictingAppointment = await findConflictingAppointment({
-                apptDate: currentAppointment.rows[0].appt_date,
-                apptTime: currentAppointment.rows[0].appt_time,
-                vetId: currentAppointment.rows[0].vet_id,
-                excludeId: id
-            });
-
-            if (conflictingAppointment) {
+            if (
+                isClosedStatus(normalizedStatus) &&
+                !isAppointmentInPast(
+                    String(currentAppointment.rows[0].appt_date).slice(0, 10),
+                    currentAppointment.rows[0].appt_time
+                )
+            ) {
                 return res.status(409).json({
-                    message: `ช่วงเวลานี้มีนัดหมายอยู่แล้ว (${conflictingAppointment.pet_name || '-'} / ${conflictingAppointment.owner_name || '-'})`
+                    message: 'เปลี่ยนเป็นเสร็จสิ้นหรือไม่มาตามนัดได้หลังผ่านเวลานัดแล้วเท่านั้น'
                 });
+            }
+
+            if (isActiveStatus(normalizedStatus)) {
+                const conflictingAppointment = await findConflictingAppointment({
+                    apptDate: currentAppointment.rows[0].appt_date,
+                    apptTime: currentAppointment.rows[0].appt_time,
+                    vetId: currentAppointment.rows[0].vet_id,
+                    excludeId: id
+                });
+
+                if (conflictingAppointment) {
+                    return res.status(409).json({
+                        message: `ช่วงเวลานี้มีนัดหมายอยู่แล้ว (${conflictingAppointment.pet_name || '-'} / ${conflictingAppointment.owner_name || '-'})`
+                    });
+                }
             }
         }
 
@@ -793,10 +1042,11 @@ router.get('/my-appointments/:user_id', auth, async (req, res) => {
             `
             SELECT
                 a.appt_id,
-                a.appt_date,
+                a.appt_date::text AS appt_date,
                 a.appt_time,
                 a.appt_reason,
                 a.appt_status,
+                a.request_source,
                 a.cancel_reason,
                 a.vet_id,
                 v.vet_name,

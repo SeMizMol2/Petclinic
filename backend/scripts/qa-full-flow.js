@@ -27,7 +27,9 @@ const qa = {
   serviceId: null,
   scheduleIds: [],
   appointmentId: null,
+  ownerRequestIds: [],
   treatmentId: null,
+  deletableTreatmentId: null,
   receiptId: null,
   surgeryId: null,
   vaccineId: null,
@@ -102,9 +104,16 @@ const cleanup = async () => {
       await client.query('DELETE FROM tb_treatment_detail WHERE treatment_id = $1', [qa.treatmentId]);
       await client.query('DELETE FROM tb_treatment WHERE treatment_id = $1', [qa.treatmentId]);
     }
+    if (qa.deletableTreatmentId) {
+      await client.query('DELETE FROM tb_treatment_detail WHERE treatment_id = $1', [qa.deletableTreatmentId]);
+      await client.query('DELETE FROM tb_treatment WHERE treatment_id = $1', [qa.deletableTreatmentId]);
+    }
     if (qa.vaccineId) await client.query('DELETE FROM tb_vaccine_rec WHERE vac_rec_id = $1', [qa.vaccineId]);
     if (qa.surgeryId) await client.query('DELETE FROM tb_surgery WHERE surg_id = $1', [qa.surgeryId]);
     if (qa.appointmentId) await client.query('DELETE FROM tb_appointment WHERE appt_id = $1', [qa.appointmentId]);
+    for (const appointmentId of qa.ownerRequestIds) {
+      await client.query('DELETE FROM tb_appointment WHERE appt_id = $1', [appointmentId]);
+    }
     for (const scheduleId of qa.scheduleIds) {
       await client.query('DELETE FROM tb_vet_schedule WHERE schedule_id = $1', [scheduleId]);
     }
@@ -133,7 +142,7 @@ const createSchedule = async (adminToken, vetId, dayOffset) => {
         vet_id: vetId,
         work_date: workDate,
         start_time: '13:00',
-        end_time: '14:00',
+        end_time: '15:00',
         schedule_note: `QA ${runId}`
       }
     });
@@ -160,7 +169,7 @@ const main = async () => {
     `SELECT table_name, column_name
      FROM information_schema.columns
      WHERE table_schema = 'public'
-       AND table_name IN ('tb_receipt_detail', 'tb_service', 'tb_vet_schedule')`
+       AND table_name IN ('tb_receipt_detail', 'tb_service', 'tb_vet_schedule', 'tb_appointment')`
   );
   const schema = new Set(requiredColumns.rows.map((row) => `${row.table_name}.${row.column_name}`));
   for (const column of [
@@ -169,7 +178,8 @@ const main = async () => {
     'tb_service.service_image',
     'tb_service.applicable_pet_type',
     'tb_service.applicable_pet_gender',
-    'tb_vet_schedule.schedule_id'
+    'tb_vet_schedule.schedule_id',
+    'tb_appointment.request_source'
   ]) {
     assert.ok(schema.has(column), `missing database column ${column}`);
   }
@@ -326,6 +336,13 @@ const main = async () => {
   const vetId = vets[0].vet_id;
 
   const firstSlot = await createSchedule(adminToken, vetId, 15);
+  const scheduleResponse = await expectStatus(
+    'load schedule date without timezone shift',
+    200,
+    request('GET', `/appointments/vet-schedules?from=${firstSlot.workDate}&to=${firstSlot.workDate}`, { token: adminToken })
+  );
+  const savedSchedule = scheduleResponse.find((item) => qa.scheduleIds.includes(item.schedule_id));
+  assert.equal(savedSchedule?.work_date, firstSlot.workDate, 'schedule date must match the date entered by staff');
   const appointment = await expectStatus(
     'admin creates pending appointment',
     201,
@@ -341,6 +358,94 @@ const main = async () => {
     })
   );
   qa.appointmentId = appointment.appointment.appt_id;
+  assert.equal(appointment.appointment.appt_date, firstSlot.workDate, 'created appointment date must match the date entered by staff');
+
+  const adminAppointments = await expectStatus(
+    'admin appointment list preserves the selected date',
+    200,
+    request('GET', '/appointments', { token: adminToken })
+  );
+  assert.equal(adminAppointments.find((item) => item.appt_id === qa.appointmentId)?.appt_date, firstSlot.workDate);
+
+  const ownerAppointments = await expectStatus(
+    'owner appointment list preserves the selected date',
+    200,
+    request('GET', `/appointments/my-appointments/${qa.userId}`, { token: userToken })
+  );
+  assert.equal(ownerAppointments.data.find((item) => item.appt_id === qa.appointmentId)?.appt_date, firstSlot.workDate);
+
+  const availableSlots = await expectStatus(
+    'owner sees only available appointment slots',
+    200,
+    request('GET', `/appointments/available-slots?date=${firstSlot.workDate}`, { token: userToken })
+  );
+  assert.ok(availableSlots.slots.some((slot) => slot.time === '13:00'));
+  assert.ok(!availableSlots.slots.some((slot) => slot.time === firstSlot.time));
+
+  await expectStatus('owner cannot request another owner pet', 403, request('POST', '/appointments/request', {
+    token: userToken,
+    body: { pet_id: 'PET_NOT_OWNED', appt_date: firstSlot.workDate, appt_time: '13:00', appt_reason: 'ทดสอบสิทธิ์' }
+  }));
+
+  const ownerRequest = await expectStatus(
+    'owner requests appointment at an exact-minute time',
+    201,
+    request('POST', '/appointments/request', {
+      token: userToken,
+      body: { pet_id: qa.petId, appt_date: firstSlot.workDate, appt_time: '14:13', appt_reason: 'ตรวจอาการ QA' }
+    })
+  );
+  qa.ownerRequestIds.push(ownerRequest.appointment.appt_id);
+  assert.equal(ownerRequest.appointment.appt_status, 'รอคลินิกยืนยัน');
+  assert.equal(ownerRequest.appointment.appt_date, firstSlot.workDate);
+  assert.equal(ownerRequest.appointment.request_source, 'owner');
+  assert.equal(ownerRequest.appointment.vet_id, null);
+
+  const slotsWhilePending = await expectStatus('pending request does not occupy slots', 200, request(
+    'GET', `/appointments/available-slots?date=${firstSlot.workDate}`, { token: userToken }
+  ));
+  assert.ok(slotsWhilePending.slots.some((slot) => slot.time === '14:00'));
+
+  const [reportYear, reportMonth] = firstSlot.workDate.split('-');
+  const pendingReport = await expectStatus(
+    'report does not count clinic-pending request as confirmed',
+    200,
+    request('GET', `/reports?month=${Number(reportMonth)}&year=${reportYear}`, { token: adminToken })
+  );
+  assert.equal(
+    pendingReport.appointmentReport.items.find((item) => item.appt_id === ownerRequest.appointment.appt_id)?.appt_status,
+    'รอคลินิกยืนยัน'
+  );
+  assert.equal(
+    pendingReport.appointmentReport.confirmedAppointments,
+    pendingReport.appointmentReport.items.filter((item) => item.appt_status === 'ยืนยัน').length
+  );
+
+  const competingRequest = await expectStatus('another pending request can propose the same time', 201, request('POST', '/appointments/request', {
+    token: userToken,
+    body: { pet_id: qa.petId, vet_id: vetId, appt_date: firstSlot.workDate, appt_time: '14:13', appt_reason: 'ตรวจซ้ำ QA' }
+  }));
+  qa.ownerRequestIds.push(competingRequest.appointment.appt_id);
+  await expectStatus('owner cannot approve own request', 409, request('PATCH', `/appointments/${ownerRequest.appointment.appt_id}/respond`, {
+    token: userToken, body: { action: 'accept' }
+  }));
+  await expectStatus('owner cannot approve request as clinic', 403, request('PATCH', `/appointments/requests/${ownerRequest.appointment.appt_id}/review`, {
+    token: userToken, body: { action: 'approve' }
+  }));
+  await expectStatus('clinic cannot bypass request review with generic status change', 409, request('PUT', `/appointments/${ownerRequest.appointment.appt_id}/status`, {
+    token: adminToken, body: { appt_status: 'ยืนยัน' }
+  }));
+  await expectStatus('clinic approves owner appointment request', 200, request('PATCH', `/appointments/requests/${ownerRequest.appointment.appt_id}/review`, {
+    token: adminToken, body: { action: 'approve' }
+  }));
+  await expectStatus('clinic cannot approve overlapping request', 409, request('PATCH', `/appointments/requests/${competingRequest.appointment.appt_id}/review`, {
+    token: adminToken, body: { action: 'approve' }
+  }));
+  await expectStatus('clinic can reject overlapping request', 200, request('PATCH', `/appointments/requests/${competingRequest.appointment.appt_id}/review`, {
+    token: adminToken, body: { action: 'reject', reason: 'เวลานี้ไม่ว่างแล้ว' }
+  }));
+  const approvedList = await expectStatus('owner sees approved request', 200, request('GET', `/appointments/my-appointments/${qa.userId}`, { token: userToken }));
+  assert.equal(approvedList.data.find((item) => item.appt_id === ownerRequest.appointment.appt_id)?.appt_status, 'ยืนยัน');
 
   await expectStatus(
     'user cancels appointment with reason',
@@ -352,6 +457,24 @@ const main = async () => {
   );
 
   const secondSlot = await createSchedule(adminToken, vetId, 40);
+  const rejectedRequest = await expectStatus('owner sends another request', 201, request('POST', '/appointments/request', {
+    token: userToken,
+    body: { pet_id: qa.petId, appt_date: secondSlot.workDate, appt_time: '13:00', appt_reason: 'ติดตามอาการ QA' }
+  }));
+  qa.ownerRequestIds.push(rejectedRequest.appointment.appt_id);
+  await expectStatus('clinic rejects request with reason', 200, request('PATCH', `/appointments/requests/${rejectedRequest.appointment.appt_id}/review`, {
+    token: adminToken, body: { action: 'reject', reason: 'วันนั้นรับนัดเพิ่มไม่ได้' }
+  }));
+  const rejectedList = await expectStatus('owner sees rejection reason', 200, request('GET', `/appointments/my-appointments/${qa.userId}`, { token: userToken }));
+  assert.equal(rejectedList.data.find((item) => item.appt_id === rejectedRequest.appointment.appt_id)?.cancel_reason, 'วันนั้นรับนัดเพิ่มไม่ได้');
+  const canceledRequest = await expectStatus('owner reuses released slot', 201, request('POST', '/appointments/request', {
+    token: userToken,
+    body: { pet_id: qa.petId, appt_date: secondSlot.workDate, appt_time: '13:00', appt_reason: 'ขอนัดใหม่ QA' }
+  }));
+  qa.ownerRequestIds.push(canceledRequest.appointment.appt_id);
+  await expectStatus('owner cancels pending clinic request', 200, request('PATCH', `/appointments/${canceledRequest.appointment.appt_id}/respond`, {
+    token: userToken, body: { action: 'cancel', cancel_reason: 'เปลี่ยนใจ' }
+  }));
   await expectStatus(
     'admin reschedules canceled appointment to pending',
     200,
@@ -402,6 +525,29 @@ const main = async () => {
     })
   );
   qa.receiptId = receipt.data.receipt_id;
+
+  const protectedDelete = await expectStatus(
+    'treatment with receipt cannot be deleted and explains why',
+    409,
+    request('DELETE', `/treatments/${qa.treatmentId}`, { token: adminToken })
+  );
+  assert.match(protectedDelete.message, /มีใบเสร็จแล้ว/);
+
+  const deletableTreatment = await expectStatus(
+    'create treatment without receipt for deletion check',
+    201,
+    request('POST', '/treatments', {
+      token: adminToken,
+      body: { pet_id: qa.petId, vet_id: vetId, symptom: 'บันทึกทดสอบการลบ', diagnosis: 'ไม่มีใบเสร็จ', services: [] }
+    })
+  );
+  qa.deletableTreatmentId = deletableTreatment.treatment_id;
+  await expectStatus(
+    'treatment without receipt can be deleted',
+    200,
+    request('DELETE', `/treatments/${qa.deletableTreatmentId}`, { token: adminToken })
+  );
+  qa.deletableTreatmentId = null;
 
   let treatmentDetail = await expectStatus(
     'load treatment detail',
@@ -536,6 +682,43 @@ const main = async () => {
   await expectStatus('user receipt list', 200, request('GET', `/receipts/my-receipts/${qa.userId}`, { token: userToken }));
   await expectStatus('user own receipt detail', 200, request('GET', `/receipts/detail/${qa.receiptId}`, { token: userToken }));
   await expectStatus('user appointment list', 200, request('GET', `/appointments/my-appointments/${qa.userId}`, { token: userToken }));
+  await expectStatus(
+    'future appointment cannot be completed early',
+    409,
+    request('PUT', `/appointments/${qa.appointmentId}/status`, {
+      token: adminToken,
+      body: { appt_status: 'เสร็จสิ้น' }
+    })
+  );
+  await pool.query(
+    `UPDATE tb_appointment
+     SET appt_date = CURRENT_DATE - INTERVAL '1 day', appt_time = '09:00:00'
+     WHERE appt_id = $1`,
+    [qa.appointmentId]
+  );
+  await expectStatus(
+    'admin completes past appointment',
+    200,
+    request('PUT', `/appointments/${qa.appointmentId}`, {
+      token: adminToken,
+      body: {
+        vet_id: vetId,
+        appt_date: isoDateAfter(-1),
+        appt_time: '09:00',
+        appt_reason: 'ปิดงานนัดหมาย QA',
+        appt_status: 'เสร็จสิ้น'
+      }
+    })
+  );
+  const completedAppointments = await expectStatus(
+    'user sees completed appointment status',
+    200,
+    request('GET', `/appointments/my-appointments/${qa.userId}`, { token: userToken })
+  );
+  assert.equal(
+    completedAppointments.data.find((item) => item.appt_id === qa.appointmentId)?.appt_status,
+    'เสร็จสิ้น'
+  );
 
   await expectStatus(
     'expense rejects zero amount',

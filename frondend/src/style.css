@@ -3,26 +3,29 @@
   line-height: 1.5;
   font-weight: 400;
   color: #0f172a;
-  background-color: #f4f7fb;
+  background-color: #f3f6f8;
   color-scheme: light;
 
   --pc-primary: #0f766e;
-  --pc-primary-hover: #115e59;
-  --pc-primary-soft: #ecfdf5;
-  --pc-accent: #2563eb;
+  --pc-primary-hover: #0b5f59;
+  --pc-primary-soft: #e8f5f2;
+  --pc-accent: #1d4ed8;
+  --pc-navy: #102a3a;
+  --pc-navy-soft: #17394c;
   --pc-surface: #ffffff;
-  --pc-surface-alt: #f8fafc;
-  --pc-border: #d9e2ec;
-  --pc-border-soft: #e8eef5;
+  --pc-surface-alt: #f3f6f8;
+  --pc-border: #d8e2e8;
+  --pc-border-soft: #e7edf1;
+  --pc-border-strong: #c4d2db;
   --pc-text: #0f172a;
-  --pc-text-sub: #64748b;
+  --pc-text-sub: #526273;
   --pc-success: #16a34a;
   --pc-warning: #d97706;
   --pc-danger: #dc2626;
-  --pc-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
-  --pc-shadow-lg: 0 18px 44px rgba(15, 23, 42, 0.12);
-  --pc-radius: 18px;
-  --pc-radius-sm: 14px;
+  --pc-shadow: 0 2px 8px rgba(15, 42, 58, 0.055);
+  --pc-shadow-lg: 0 16px 36px rgba(15, 42, 58, 0.14);
+  --pc-radius: 14px;
+  --pc-radius-sm: 10px;
 }
 
 * {
@@ -61,7 +64,11 @@ textarea {
 button {
   cursor: pointer;
   border: none;
-  outline: none;
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(20, 184, 166, 0.28);
+  outline-offset: 2px;
 }
 
 .admin-page,
@@ -86,8 +93,8 @@ button {
 .pets-page .hero-section,
 .pets-page .state-section,
 .pets-page .pet-card {
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(217, 226, 236, 0.92);
+  background: var(--pc-surface);
+  border: 1px solid var(--pc-border);
   border-radius: var(--pc-radius);
   box-shadow: var(--pc-shadow);
 }
@@ -154,7 +161,7 @@ button {
 .pets-page select {
   min-height: 46px;
   padding: 0 14px;
-  border-radius: 14px;
+  border-radius: var(--pc-radius-sm);
   border: 1px solid var(--pc-border);
   background: #ffffff;
   color: var(--pc-text);
@@ -203,10 +210,10 @@ button {
 .pets-page .close-btn {
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 14px;
+  border-radius: var(--pc-radius-sm);
   font: inherit;
   font-weight: 700;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
 .admin-page .primary-btn,
@@ -214,9 +221,9 @@ button {
 .profile-page .action-btn,
 .pets-page .primary-link,
 .pets-page .primary-btn {
-  background: linear-gradient(135deg, var(--pc-primary) 0%, #14b8a6 100%);
+  background: var(--pc-primary);
   color: #ffffff;
-  box-shadow: 0 12px 24px rgba(15, 118, 110, 0.18);
+  box-shadow: none;
 }
 
 .admin-page .primary-btn:hover,
@@ -224,7 +231,7 @@ button {
 .profile-page .action-btn:hover,
 .pets-page .primary-link:hover,
 .pets-page .primary-btn:hover {
-  transform: translateY(-1px);
+  background: var(--pc-primary-hover);
 }
 
 .admin-page .ghost-btn,
@@ -271,8 +278,7 @@ button {
   color: var(--pc-text-sub);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .admin-page tbody tr:hover,
@@ -318,7 +324,7 @@ button {
   max-height: 90vh;
   overflow-y: auto;
   background: #ffffff;
-  border-radius: 20px;
+  border-radius: var(--pc-radius);
   border: 1px solid var(--pc-border);
   box-shadow: var(--pc-shadow-lg);
 }
@@ -371,9 +377,42 @@ button {
   gap: 20px;
 }
 
+.dashboard-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff7f7;
+  color: #991b1b;
+}
+
+.dashboard-alert p {
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+.dashboard-alert button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #dc2626;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #b91c1c;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dashboard-freshness {
+  justify-self: end;
+  color: var(--pc-text-sub);
+  font-size: 12px;
+}
+
 .dashboard-page .overview-grid,
-.dashboard-page .content-grid,
-.dashboard-page .summary-row {
+.dashboard-page .content-grid {
   display: grid;
   gap: 18px;
 }
@@ -386,23 +425,18 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.dashboard-page .summary-row {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
 .dashboard-page .overview-card,
 .dashboard-page .panel-card,
-.dashboard-page .summary-card,
 .dashboard-page .modal-card {
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(226, 232, 240, 0.96);
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.045);
+  border-radius: var(--pc-radius);
+  background: var(--pc-surface);
+  border: 1px solid var(--pc-border);
+  box-shadow: var(--pc-shadow);
 }
 
 .dashboard-page .overview-card,
 .dashboard-page .panel-card {
-  padding: 24px;
+  padding: 20px;
 }
 
 .dashboard-page .overview-card-main {
@@ -422,8 +456,7 @@ button {
   color: var(--pc-primary);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .dashboard-page .overview-card h1,
@@ -461,7 +494,7 @@ button {
   gap: 10px;
   min-width: 260px;
   padding: 12px;
-  border-radius: 16px;
+  border-radius: var(--pc-radius-sm);
   background: #f8fafc;
   border: 1px solid #e2e8f0;
 }
@@ -481,7 +514,7 @@ button {
 .dashboard-page .filter-field select {
   min-height: 42px;
   padding: 0 12px;
-  border-radius: 12px;
+  border-radius: 9px;
   border: 1px solid var(--pc-border);
   background: #ffffff;
   color: var(--pc-text);
@@ -498,15 +531,24 @@ button {
   gap: 14px;
   width: 100%;
   padding: 18px;
-  border-radius: 18px;
+  border-radius: 12px;
   border: 1px solid #e8eef5;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  background: #ffffff;
   text-align: left;
 }
 
 .dashboard-page .metric-card:hover {
-  border-color: #d6e3ee;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+  border-color: var(--pc-border-strong);
+  box-shadow: none;
+}
+
+.dashboard-page .metric-card:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.dashboard-page .metric-card:disabled:hover {
+  border-color: #e8eef5;
 }
 
 .dashboard-page .metric-top {
@@ -518,7 +560,7 @@ button {
 .dashboard-page .metric-code {
   width: 36px;
   height: 36px;
-  border-radius: 12px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -546,7 +588,6 @@ button {
 }
 
 .dashboard-page .metric-card strong,
-.dashboard-page .summary-card strong,
 .dashboard-page .net-profit {
   color: var(--pc-text);
   line-height: 1.1;
@@ -581,8 +622,7 @@ button {
   border-top: 1px solid #edf2f7;
 }
 
-.dashboard-page .mini-breakdown span,
-.dashboard-page .summary-card span {
+.dashboard-page .mini-breakdown span {
   display: block;
   margin-bottom: 6px;
   color: var(--pc-text-sub);
@@ -618,8 +658,8 @@ button {
 .dashboard-page .chart-frame {
   margin-top: 18px;
   min-height: 340px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #fcfdff 0%, #f8fbfe 100%);
+  border-radius: 12px;
+  background: #fbfcfd;
   border: 1px solid #edf2f7;
   overflow: hidden;
 }
@@ -645,12 +685,13 @@ button {
   font-size: 18px;
 }
 
-.dashboard-page .summary-card {
-  padding: 18px 20px;
+.dashboard-page .loading-state {
+  color: var(--pc-text-sub);
 }
 
-.dashboard-page .summary-card strong {
-  font-size: 22px;
+.dashboard-page .error-state {
+  color: #991b1b;
+  background: #fff7f7;
 }
 
 .dashboard-page .positive {
@@ -692,7 +733,7 @@ button {
 .dashboard-page .close-btn {
   min-height: 40px;
   padding: 0 14px;
-  border-radius: 12px;
+  border-radius: 9px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   color: #334155;
@@ -718,8 +759,7 @@ button {
   padding: 14px 18px;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0;
   border-bottom: 1px solid #e5edf5;
 }
 
@@ -742,7 +782,6 @@ button {
 @media (max-width: 1180px) {
   .dashboard-page .overview-grid,
   .dashboard-page .content-grid,
-  .dashboard-page .summary-row,
   .dashboard-page .metric-grid {
     grid-template-columns: 1fr;
   }
@@ -884,7 +923,6 @@ table {
   .admin-page .dual-grid,
   .dashboard-page .overview-grid,
   .dashboard-page .content-grid,
-  .dashboard-page .summary-row,
   .dashboard-page .metric-grid,
   .profile-page .profile-card,
   .profile-page .info-grid,
@@ -966,7 +1004,6 @@ table {
   .admin-page .summary-card,
   .dashboard-page .overview-card,
   .dashboard-page .panel-card,
-  .dashboard-page .summary-card,
   .profile-page .hero-section,
   .profile-page .profile-summary,
   .profile-page .profile-details,
@@ -1045,5 +1082,71 @@ table {
   .nav-solid-button,
   .primary-button {
     max-width: 100%;
+  }
+}
+
+/* Clinical Calm: shared component harmonization */
+:where(.admin-page, .dashboard-page, .profile-page, .pets-page, .user-page, .history-page, .add-pet-page)
+  :where(.hero-section, .page-header, .toolbar, .table-panel, .table-card, .panel-card, .profile-summary, .profile-details, .state-section, .pet-card, .receipt-card, .summary-card, .form-shell, .calendar-shell, .schedule-panel, .list-section) {
+  border-radius: var(--pc-radius) !important;
+  border-color: var(--pc-border) !important;
+  box-shadow: var(--pc-shadow) !important;
+}
+
+:where(.profile-page, .pets-page, .history-page, .add-pet-page, .user-page) .hero-section {
+  background: #ffffff !important;
+}
+
+:where(.profile-page, .pets-page, .history-page, .add-pet-page, .user-page) :where(.eyebrow, .section-kicker, .card-kicker) {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+:where(.admin-page, .profile-page, .pets-page, .user-page, .history-page, .add-pet-page)
+  :where(input, select, textarea) {
+  border-radius: var(--pc-radius-sm) !important;
+  border-color: var(--pc-border) !important;
+}
+
+:where(.admin-page, .profile-page, .pets-page, .user-page, .history-page, .add-pet-page)
+  :where(input, select, textarea):focus {
+  border-color: rgba(15, 118, 110, 0.58) !important;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.11) !important;
+}
+
+:where(.admin-page, .profile-page, .pets-page, .user-page, .history-page, .add-pet-page)
+  :where(.primary-btn, .action-btn, .accept-btn) {
+  border-radius: var(--pc-radius-sm) !important;
+  background: var(--pc-primary) !important;
+  box-shadow: none !important;
+}
+
+:where(.admin-page, .profile-page, .pets-page, .user-page, .history-page, .add-pet-page)
+  :where(.primary-btn, .action-btn, .accept-btn):hover {
+  background: var(--pc-primary-hover) !important;
+  transform: none !important;
+}
+
+:where(.admin-page, .dashboard-page, .history-page) table th {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+:where(.admin-page, .dashboard-page, .history-page) table tbody tr:hover {
+  background: #f6f9fa !important;
+}
+
+:where(.admin-page, .dashboard-page, .pets-page) :where(.modal, .modal-card, .role-modal) {
+  border-radius: var(--pc-radius) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

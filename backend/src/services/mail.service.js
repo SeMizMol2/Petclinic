@@ -57,7 +57,14 @@ const formatTime = (value) => {
     return String(value).slice(0, 5);
 };
 
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[character]));
+
 const getSubjectByType = (type, appointment) => {
+    if (type === 'updated' && appointment?.request_source === 'owner' && appointment?.appt_status === 'ยืนยัน') {
+        return 'คลินิกยืนยันคำขอนัดหมายแล้ว - โรงพยาบาลสัตว์เมืองเลย';
+    }
     if (type === 'created' && appointment?.appt_status === 'รอ') {
         return 'แจ้งนัดหมายใหม่ รอการตอบรับ - โรงพยาบาลสัตว์เมืองเลย';
     }
@@ -68,6 +75,9 @@ const getSubjectByType = (type, appointment) => {
 };
 
 const getHeadingByType = (type, appointment) => {
+    if (type === 'updated' && appointment?.request_source === 'owner' && appointment?.appt_status === 'ยืนยัน') {
+        return 'คลินิกยืนยันคำขอนัดหมายของคุณแล้ว';
+    }
     if (type === 'created' && appointment?.appt_status === 'รอ') {
         return 'คลินิกส่งนัดหมายใหม่ กรุณาตอบรับในระบบ';
     }
@@ -114,18 +124,18 @@ const buildAppointmentMessage = (type, appointment) => {
 
     const html = `
         <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
-            <h2 style="margin-bottom: 12px;">${heading}</h2>
-            <p>เรียน คุณ${appointment.owner_name || 'ลูกค้า'}</p>
+            <h2 style="margin-bottom: 12px;">${escapeHtml(heading)}</h2>
+            <p>เรียน คุณ${escapeHtml(appointment.owner_name || 'ลูกค้า')}</p>
             <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; background: #f9fafb;">
-                <p style="margin: 0 0 8px;"><strong>สัตว์เลี้ยง:</strong> ${appointment.pet_name || '-'}</p>
-                <p style="margin: 0 0 8px;"><strong>วันที่นัดหมาย:</strong> ${dateText}</p>
-                <p style="margin: 0 0 8px;"><strong>เวลา:</strong> ${timeText} น.</p>
-                <p style="margin: 0 0 8px;"><strong>สัตวแพทย์:</strong> ${appointment.vet_name || '-'}</p>
-                <p style="margin: 0;"><strong>${extraLabel}:</strong> ${extraValue}</p>
+                <p style="margin: 0 0 8px;"><strong>สัตว์เลี้ยง:</strong> ${escapeHtml(appointment.pet_name || '-')}</p>
+                <p style="margin: 0 0 8px;"><strong>วันที่นัดหมาย:</strong> ${escapeHtml(dateText)}</p>
+                <p style="margin: 0 0 8px;"><strong>เวลา:</strong> ${escapeHtml(timeText)} น.</p>
+                <p style="margin: 0 0 8px;"><strong>สัตวแพทย์:</strong> ${escapeHtml(appointment.vet_name || '-')}</p>
+                <p style="margin: 0;"><strong>${escapeHtml(extraLabel)}:</strong> ${escapeHtml(extraValue)}</p>
             </div>
-            <p style="margin-top: 16px;"><strong>คลินิก:</strong> ${clinicName}<br />
-            <strong>โทร:</strong> ${clinicTel}<br />
-            <strong>ที่อยู่:</strong> ${clinicAddress}</p>
+            <p style="margin-top: 16px;"><strong>คลินิก:</strong> ${escapeHtml(clinicName)}<br />
+            <strong>โทร:</strong> ${escapeHtml(clinicTel)}<br />
+            <strong>ที่อยู่:</strong> ${escapeHtml(clinicAddress)}</p>
         </div>
     `;
 

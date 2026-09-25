@@ -131,7 +131,7 @@ router.get('/pet-summary/:pet_id', auth, async (req, res) => {
     const [appointmentsResult, treatments, vaccinesResult, surgeriesResult, receiptsResult] = await Promise.all([
       pool.query(
         `
-        SELECT appt_id, appt_date, appt_time, appt_reason, appt_status, cancel_reason, create_datetime
+        SELECT appt_id, appt_date::text AS appt_date, appt_time, appt_reason, appt_status, cancel_reason, create_datetime
         FROM tb_appointment
         WHERE pet_id = $1
         ORDER BY appt_date DESC, appt_time DESC

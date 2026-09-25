@@ -25,7 +25,7 @@ router.get('/dashboard', auth, async (req, res) => {
 
         const appointments = await pool.query(
             `
-            SELECT a.appt_date, a.appt_time, a.appt_reason, a.appt_status, p.pet_name
+            SELECT a.appt_date::text AS appt_date, a.appt_time, a.appt_reason, a.appt_status, p.pet_name
             FROM tb_appointment a
             JOIN tb_pet p ON a.pet_id = p.pet_id
             WHERE p.owner_id = $1

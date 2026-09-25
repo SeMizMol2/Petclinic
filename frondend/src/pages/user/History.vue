@@ -1,6 +1,6 @@
 ﻿<template>
-  <div class="history-page">
-    <section class="hero-section">
+  <div class="history-page" :class="{ 'owner-history': !isAdminView }">
+    <section v-if="isAdminView" class="hero-section">
       <div>
         <p class="eyebrow">รายงานจากข้อมูลเดิมในระบบ</p>
         <h1>สรุปประวัติสัตว์เลี้ยงรายตัว</h1>
@@ -13,15 +13,27 @@
       <router-link :to="backTarget" class="back-link">{{ backLabel }}</router-link>
     </section>
 
+    <section v-else class="owner-intro">
+      <div>
+        <h1>แฟ้มสุขภาพ</h1>
+        <p v-if="summary.pet">ข้อมูลสุขภาพและประวัติการดูแลของ {{ summary.pet.pet_name }}</p>
+      </div>
+      <router-link :to="backTarget" class="back-link">{{ backLabel }}</router-link>
+    </section>
+
     <section v-if="loading" class="state-section">กำลังโหลดข้อมูล...</section>
-    <section v-else-if="!summary.pet" class="state-section">ไม่พบข้อมูลสัตว์เลี้ยง</section>
+    <section v-else-if="!summary.pet" class="state-section">
+      <h2>ไม่พบข้อมูลสัตว์เลี้ยง</h2>
+      <p v-if="!isAdminView">ลองกลับไปเลือกสัตว์เลี้ยงจากหน้ารายชื่ออีกครั้ง</p>
+      <router-link v-if="!isAdminView" :to="backTarget" class="back-link">{{ backLabel }}</router-link>
+    </section>
 
     <template v-else>
       <section class="summary-shell">
         <article class="profile-card">
           <div class="profile-top">
             <div class="pet-avatar">
-              <img v-if="summary.pet.pet_image" :src="resolveImageUrl(summary.pet.pet_image)" alt="pet photo" />
+              <img v-if="summary.pet.pet_image" :src="resolveImageUrl(summary.pet.pet_image)" :alt="`รูป ${summary.pet.pet_name}`" />
               <AppIcon v-else :name="getPetIcon(summary.pet.pet_type)" :size="34" />
             </div>
             <div>
@@ -33,7 +45,7 @@
           <div class="info-grid">
             <div class="info-item">
               <span>เพศ</span>
-              <strong>{{ summary.pet.pet_gender || '-' }}</strong>
+              <strong>{{ formatPetGender(summary.pet.pet_gender) }}</strong>
             </div>
             <div class="info-item">
               <span>อายุ</span>
@@ -51,10 +63,14 @@
               <span>วันเกิด</span>
               <strong>{{ formatBirthdate(summary.pet.pet_birthdate) }}</strong>
             </div>
-            <div class="info-item">
+            <div v-if="isAdminView" class="info-item">
               <span>แพ้ยา</span>
               <strong>{{ summary.pet.drug_allergy || 'ไม่มีข้อมูล' }}</strong>
             </div>
+          </div>
+          <div v-if="!isAdminView" class="allergy-notice" :class="{ 'has-allergy': summary.pet.drug_allergy }">
+            <strong>ข้อมูลแพ้ยา</strong>
+            <p>{{ summary.pet.drug_allergy || 'ไม่มีข้อมูลการแพ้ยา' }}</p>
           </div>
         </article>
 
@@ -87,35 +103,43 @@
       </section>
 
       <section class="metric-grid">
-        <article class="metric-card">
+        <article class="metric-card" :class="{ 'is-empty': !summary.overview.appointment_count }">
           <span>นัดหมาย</span>
           <strong>{{ summary.overview.appointment_count || 0 }}</strong>
           <small>{{ formatAppointmentSummary(summary.overview.latest_appointment) }}</small>
         </article>
-        <article class="metric-card">
+        <article class="metric-card" :class="{ 'is-empty': !summary.overview.treatment_count }">
           <span>การรักษา</span>
           <strong>{{ summary.overview.treatment_count || 0 }}</strong>
           <small>{{ formatTreatmentSummary(summary.overview.latest_treatment) }}</small>
         </article>
-        <article class="metric-card">
+        <article class="metric-card" :class="{ 'is-empty': !summary.overview.vaccine_count }">
           <span>วัคซีน</span>
           <strong>{{ summary.overview.vaccine_count || 0 }}</strong>
           <small>{{ formatVaccineSummary(summary.overview.latest_vaccine) }}</small>
         </article>
-        <article class="metric-card">
+        <article class="metric-card" :class="{ 'is-empty': !summary.overview.surgery_count }">
           <span>ผ่าตัด</span>
           <strong>{{ summary.overview.surgery_count || 0 }}</strong>
           <small>{{ formatSurgerySummary(summary.overview.latest_surgery) }}</small>
         </article>
-        <article class="metric-card">
+        <article class="metric-card" :class="{ 'is-empty': !summary.overview.receipt_count }">
           <span>ใบเสร็จ</span>
           <strong>{{ summary.overview.receipt_count || 0 }}</strong>
           <small>{{ formatReceiptSummary(summary.overview.latest_receipt) }}</small>
         </article>
       </section>
 
+      <nav v-if="!isAdminView" class="history-nav" aria-label="ข้ามไปยังหมวดประวัติ">
+        <a href="#history-treatments">การรักษา</a>
+        <a href="#history-appointments">นัดหมาย</a>
+        <a href="#history-vaccines">วัคซีน</a>
+        <a href="#history-surgeries">ผ่าตัด</a>
+        <a href="#history-receipts">ใบเสร็จ</a>
+      </nav>
+
       <section class="timeline-grid">
-        <article class="panel-card">
+        <article :id="!isAdminView ? 'history-appointments' : undefined" class="panel-card">
           <div class="panel-head">
             <h2><AppIcon name="calendar" :size="18" /> นัดหมาย</h2>
             <span>{{ summary.appointments.length }} รายการ</span>
@@ -128,12 +152,12 @@
                 <span>{{ formatTime(item.appt_time) }}</span>
               </div>
               <p>{{ item.appt_reason || 'ไม่ได้ระบุสาเหตุการนัดหมาย' }}</p>
-              <span class="tag">{{ item.appt_status || '-' }}</span>
+              <span class="tag" :class="!isAdminView ? appointmentTagClass(item.appt_status) : ''">{{ item.appt_status || '-' }}</span>
             </div>
           </div>
         </article>
 
-        <article class="panel-card">
+        <article :id="!isAdminView ? 'history-treatments' : undefined" class="panel-card treatment-panel">
           <div class="panel-head">
             <h2><AppIcon name="treatment" :size="18" /> การรักษา</h2>
             <span>{{ summary.treatments.length }} รายการ</span>
@@ -159,7 +183,7 @@
           </div>
         </article>
 
-        <article class="panel-card">
+        <article :id="!isAdminView ? 'history-vaccines' : undefined" class="panel-card">
           <div class="panel-head">
             <h2><AppIcon name="vaccine" :size="18" /> วัคซีน</h2>
             <span>{{ summary.vaccines.length }} รายการ</span>
@@ -178,7 +202,7 @@
           </div>
         </article>
 
-        <article class="panel-card">
+        <article :id="!isAdminView ? 'history-surgeries' : undefined" class="panel-card">
           <div class="panel-head">
             <h2><AppIcon name="surgery" :size="18" /> การผ่าตัด</h2>
             <span>{{ summary.surgeries.length }} รายการ</span>
@@ -197,7 +221,7 @@
           </div>
         </article>
 
-        <article class="panel-card full-width">
+        <article :id="!isAdminView ? 'history-receipts' : undefined" class="panel-card full-width">
           <div class="panel-head">
             <h2><AppIcon name="receipt" :size="18" /> ใบเสร็จ</h2>
             <span>{{ summary.receipts.length }} รายการ</span>
@@ -217,12 +241,12 @@
               </thead>
               <tbody>
                 <tr v-for="item in summary.receipts" :key="item.receipt_id">
-                  <td><strong>{{ item.receipt_id }}</strong></td>
-                  <td>{{ formatDateTime(item.issue_date) }}</td>
-                  <td>{{ item.treatment_id || '-' }}</td>
-                  <td class="money">{{ formatPrice(item.total_amount) }}</td>
-                  <td>{{ item.payment_status || '-' }}</td>
-                  <td>{{ item.pay_method || '-' }}</td>
+                  <td data-label="เลขที่ใบเสร็จ"><strong>{{ item.receipt_id }}</strong></td>
+                  <td data-label="วันที่ออก">{{ formatDateTime(item.issue_date) }}</td>
+                  <td data-label="เลขที่รักษา">{{ item.treatment_id || '-' }}</td>
+                  <td data-label="ยอดเงิน" class="money">{{ formatPrice(item.total_amount) }}</td>
+                  <td data-label="สถานะ">{{ item.payment_status || '-' }}</td>
+                  <td data-label="ช่องทาง">{{ item.pay_method || '-' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -253,9 +277,22 @@ const summary = ref({
   receipts: []
 })
 
+const formatPetGender = (value) => {
+  const gender = String(value || '').trim().toLowerCase()
+  if (['ผู้', 'เพศผู้', 'male'].includes(gender)) return 'เพศผู้'
+  if (['เมีย', 'เพศเมีย', 'female'].includes(gender)) return 'เพศเมีย'
+  return 'ไม่ระบุเพศ'
+}
+
 const isAdminView = computed(() => route.path.startsWith('/admin/'))
 const backTarget = computed(() => (isAdminView.value ? '/admin/pets' : '/user/pets'))
 const backLabel = computed(() => (isAdminView.value ? 'กลับไปหน้าจัดการสัตว์เลี้ยง' : 'กลับไปหน้าสัตว์เลี้ยง'))
+
+const appointmentTagClass = (status) => {
+  if (['ยกเลิก', 'ไม่มาตามนัด'].includes(status)) return 'tag-muted'
+  if (['รอ', 'รอคลินิกยืนยัน'].includes(status)) return 'tag-waiting'
+  return 'tag-success'
+}
 
 const getHeaders = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -706,9 +743,277 @@ onMounted(loadSummary)
   color: #0f766e;
 }
 
+/* Owner view: keep the shared admin report intact while giving the pet owner a calmer record. */
+.owner-history {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  gap: 18px;
+}
+
+.owner-history .owner-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 4px 2px 2px;
+}
+
+.owner-history .owner-intro h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(23px, 2vw, 28px);
+  line-height: 1.3;
+}
+
+.owner-history .owner-intro p {
+  margin: 5px 0 0;
+  color: #526277;
+  line-height: 1.55;
+}
+
+.owner-history .back-link {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 14px;
+  box-sizing: border-box;
+}
+
+.owner-history .back-link:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+.owner-history :is(a, button):focus-visible {
+  outline: 3px solid #0f766e;
+  outline-offset: 3px;
+}
+
+.owner-history .state-section {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.owner-history .state-section h2,
+.owner-history .state-section p { margin: 0; }
+
+.owner-history .summary-shell {
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.7fr);
+  gap: 16px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.owner-history .profile-card {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid #d9e2ec;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.owner-history .profile-top {
+  margin-bottom: 16px;
+}
+
+.owner-history .profile-top h2 {
+  font-size: 22px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.owner-history .pet-avatar {
+  width: 76px;
+  height: 76px;
+  border-radius: 14px;
+  background: #e9f7f4;
+}
+
+.owner-history .owner-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #e9f7f4;
+}
+
+.owner-history .owner-head { margin-bottom: 14px; }
+.owner-history .owner-head h3 { font-size: 17px; }
+
+.owner-history .info-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.owner-history .info-item,
+.owner-history .owner-row {
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid #e5edf5;
+  border-radius: 0;
+  background: transparent;
+}
+
+.owner-history .owner-list { gap: 0; }
+.owner-history .info-item span,
+.owner-history .owner-row span {
+  margin-bottom: 3px;
+  color: #526277;
+  text-transform: none;
+}
+
+.owner-history .info-item strong,
+.owner-history .owner-row strong {
+  display: block;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.owner-history .allergy-notice {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f4f7fa;
+  color: #334155;
+}
+
+.owner-history .allergy-notice.has-allergy {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.owner-history .allergy-notice strong { font-size: 13px; }
+.owner-history .allergy-notice p {
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.owner-history .metric-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #d9e2ec;
+  border-radius: 16px;
+  background: #e5edf5;
+}
+
+.owner-history .metric-card {
+  min-width: 0;
+  min-height: 0;
+  padding: 15px 18px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #ffffff;
+}
+
+.owner-history .metric-card span {
+  margin-bottom: 6px;
+  color: #526277;
+  text-transform: none;
+}
+.owner-history .metric-card strong {
+  font-size: 24px;
+  line-height: 1.1;
+}
+.owner-history .metric-card small {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.owner-history .metric-card.is-empty strong { color: #64748b; }
+
+.owner-history .history-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d9e2ec;
+}
+
+.owner-history .history-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: #0f766e;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.owner-history .history-nav a:hover { background: #e9f7f4; }
+
+.owner-history .timeline-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.owner-history .panel-card {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid #d9e2ec;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+  background: #ffffff;
+  scroll-margin-top: 22px;
+}
+
+.owner-history .panel-head {
+  align-items: center;
+  margin-bottom: 6px;
+}
+.owner-history .panel-head h2 { font-size: 17px; }
+.owner-history .panel-head span {
+  margin: 0;
+  color: #526277;
+  text-transform: none;
+}
+
+.owner-history .timeline-list { gap: 0; }
+.owner-history .timeline-item {
+  min-width: 0;
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid #e5edf5;
+  border-radius: 0;
+  background: transparent;
+}
+.owner-history .timeline-item:last-child { border-bottom: 0; }
+.owner-history .timeline-item p { margin-top: 6px; }
+.owner-history .timeline-meta { flex-wrap: wrap; }
+.owner-history .timeline-meta span { color: #526277; }
+.owner-history .detail-list { border-color: #e5edf5; }
+.owner-history .empty-box {
+  padding: 14px 0 4px;
+  border-radius: 0;
+  background: transparent;
+  color: #526277;
+  text-align: left;
+}
+.owner-history .tag.tag-waiting { background: #fff3d6; color: #92400e; }
+.owner-history .tag.tag-muted { background: #f1f5f9; color: #475569; }
+
 @media (max-width: 1180px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .owner-history .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -716,6 +1021,10 @@ onMounted(loadSummary)
   .summary-shell,
   .timeline-grid {
     grid-template-columns: 1fr;
+  }
+
+  .owner-history .summary-shell {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -730,6 +1039,65 @@ onMounted(loadSummary)
   .metric-grid,
   .info-grid {
     grid-template-columns: 1fr;
+  }
+
+  .owner-history .owner-intro {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .owner-history .owner-intro > div { flex: 1 1 165px; }
+  .owner-history .owner-intro h1 { font-size: 22px; }
+  .owner-history .owner-intro p { font-size: 14px; }
+  .owner-history .owner-intro .back-link { padding: 8px 10px; font-size: 12px; }
+  .owner-history .profile-card,
+  .owner-history .panel-card { padding: 18px; }
+  .owner-history .info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .owner-history .allergy-notice { grid-template-columns: 1fr; gap: 3px; }
+  .owner-history .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .owner-history .metric-card { padding: 12px 14px; }
+  .owner-history .history-nav { flex-wrap: nowrap; overflow-x: auto; }
+  .owner-history .history-nav a { flex: 0 0 auto; }
+  .owner-history .timeline-meta,
+  .owner-history .detail-row { flex-direction: row; align-items: flex-start; }
+  .owner-history .timeline-meta { flex-wrap: wrap; }
+
+  .owner-history .receipt-table,
+  .owner-history .receipt-table tbody,
+  .owner-history .receipt-table tr { display: block; width: 100%; min-width: 0; }
+  .owner-history .receipt-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .owner-history .receipt-table tr {
+    padding: 10px 0;
+    border-bottom: 1px solid #e5edf5;
+  }
+  .owner-history .receipt-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    border: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .owner-history .receipt-table td::before {
+    content: attr(data-label);
+    flex: 0 0 42%;
+    color: #526277;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: left;
   }
 }
 </style>

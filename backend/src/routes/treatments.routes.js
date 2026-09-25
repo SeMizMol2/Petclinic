@@ -553,6 +553,24 @@ router.delete('/:id', auth, async (req, res) => {
         if (!ensureAdmin(req, res)) return;
 
         await client.query('BEGIN');
+        const treatment = await client.query(
+            'SELECT treatment_id FROM tb_treatment WHERE treatment_id = $1 FOR UPDATE',
+            [req.params.id]
+        );
+        if (treatment.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'ไม่พบข้อมูลการรักษา' });
+        }
+
+        const receipt = await client.query(
+            'SELECT receipt_id FROM tb_receipt WHERE treatment_id = $1 LIMIT 1',
+            [req.params.id]
+        );
+        if (receipt.rowCount > 0) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'การรักษานี้มีใบเสร็จแล้ว จึงลบไม่ได้ หากข้อมูลไม่ถูกต้องให้แก้ไขรายการการรักษาแทน' });
+        }
+
         await client.query('DELETE FROM tb_treatment_detail WHERE treatment_id = $1', [req.params.id]);
         const result = await client.query(
             'DELETE FROM tb_treatment WHERE treatment_id = $1',

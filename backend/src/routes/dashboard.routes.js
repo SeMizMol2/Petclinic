@@ -55,7 +55,7 @@ router.get('/', auth, async (req, res) => {
     const appointmentsResult = await pool.query(
       `
         SELECT
-          a.appt_date,
+          a.appt_date::text AS appt_date,
           a.appt_time,
           a.appt_reason,
           a.appt_status,
