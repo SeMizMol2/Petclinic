@@ -64,7 +64,7 @@ const register = async () => {
   const name = username.value.trim(), address = email.value.trim().toLowerCase()
   if (name.length < 3 || name.length > 50 || /\s|[\u0000-\u001f\u007f]/u.test(name)) errors.value.username = 'กรอกชื่อผู้ใช้ 3–50 ตัวอักษร โดยไม่มีช่องว่าง'
   if (address.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) errors.value.email = 'กรุณากรอกอีเมลให้ถูกต้อง'
-  if (Array.from(password.value).length < 8 || !password.value.trim() || new TextEncoder().encode(password.value).length > 72) errors.value.password = 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร และไม่เกิน 72 ไบต์'
+  if (Array.from(password.value).length < 8 || !password.value.trim() || new TextEncoder().encode(password.value).length > 72) errors.value.password = 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร '
   if (!confirmPassword.value || confirmPassword.value !== password.value) errors.value.confirm = 'รหัสผ่านทั้งสองช่องต้องตรงกัน'
   if (Object.keys(errors.value).length) {
     await nextTick()
