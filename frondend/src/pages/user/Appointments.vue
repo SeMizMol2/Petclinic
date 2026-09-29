@@ -66,8 +66,17 @@
             <option value="">ให้คลินิกจัดสัตวแพทย์</option>
             <option v-for="vet in availableBookingVets" :key="vet.vet_id" :value="vet.vet_id">{{ vet.vet_name }}</option>
           </select></label>
-          <label class="booking-time"><span>เวลาที่ต้องการนัด *</span><input v-model="bookingTime" type="time" step="60" :disabled="!bookingDate" required /></label>
-          <p class="booking-time-hint">กรอกเวลาได้ถึงระดับนาที เช่น 13:34 น. เวลานี้ยังไม่ใช่คิวที่ยืนยันแล้ว</p>
+          <div class="booking-time">
+            <span id="booking-time-label">เวลาที่ต้องการนัด <span aria-hidden="true">*</span></span>
+            <div class="time-entry" role="group" aria-labelledby="booking-time-label" :class="{ 'has-error': bookingTimeError }">
+              <label class="time-part"><span>ชั่วโมง</span><input :value="bookingHour" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" enterkeyhint="next" placeholder="13" aria-label="ชั่วโมง แบบ 24 ชั่วโมง" aria-required="true" :aria-invalid="Boolean(bookingTimeError)" aria-describedby="booking-time-help" :disabled="!bookingDate" @input="onTimePartInput('hour', $event)" @blur="onTimePartBlur('hour')" /></label>
+              <span class="time-colon" aria-hidden="true">:</span>
+              <label class="time-part"><span>นาที</span><input :value="bookingMinute" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" enterkeyhint="done" placeholder="34" aria-label="นาที" aria-required="true" :aria-invalid="Boolean(bookingTimeError)" aria-describedby="booking-time-help" :disabled="!bookingDate" @input="onTimePartInput('minute', $event)" @blur="onTimePartBlur('minute')" /></label>
+              <span class="time-suffix">น.</span>
+            </div>
+            <p id="booking-time-help" :class="['booking-time-hint', { error: bookingTimeError }]" aria-live="polite">{{ bookingTimeError || 'เวลาแบบ 24 ชั่วโมง เช่น 13:34 น. กรอกได้ทุกนาที' }}</p>
+            <p v-if="bookingTimeWarning" class="booking-time-warning" role="status">{{ bookingTimeWarning }}</p>
+          </div>
         </aside>
       </div>
     </section>
@@ -82,7 +91,7 @@
           <label><span>สัตว์เลี้ยง *</span><select v-model="bookingPetId" required><option value="" disabled>เลือกสัตว์เลี้ยง</option><option v-for="pet in pets" :key="pet.pet_id" :value="pet.pet_id">{{ pet.pet_name }}</option></select></label>
           <label class="booking-reason"><span>อาการหรือเหตุผลที่นัด *</span><textarea v-model.trim="bookingReason" maxlength="500" rows="2" required placeholder="เช่น ซึม ไม่กินอาหาร ต้องการให้สัตวแพทย์ตรวจอาการ"></textarea></label>
         </div>
-        <div class="booking-footer"><p>คำขอจะยังไม่ยึดคิว คลินิกจะตรวจสอบเวลาและยืนยันอีกครั้ง</p><button type="submit" class="booking-submit" :disabled="bookingSubmitting || !bookingPetId || !bookingDate || !bookingTime || !bookingReason.trim()">{{ bookingSubmitting ? 'กำลังส่งคำขอ...' : 'ส่งคำขอนัดหมาย' }}</button></div>
+        <div class="booking-footer"><p>คำขอจะยังไม่ยึดคิว คลินิกจะตรวจสอบเวลาและยืนยันอีกครั้ง</p><button type="submit" class="booking-submit" :disabled="bookingSubmitting || !bookingPetId || !bookingDate || !bookingTime || Boolean(bookingTimeError) || !bookingReason.trim()">{{ bookingSubmitting ? 'กำลังส่งคำขอ...' : 'ส่งคำขอนัดหมาย' }}</button></div>
       </form>
     </section>
 
@@ -265,7 +274,9 @@ const bookingVets = ref([])
 const bookingPetId = ref('')
 const bookingDate = ref('')
 const bookingVetId = ref('')
-const bookingTime = ref('')
+const bookingHour = ref('')
+const bookingMinute = ref('')
+const bookingTimeTouched = ref(false)
 const bookingReason = ref('')
 const bookingSubmitting = ref(false)
 const schedules = ref([])
@@ -544,16 +555,61 @@ const availableBookingVets = computed(() => {
   return bookingVets.value.filter((vet) => scheduledVetIds.has(String(vet.vet_id)))
 })
 
+const bookingTime = computed(() => {
+  if (!/^\d{2}$/.test(bookingHour.value) || !/^\d{2}$/.test(bookingMinute.value)) return ''
+  const hour = Number(bookingHour.value)
+  const minute = Number(bookingMinute.value)
+  return hour <= 23 && minute <= 59 ? `${bookingHour.value}:${bookingMinute.value}` : ''
+})
+
+const bookingTimeError = computed(() => {
+  if (bookingHour.value.length === 2 && Number(bookingHour.value) > 23) return 'ชั่วโมงต้องอยู่ระหว่าง 00–23'
+  if (bookingMinute.value.length === 2 && Number(bookingMinute.value) > 59) return 'นาทีต้องอยู่ระหว่าง 00–59'
+  if (bookingTimeTouched.value && !bookingTime.value) return 'กรอกชั่วโมงและนาทีให้ครบ เช่น 13:34'
+  if (bookingTime.value && new Date(`${bookingDate.value}T${bookingTime.value}:00+07:00`).getTime() < Date.now()) return 'วันและเวลานี้ผ่านไปแล้ว กรุณาเลือกเวลาใหม่'
+  return ''
+})
+
+const bookingTimeWarning = computed(() => {
+  if (!bookingTime.value || bookingTimeError.value || scheduleError.value || !selectedSchedules.value.length) return ''
+  const shifts = bookingVetId.value
+    ? selectedSchedules.value.filter((shift) => String(shift.vet_id) === String(bookingVetId.value))
+    : selectedSchedules.value
+  const inShift = shifts.some((shift) => bookingTime.value >= String(shift.start_time).slice(0, 5) && bookingTime.value < String(shift.end_time).slice(0, 5))
+  return inShift ? '' : 'เวลานี้อยู่นอกตารางเข้าเวร คลินิกอาจเสนอเวลาใหม่ก่อนยืนยันนัด'
+})
+
+const resetBookingTime = () => {
+  bookingHour.value = ''
+  bookingMinute.value = ''
+  bookingTimeTouched.value = false
+}
+
+const onTimePartInput = (part, event) => {
+  const digits = String(event.target.value).replace(/\D/g, '').slice(0, 2)
+  event.target.value = digits
+  if (part === 'hour') bookingHour.value = digits
+  else bookingMinute.value = digits
+}
+
+const onTimePartBlur = (part) => {
+  bookingTimeTouched.value = true
+  const value = part === 'hour' ? bookingHour.value : bookingMinute.value
+  if (value.length !== 1) return
+  if (part === 'hour') bookingHour.value = value.padStart(2, '0')
+  else bookingMinute.value = value.padStart(2, '0')
+}
+
 const selectCalendarDay = (dateKey) => {
   selectedDate.value = dateKey
   bookingVetId.value = ''
   bookingDate.value = dateKey
-  bookingTime.value = ''
+  resetBookingTime()
 }
 
 watch(bookingDate, (dateKey) => {
   if (dateKey && selectedDate.value !== dateKey) selectedDate.value = dateKey
-  bookingTime.value = ''
+  resetBookingTime()
   if (bookingVetId.value && !availableBookingVets.value.some((vet) => vet.vet_id === bookingVetId.value)) bookingVetId.value = ''
 })
 
@@ -582,7 +638,8 @@ const loadBookingVets = async () => {
 }
 
 const submitBooking = async () => {
-  if (!bookingPetId.value || !bookingDate.value || !bookingTime.value || !bookingReason.value.trim()) return
+  bookingTimeTouched.value = true
+  if (!bookingPetId.value || !bookingDate.value || !bookingTime.value || bookingTimeError.value || !bookingReason.value.trim()) return
   bookingSubmitting.value = true
   try {
     const response = await axios.post('http://localhost:3000/api/appointments/request', {
@@ -593,7 +650,7 @@ const submitBooking = async () => {
       appt_reason: bookingReason.value.trim()
     }, authHeaders())
     bookingReason.value = ''
-    bookingTime.value = ''
+    resetBookingTime()
     await loadAppointments(true)
     showActionMessage(response.data?.message || 'ส่งคำขอนัดหมายแล้ว รอคลินิกยืนยัน')
   } catch (error) {
@@ -1914,7 +1971,18 @@ button:disabled {
   border: 1px solid #cbd8e3; border-radius: 10px;
   background: #fff; color: #0f172a; font: inherit;
 }
+.time-entry { display: flex; align-items: end; gap: 9px; margin-top: 2px; }
+.time-part { display: grid; gap: 5px; width: 82px; min-width: 0; }
+.time-part > span { color: #526277; font-size: 11px; font-weight: 600; }
+.time-entry .time-part input { min-height: 48px; padding: 8px 10px; text-align: center; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.time-entry .time-part input::placeholder { color: #91a3b4; opacity: 1; }
+.time-entry .time-part input:disabled { background: #f1f5f9; color: #94a3b8; }
+.time-entry.has-error .time-part input { border-color: #dc2626; }
+.time-colon { align-self: end; padding-bottom: 10px; color: #334155; font-size: 24px; line-height: 28px; }
+.time-suffix { align-self: end; padding-bottom: 13px; color: #526277; font-size: 13px; font-weight: 600; }
 .booking-time-hint { margin: 7px 0 0; color: #526277; font-size: 12px; line-height: 1.5; }
+.booking-time-hint.error { color: #b91c1c; }
+.booking-time-warning { margin: 5px 0 0; color: #965b0a; font-size: 12px; font-weight: 500; line-height: 1.5; }
 .booking-slots { margin-top: 18px; gap: 8px; }
 .slots-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .slots-head strong { color: #0f172a; font-size: 14px; }
