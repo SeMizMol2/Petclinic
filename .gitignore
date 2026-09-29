@@ -1,8 +1,10 @@
-backend/.env
+# Local credentials must never be committed. Keep examples tracked.
+**/.env
+**/.env.*
+!**/.env.example
 *-dev.log
 *-dev.err.log
 node_modules/
 .codex/
 .agents/
 uploads/profiles/
-backend/.env
