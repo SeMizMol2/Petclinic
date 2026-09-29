@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '../../components/AppIcon.vue'
 
@@ -112,18 +112,22 @@ const titleMap = {
   '/user/profile': ['ข้อมูลส่วนตัว', 'จัดการรูปโปรไฟล์ ข้อมูลติดต่อ และรายละเอียดเจ้าของสัตว์เลี้ยง'],
   '/user/pets': ['สัตว์เลี้ยงของฉัน', 'ดูข้อมูลสัตว์เลี้ยงแต่ละตัวและเปิดดูประวัติการรักษา'],
   '/user/pets/add': ['เพิ่มสัตว์เลี้ยง', 'กรอกข้อมูลสัตว์เลี้ยงตัวใหม่เพื่อเริ่มต้นใช้งานระบบ'],
-  '/user/receipts': ['การชำระเงิน', 'ติดตามใบเสร็จ ยอดค่าใช้จ่าย และสถานะการชำระเงิน'],
+  '/user/receipts': ['ค่าใช้จ่ายและการชำระเงิน', 'ตรวจสอบค่าใช้จ่ายและสถานะการชำระกับคลินิก'],
   '/user/appointments': ['การนัดหมายของฉัน', 'ขอนัดหมาย ตรวจสอบสถานะ และดูประวัตินัดหมายของสัตว์เลี้ยง']
 }
 
-const currentUserName = computed(() => {
+const readSessionUser = () => {
   try {
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    return user.owner_name || user.username || 'ผู้ใช้งาน'
+    return JSON.parse(localStorage.getItem('user') || '{}')
   } catch {
-    return 'ผู้ใช้งาน'
+    return {}
   }
-})
+}
+const sessionUser = ref(readSessionUser())
+const refreshSessionUser = () => { sessionUser.value = readSessionUser() }
+const currentUserName = computed(() => sessionUser.value.owner_name || sessionUser.value.username || 'ผู้ใช้งาน')
+onMounted(() => window.addEventListener('petclinic:profile-updated', refreshSessionUser))
+onUnmounted(() => window.removeEventListener('petclinic:profile-updated', refreshSessionUser))
 
 const pageTitle = computed(() => {
   if (route.path.startsWith('/user/history/')) return 'ประวัติการรักษา'

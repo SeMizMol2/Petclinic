@@ -43,7 +43,10 @@ const getTransporter = () => {
 
 const formatThaiDate = (value) => {
     if (!value) return '-';
-    const date = new Date(value);
+    const raw = String(value);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+        ? new Date(`${raw}T00:00:00`)
+        : new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
     return new Intl.DateTimeFormat('th-TH', {
         year: 'numeric',
@@ -60,6 +63,34 @@ const formatTime = (value) => {
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[character]));
+
+const sendEmailVerification = async ({ email, username, token }) => {
+    const mailer = getTransporter();
+    if (!mailer) return { sent: false, reason: 'mail-not-configured' };
+    const baseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:5173';
+    let link;
+    try {
+        link = new URL('/verify-email', baseUrl);
+        link.searchParams.set('token', token);
+    } catch {
+        return { sent: false, reason: 'invalid-frontend-url' };
+    }
+    const safeName = escapeHtml(username);
+    const safeLink = escapeHtml(link.toString());
+    try {
+        await mailer.sendMail({
+            from: getMailConfig().from,
+            to: email,
+            subject: 'ยืนยันอีเมลของคุณ - โรงพยาบาลสัตว์เมืองเลย',
+            text: `สวัสดี ${username}\n\nกดลิงก์เพื่อยืนยันอีเมลของคุณ (ใช้ได้ภายใน 24 ชั่วโมง):\n${link}\n\nหากคุณไม่ได้ทำรายการนี้ โปรดละเว้นอีเมลฉบับนี้`,
+            html: `<p>สวัสดี ${safeName}</p><p>กดลิงก์เพื่อยืนยันอีเมลของคุณ (ใช้ได้ภายใน 24 ชั่วโมง)</p><p><a href="${safeLink}">ยืนยันอีเมล</a></p><p>หากคุณไม่ได้ทำรายการนี้ โปรดละเว้นอีเมลฉบับนี้</p>`
+        });
+        return { sent: true };
+    } catch (error) {
+        console.error('Send email verification failed:', error.message);
+        return { sent: false, reason: 'send-failed' };
+    }
+};
 
 const getSubjectByType = (type, appointment) => {
     if (type === 'updated' && appointment?.request_source === 'owner' && appointment?.appt_status === 'ยืนยัน') {
@@ -142,6 +173,43 @@ const buildAppointmentMessage = (type, appointment) => {
     return { text, html };
 };
 
+const getClinicNotificationRecipient = () =>
+    String(process.env.CLINIC_NOTIFICATION_EMAIL || process.env.SMTP_USER || '').trim();
+
+const buildClinicRequestMessage = (appointment) => {
+    const clinicName = appointment.clinic_name || 'โรงพยาบาลสัตว์เมืองเลย';
+    const vetName = appointment.vet_name || 'ให้คลินิกเลือกสัตวแพทย์ที่ว่าง';
+    const fields = [
+        ['รหัสคำขอ', appointment.appt_id || '-'],
+        ['เจ้าของสัตว์', appointment.owner_name || '-'],
+        ['เบอร์โทร', appointment.owner_tel || '-'],
+        ['สัตว์เลี้ยง', appointment.pet_name || '-'],
+        ['วันที่ขอนัด', formatThaiDate(appointment.appt_date)],
+        ['เวลา', `${formatTime(appointment.appt_time)} น.`],
+        ['สัตวแพทย์ที่เลือก', vetName],
+        ['อาการหรือเหตุผล', appointment.appt_reason || '-']
+    ];
+    const instruction = 'คำขอนี้ยังไม่ยืนยัน กรุณาเข้าสู่ระบบแอดมินที่หน้า “การนัดหมาย” เพื่ออนุมัติหรือไม่รับคำขอ';
+    const text = [
+        `มีคำขอนัดใหม่ถึง ${clinicName}`,
+        '',
+        ...fields.map(([label, value]) => `${label}: ${value}`),
+        '',
+        instruction
+    ].join('\n');
+    const html = `
+        <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+            <h2>มีคำขอนัดใหม่ถึง ${escapeHtml(clinicName)}</h2>
+            <p>คำขอนี้ยังไม่ยืนยัน</p>
+            <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; background: #f9fafb;">
+                ${fields.map(([label, value]) => `<p style="margin: 0 0 8px;"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</p>`).join('')}
+            </div>
+            <p>${escapeHtml(instruction)}</p>
+        </div>
+    `;
+    return { text, html };
+};
+
 const sendAppointmentNotification = async ({ type, appointment }) => {
     if (!appointment?.owner_email) {
         return {
@@ -219,8 +287,51 @@ const queueAppointmentNotification = ({ type, appointment }) => {
     };
 };
 
+const sendClinicRequestNotification = async ({ appointment }) => {
+    const recipient = getClinicNotificationRecipient();
+    if (!recipient) return { sent: false, skipped: true, reason: 'missing-clinic-recipient' };
+
+    const mailer = getTransporter();
+    if (!mailer) return { sent: false, skipped: true, reason: 'mail-not-configured' };
+
+    const { text, html } = buildClinicRequestMessage(appointment);
+    try {
+        await mailer.sendMail({
+            from: getMailConfig().from,
+            to: recipient,
+            subject: 'คำขอนัดใหม่ รอคลินิกยืนยัน - โรงพยาบาลสัตว์เมืองเลย',
+            text,
+            html
+        });
+        return { sent: true, skipped: false };
+    } catch (error) {
+        console.error('Send clinic appointment request email failed:', error.message);
+        return { sent: false, skipped: false, reason: 'send-failed' };
+    }
+};
+
+const queueClinicRequestNotification = ({ appointment }) => {
+    if (!appointment) return { sent: false, queued: false, skipped: true, reason: 'missing-appointment' };
+    if (!getClinicNotificationRecipient()) {
+        return { sent: false, queued: false, skipped: true, reason: 'missing-clinic-recipient' };
+    }
+    if (!isMailConfigured()) {
+        return { sent: false, queued: false, skipped: true, reason: 'mail-not-configured' };
+    }
+
+    setImmediate(() => {
+        sendClinicRequestNotification({ appointment }).catch((error) => {
+            console.error('Queued clinic appointment request email failed:', error.message);
+        });
+    });
+    return { sent: false, queued: true, skipped: false };
+};
+
 module.exports = {
     isMailConfigured,
+    sendEmailVerification,
     sendAppointmentNotification,
-    queueAppointmentNotification
+    queueAppointmentNotification,
+    sendClinicRequestNotification,
+    queueClinicRequestNotification
 };

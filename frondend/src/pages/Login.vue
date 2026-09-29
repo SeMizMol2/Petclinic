@@ -7,6 +7,10 @@
         <p class="subtitle">เข้าสู่ระบบเพื่อจัดการข้อมูลสัตว์เลี้ยง ประวัติการรักษา และบริการของคลินิก</p>
       </div>
 
+      <p v-if="sessionExpired" class="session-notice" role="alert">
+        เพื่อความปลอดภัย กรุณาเข้าสู่ระบบอีกครั้ง ข้อมูลของคุณยังอยู่ครบ
+      </p>
+
       <form class="auth-form" @submit.prevent="login">
         <label class="field">
           <span>ชื่อผู้ใช้</span>
@@ -27,26 +31,32 @@
       </div>
 
       <p v-if="error" class="error-msg">{{ error }}</p>
+      <router-link v-if="unverifiedEmail" :to="{ path: '/verify-email', query: { email: unverifiedEmail } }" class="verify-link">ส่งลิงก์ยืนยันอีเมลใหม่</router-link>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import axios from 'axios'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { API_BASE_URL } from '../api'
 
 const router = useRouter()
+const route = useRoute()
+const sessionExpired = computed(() => route.query.reason === 'session-expired')
 
 const username = ref('')
 const password = ref('')
 const error = ref('')
+const unverifiedEmail = ref('')
 
 const login = async () => {
   error.value = ''
+  unverifiedEmail.value = ''
 
   try {
-    const response = await axios.post('http://localhost:3000/api/auth/login', {
+    const response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
       username: username.value,
       password: password.value
     })
@@ -61,6 +71,7 @@ const login = async () => {
     router.push(userData.role === 'admin' ? '/admin' : '/user')
   } catch (err) {
     error.value = err.response?.data?.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+    if (err.response?.data?.code === 'EMAIL_NOT_VERIFIED') unverifiedEmail.value = err.response.data.email || ''
   }
 }
 </script>
@@ -179,6 +190,16 @@ const login = async () => {
   border: 1px solid #fecaca;
   color: #b91c1c;
   text-align: center;
+}
+.verify-link { display: block; margin-top: 12px; text-align: center; color: #0f766e; font-weight: 700; }
+
+.session-notice {
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #065f46;
+  line-height: 1.6;
 }
 
 @media (max-width: 520px) {

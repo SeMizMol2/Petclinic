@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
+const { petBirthdateError } = require('../services/pet-birthdate');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { protectedRecordMessage, lockPet, petHasHistory } = require('../services/deletion-guard');
 
 const uploadDir = path.join(__dirname, '../../../uploads/pets');
 if (!fs.existsSync(uploadDir)) {
@@ -86,6 +88,8 @@ router.post('/', auth, upload.single('petImage'), async (req, res) => {
     if (!pet_name || !pet_type || !pet_gender || !sterile_status) {
       return res.status(400).json({ message: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบ' });
     }
+    const birthdateError = petBirthdateError(pet_birthdate);
+    if (birthdateError) return res.status(400).json({ message: birthdateError });
 
     const petImage = getUploadedPetImageUrl(req) || pet_image || null;
 
@@ -144,6 +148,8 @@ router.put('/:id', auth, upload.single('petImage'), async (req, res) => {
     if (!pet_name || !pet_type || !pet_gender || !sterile_status) {
       return res.status(400).json({ message: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบ' });
     }
+    const birthdateError = petBirthdateError(pet_birthdate);
+    if (birthdateError) return res.status(400).json({ message: birthdateError });
 
     const petImage = getUploadedPetImageUrl(req) || pet_image || null;
 
@@ -188,25 +194,30 @@ router.put('/:id', auth, upload.single('petImage'), async (req, res) => {
 });
 
 router.delete('/:id', auth, async (req, res) => {
+  const client = await pool.connect();
   try {
     const ownerId = await getOwnerIdByUserId(req.user.user_id);
     if (!ownerId) {
       return res.status(404).json({ message: 'ไม่พบข้อมูลเจ้าของสัตว์เลี้ยง' });
     }
-
-    const result = await pool.query(
-      'DELETE FROM tb_pet WHERE pet_id = $1 AND owner_id = $2',
-      [req.params.id, ownerId]
-    );
-
-    if (result.rowCount === 0) {
+    await client.query('BEGIN');
+    if (!await lockPet(client, req.params.id, ownerId)) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'ไม่พบสัตว์เลี้ยงที่ต้องการลบ' });
     }
-
+    if (await petHasHistory(client, req.params.id)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: protectedRecordMessage });
+    }
+    await client.query('DELETE FROM tb_pet WHERE pet_id = $1 AND owner_id = $2', [req.params.id, ownerId]);
+    await client.query('COMMIT');
     res.json({ message: 'ลบสัตว์เลี้ยงสำเร็จ' });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Error deleting pet:', err);
     res.status(500).json({ message: 'ลบสัตว์เลี้ยงไม่สำเร็จ' });
+  } finally {
+    client.release();
   }
 });
 

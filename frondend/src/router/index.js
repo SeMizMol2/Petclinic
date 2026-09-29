@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../pages/Home.vue'
 import Login from '../pages/Login.vue'
 import Register from '../pages/Register.vue'
+import VerifyEmail from '../pages/VerifyEmail.vue'
 
 const UserLayout = () => import('../pages/user/UserLayout.vue')
 const Profile = () => import('../pages/user/Profile.vue')
@@ -31,6 +32,7 @@ const routes = [
   { path: '/', component: Home },
   { path: '/login', component: Login },
   { path: '/register', component: Register },
+  { path: '/verify-email', component: VerifyEmail },
   
   // User Routes
   {
@@ -92,7 +94,8 @@ router.beforeEach((to, from, next) => {
       localStorage.setItem('user', JSON.stringify(user));
     }
   } catch (e) {
-    localStorage.clear();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     return next('/login');
   }
 

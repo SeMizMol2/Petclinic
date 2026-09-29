@@ -75,8 +75,8 @@
             <input v-model="form.username" :placeholder="modalMode === 'add' ? 'เว้นว่างเพื่อสร้างอัตโนมัติ' : ''" />
           </label>
           <label v-if="modalMode === 'add'">
-            รหัสผ่านเริ่มต้น
-            <input v-model="form.password" placeholder="เว้นว่างเพื่อใช้ 123456" />
+            รหัสผ่านเริ่มต้น (ไม่บังคับ)
+            <input v-model="form.password" type="password" autocomplete="new-password" placeholder="เว้นว่างเพื่อสร้างรหัสเฉพาะบัญชี" :disabled="saving" />
           </label>
           <label>
             เบอร์โทร
@@ -88,9 +88,11 @@
           </label>
         </div>
 
+        <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
+
         <div class="modal-actions">
-          <button type="button" class="ghost-btn" @click="closeModal">ยกเลิก</button>
-          <button class="primary-btn" type="submit">บันทึกข้อมูล</button>
+          <button type="button" class="ghost-btn" :disabled="saving" @click="closeModal">ยกเลิก</button>
+          <button class="primary-btn" type="submit" :disabled="saving">{{ saving ? 'กำลังบันทึก…' : 'บันทึกข้อมูล' }}</button>
         </div>
       </form>
     </div>
@@ -108,6 +110,8 @@ const searchQuery = ref('')
 const isModalOpen = ref(false)
 const modalMode = ref('add')
 const form = ref({})
+const saving = ref(false)
+const formError = ref('')
 
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
@@ -134,6 +138,7 @@ const filteredOwners = computed(() => {
 })
 
 const openAddModal = () => {
+  formError.value = ''
   modalMode.value = 'add'
   form.value = {
     owner_name: '',
@@ -146,28 +151,39 @@ const openAddModal = () => {
 }
 
 const openEditModal = (owner) => {
+  formError.value = ''
   modalMode.value = 'edit'
   form.value = { ...owner }
   isModalOpen.value = true
 }
 
 const closeModal = () => {
+  if (saving.value) return
   isModalOpen.value = false
 }
 
 const submitOwner = async () => {
+  if (saving.value) return
+  formError.value = ''
+  if (modalMode.value === 'add' && form.value.password && Array.from(form.value.password).length < 8) {
+    formError.value = 'รหัสผ่านที่กำหนดเองต้องมีอย่างน้อย 8 ตัวอักษร หรือเว้นว่างให้ระบบสร้าง'
+    return
+  }
+  saving.value = true
   try {
     if (modalMode.value === 'add') {
       const res = await axios.post('http://localhost:3000/api/admin/owners', form.value, { headers: headers() })
-      alert(`เพิ่มเจ้าของสัตว์สำเร็จ\nUsername: ${res.data.username}\nรหัสผ่านเริ่มต้น: ${res.data.default_password}`)
+      alert(`เพิ่มเจ้าของสัตว์สำเร็จ\nUsername: ${res.data.username}\nรหัสผ่านเริ่มต้น: ${res.data.initial_password}\nกรุณาส่งรหัสนี้ให้เจ้าของอย่างปลอดภัย ระบบจะแสดงครั้งนี้ครั้งเดียว`)
     } else {
       await axios.put(`http://localhost:3000/api/admin/owners/${form.value.owner_id}`, form.value, { headers: headers() })
       alert('แก้ไขเจ้าของสัตว์สำเร็จ')
     }
-    closeModal()
+    isModalOpen.value = false
     fetchOwners()
   } catch (err) {
-    alert(err.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ')
+    formError.value = err.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง'
+  } finally {
+    saving.value = false
   }
 }
 
@@ -271,6 +287,9 @@ select:focus {
   border-color: rgba(20, 184, 166, 0.6);
   box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
 }
+
+.form-error { margin: 12px 0 0; color: #a43522; line-height: 1.5; }
+.primary-btn:disabled, .ghost-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 
 .primary-btn,
 .ghost-btn,

@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
+const { randomBytes } = require('node:crypto');
 
 const RECEIPT_STATUS_UNPAID = '\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e0a\u0e33\u0e23\u0e30';
 const RECEIPT_STATUS_PAID = '\u0e0a\u0e33\u0e23\u0e30\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e2a\u0e34\u0e49\u0e19';
@@ -25,15 +26,13 @@ const normalizeReceiptStatus = (value) => {
     if (!text) return null;
     if (
         text === RECEIPT_STATUS_UNPAID ||
-        text === 'unpaid' ||
-        text.includes('\u0e04\u0e49\u0e32\u0e07')
+        text === 'unpaid'
     ) {
         return RECEIPT_STATUS_UNPAID;
     }
     if (
         text === RECEIPT_STATUS_PAID ||
-        text === 'paid' ||
-        text.includes('\u0e40\u0e2a\u0e23\u0e47\u0e08')
+        text === 'paid'
     ) {
         return RECEIPT_STATUS_PAID;
     }
@@ -88,6 +87,7 @@ const nextReceiptDetailId = async (dbClient) => {
 };
 
 const buildReceiptDetails = async (dbClient, receiptId, treatmentId) => {
+    await dbClient.query('SELECT pg_advisory_xact_lock(74018, 1)');
     const existing = await dbClient.query(
         'SELECT COUNT(*)::int AS count FROM tb_receipt_detail WHERE receipt_id = $1',
         [receiptId]
@@ -279,11 +279,17 @@ router.get('/my-receipts/:user_id', auth, async (req, res) => {
                 r.payment_status,
                 r.pay_method,
                 r.pay_date,
-                r.treatment_id
+                r.treatment_id,
+                t.treatment_date,
+                p.pet_id,
+                p.pet_name,
+                p.pet_image
             FROM tb_receipt r
             JOIN tb_owner o ON r.owner_id = o.owner_id
+            LEFT JOIN tb_treatment t ON r.treatment_id = t.treatment_id
+            LEFT JOIN tb_pet p ON t.pet_id = p.pet_id
             WHERE o.user_id = $1
-            ORDER BY r.issue_date DESC
+            ORDER BY r.issue_date DESC, r.receipt_id DESC
             `,
             [user_id]
         );
@@ -323,6 +329,7 @@ router.post('/', auth, async (req, res) => {
             FROM tb_treatment t
             JOIN tb_pet p ON t.pet_id = p.pet_id
             WHERE t.treatment_id = $1
+            FOR UPDATE OF t
             `,
             [treatment_id]
         );
@@ -352,7 +359,7 @@ router.post('/', auth, async (req, res) => {
         }
 
         const { total_amount, owner_id } = treatmentResult.rows[0];
-        const receiptId = `RC${Date.now()}`;
+        const receiptId = `RC${randomBytes(6).toString('hex')}`;
 
         await client.query(
             `
@@ -397,53 +404,77 @@ router.post('/', auth, async (req, res) => {
     }
 });
 
-router.put('/:id/status', auth, async (req, res) => {
+router.get('/:id/payment-events', auth, async (req, res) => {
     try {
         if (!ensureAdmin(req, res)) return;
-
-        const { id } = req.params;
-        const rawStatus = String(req.body.payment_status || '').trim();
-        const normalizedStatus = normalizeReceiptStatus(rawStatus) || rawStatus;
-        const { pay_method } = req.body;
-        const normalizedPayMethod = normalizePayMethod(pay_method);
-
-        if (!rawStatus) {
-            return res.status(400).json({
-                success: false,
-                message: '\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e44\u0e21\u0e48\u0e16\u0e39\u0e01\u0e15\u0e49\u0e2d\u0e07'
-            });
-        }
-
-        const payDate = normalizedStatus === RECEIPT_STATUS_PAID ? new Date() : null;
         const result = await pool.query(
-            `
-            UPDATE tb_receipt
-            SET payment_status = $1,
-                pay_method = COALESCE($2, pay_method),
-                pay_date = $3,
-                update_datetime = NOW()
-            WHERE receipt_id = $4
-            `,
-            [normalizedStatus, normalizedPayMethod, payDate, id]
+            `SELECT event_id, previous_status, new_status, reason, changed_by_username, event_datetime
+             FROM tb_receipt_payment_event WHERE receipt_id = $1
+             ORDER BY event_datetime DESC, event_id DESC`,
+            [req.params.id]
         );
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'ไม่พบใบเสร็จที่ต้องการแก้ไข'
-            });
-        }
-
-        res.json({
-            success: true,
-            message: '\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e01\u0e32\u0e23\u0e0a\u0e33\u0e23\u0e30\u0e40\u0e07\u0e34\u0e19\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
-        });
+        res.json({ success: true, data: result.rows });
     } catch (err) {
+        console.error('Error Get Receipt Payment Events:', err);
+        res.status(500).json({ success: false, message: 'โหลดประวัติการชำระเงินไม่สำเร็จ' });
+    }
+});
+
+router.put('/:id/status', auth, async (req, res) => {
+    if (!ensureAdmin(req, res)) return;
+    const normalizedStatus = normalizeReceiptStatus(req.body?.payment_status);
+    if (!normalizedStatus) {
+        return res.status(400).json({ success: false, message: 'สถานะการชำระเงินไม่ถูกต้อง' });
+    }
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+    if (normalizedStatus === RECEIPT_STATUS_UNPAID && (reason.length < 5 || reason.length > 500)) {
+        return res.status(400).json({ success: false, message: 'กรุณาระบุเหตุผลการยกเลิกชำระ 5–500 ตัวอักษร' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const current = await client.query(
+            'SELECT payment_status, pay_date FROM tb_receipt WHERE receipt_id = $1 FOR UPDATE',
+            [req.params.id]
+        );
+        if (!current.rowCount) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, message: 'ไม่พบใบเสร็จที่ต้องการแก้ไข' });
+        }
+        const previous = current.rows[0];
+        if (previous.payment_status === normalizedStatus) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ success: false, message: 'ใบเสร็จอยู่ในสถานะนี้แล้ว กรุณารีเฟรชข้อมูล' });
+        }
+        if (normalizedStatus === RECEIPT_STATUS_UNPAID && previous.payment_status !== RECEIPT_STATUS_PAID) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ success: false, message: 'ยกเลิกชำระได้เฉพาะใบเสร็จที่ชำระแล้ว' });
+        }
+        const actorResult = await client.query('SELECT username FROM tb_user WHERE user_id = $1', [req.user.user_id]);
+        const actorName = actorResult.rows[0]?.username || process.env.ADMIN_DISPLAY_NAME || req.user.user_id;
+        const payDate = normalizedStatus === RECEIPT_STATUS_PAID ? new Date() : null;
+        await client.query(
+            `UPDATE tb_receipt SET payment_status = $1,
+             pay_method = CASE WHEN $2 THEN COALESCE($3, pay_method) ELSE pay_method END,
+             pay_date = $4, update_datetime = NOW() WHERE receipt_id = $5`,
+            [normalizedStatus, normalizedStatus === RECEIPT_STATUS_PAID, normalizePayMethod(req.body?.pay_method), payDate, req.params.id]
+        );
+        await client.query(
+            `INSERT INTO tb_receipt_payment_event
+             (receipt_id, previous_status, new_status, reason, changed_by_user_id, changed_by_username, previous_pay_date)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [req.params.id, previous.payment_status, normalizedStatus, reason || null,
+                req.user.user_id, actorName, previous.pay_date]
+        );
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'อัปเดตสถานะการชำระเงินสำเร็จ' });
+    } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
         console.error('Error Update Receipt Status:', err);
-        res.status(500).json({
-            success: false,
-            message: '\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e2a\u0e16\u0e32\u0e19\u0e30\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08'
-        });
+        res.status(500).json({ success: false, message: 'อัปเดตสถานะไม่สำเร็จ กรุณาตรวจสอบตารางประวัติการชำระเงิน' });
+    } finally {
+        client.release();
     }
 });
 

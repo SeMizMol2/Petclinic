@@ -55,8 +55,8 @@
               <td class="center">
                 <div class="actions">
                   <button class="action view" @click="openReceipt(receipt)">ดู/พิมพ์</button>
-                  <button v-if="!isPaid(receipt)" class="action paid" @click="markPaid(receipt)">รับชำระ</button>
-                  <button v-else class="action unpaid" @click="markUnpaid(receipt)">ยกเลิกชำระ</button>
+                  <button v-if="!isPaid(receipt)" class="action paid" :disabled="savingStatus" @click="markPaid(receipt)">รับชำระ</button>
+                  <button v-else class="action unpaid" :disabled="savingStatus" @click="markUnpaid(receipt)">ยกเลิกชำระ</button>
                 </div>
               </td>
             </tr>
@@ -134,6 +134,31 @@
             <p><strong>วันที่ออกเอกสาร:</strong> {{ formatDateTime(selectedReceipt.receipt.issue_date) }}</p>
           </div>
         </section>
+        <section class="payment-history no-print" aria-label="ประวัติสถานะการชำระเงิน">
+          <h3>ประวัติการชำระเงิน</h3>
+          <p v-if="eventsLoading">กำลังโหลดประวัติ...</p>
+          <p v-else-if="eventsError" class="form-error">{{ eventsError }}</p>
+          <p v-else-if="!paymentEvents.length">ยังไม่มีประวัติการเปลี่ยนสถานะในระบบ</p>
+          <div v-for="event in paymentEvents" :key="event.event_id" class="payment-event">
+            <strong>{{ event.previous_status }} → {{ event.new_status }}</strong>
+            <span>{{ formatDateTime(event.event_datetime) }} · {{ event.changed_by_username }}</span>
+            <p v-if="event.reason">เหตุผล: {{ event.reason }}</p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div v-if="reversalReceipt" class="modal-overlay" @click.self="closeReversal">
+      <div class="modal reversal-modal" role="dialog" aria-modal="true" aria-labelledby="reversal-title">
+        <h2 id="reversal-title">ยกเลิกการชำระเงิน</h2>
+        <p>ใบเสร็จ {{ reversalReceipt.receipt_id }} จะกลับเป็นสถานะค้างชำระ การเปลี่ยนแปลงนี้จะถูกบันทึกพร้อมชื่อผู้ดำเนินการ</p>
+        <label for="reversal-reason">เหตุผล <span aria-hidden="true">*</span></label>
+        <textarea id="reversal-reason" v-model="reversalReason" rows="3" maxlength="500" placeholder="เช่น รับชำระผิดใบเสร็จ" :aria-invalid="Boolean(reversalError)" />
+        <p v-if="reversalError" class="form-error" role="alert">{{ reversalError }}</p>
+        <div class="reversal-actions">
+          <button class="ghost-btn" :disabled="savingStatus" @click="closeReversal">กลับ</button>
+          <button class="action unpaid" :disabled="savingStatus" @click="confirmReversal">{{ savingStatus ? 'กำลังบันทึก...' : 'ยืนยันยกเลิกชำระ' }}</button>
+        </div>
       </div>
     </div>
   </div>
@@ -147,6 +172,13 @@ import axios from 'axios'
 const route = useRoute()
 const receipts = ref([])
 const selectedReceipt = ref(null)
+const paymentEvents = ref([])
+const eventsLoading = ref(false)
+const eventsError = ref('')
+const reversalReceipt = ref(null)
+const reversalReason = ref('')
+const reversalError = ref('')
+const savingStatus = ref(false)
 const loading = ref(false)
 const error = ref('')
 const searchQuery = ref('')
@@ -204,6 +236,17 @@ const openReceipt = async (receipt) => {
   try {
     const res = await axios.get(`http://localhost:3000/api/receipts/detail/${receipt.receipt_id}`, { headers: headers() })
     selectedReceipt.value = res.data.data
+    paymentEvents.value = []
+    eventsLoading.value = true
+    eventsError.value = ''
+    try {
+      const events = await axios.get(`http://localhost:3000/api/receipts/${receipt.receipt_id}/payment-events`, { headers: headers() })
+      paymentEvents.value = events.data.data || []
+    } catch (err) {
+      eventsError.value = err.response?.data?.message || 'โหลดประวัติไม่สำเร็จ'
+    } finally {
+      eventsLoading.value = false
+    }
   } catch (err) {
     alert(err.response?.data?.message || 'โหลดรายละเอียดใบเสร็จไม่สำเร็จ')
   }
@@ -213,24 +256,51 @@ const closeReceipt = () => {
   selectedReceipt.value = null
 }
 
-const updateStatus = async (receipt, paymentStatus) => {
+const updateStatus = async (receipt, paymentStatus, reason = '') => {
   try {
+    savingStatus.value = true
     await axios.put(
       `http://localhost:3000/api/receipts/${receipt.receipt_id}/status`,
-      { payment_status: paymentStatus, pay_method: receipt.pay_method || cashMethod },
+      { payment_status: paymentStatus, pay_method: receipt.pay_method || cashMethod, reason },
       { headers: headers() }
     )
     await fetchReceipts()
     if (selectedReceipt.value?.receipt?.receipt_id === receipt.receipt_id) {
       await openReceipt(receipt)
     }
+    return true
   } catch (err) {
-    alert(err.response?.data?.message || 'อัปเดตสถานะไม่สำเร็จ')
+    const message = err.response?.data?.message || 'อัปเดตสถานะไม่สำเร็จ'
+    if (paymentStatus === unpaidStatus) reversalError.value = message
+    else alert(message)
+    return false
+  } finally {
+    savingStatus.value = false
   }
 }
 
 const markPaid = (receipt) => updateStatus(receipt, paidStatus)
-const markUnpaid = (receipt) => updateStatus(receipt, unpaidStatus)
+const markUnpaid = (receipt) => {
+  reversalReceipt.value = receipt
+  reversalReason.value = ''
+  reversalError.value = ''
+}
+const closeReversal = () => {
+  if (savingStatus.value) return
+  reversalReceipt.value = null
+  reversalReason.value = ''
+  reversalError.value = ''
+}
+const confirmReversal = async () => {
+  const reason = reversalReason.value.trim()
+  if (reason.length < 5) {
+    reversalError.value = 'กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร'
+    return
+  }
+  reversalError.value = ''
+  const success = await updateStatus(reversalReceipt.value, unpaidStatus, reason)
+  if (success) closeReversal()
+}
 
 const printReceipt = () => {
   const printable = document.getElementById('printable-receipt')
@@ -347,6 +417,22 @@ onMounted(async () => {
   background: #fee2e2;
   color: #991b1b;
 }
+
+.action:disabled, .ghost-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.admin-page .reversal-modal { width: min(480px, 100%); box-sizing: border-box; padding: 28px; background: #fff; border-radius: 18px; }
+.reversal-modal h2 { margin: 0 0 10px; }
+.reversal-modal p { color: #475569; line-height: 1.55; }
+.reversal-modal label { display: block; margin: 18px 0 8px; font-weight: 700; }
+.reversal-modal textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; resize: vertical; }
+.reversal-modal textarea:focus { outline: 2px solid #0f766e; outline-offset: 2px; }
+.reversal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.form-error { color: #b91c1c !important; }
+.payment-history { margin-top: 16px; padding: 20px; border-radius: 14px; background: #f8fafc; }
+.payment-history h3 { margin: 0 0 12px; }
+.payment-history p { margin: 7px 0; }
+.payment-event { display: grid; gap: 3px; padding: 11px 0; border-top: 1px solid #e2e8f0; }
+.payment-event span { color: #64748b; font-size: 13px; }
 
 .receipt-modal {
   width: min(900px, 100%);

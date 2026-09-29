@@ -2,6 +2,10 @@ CREATE TABLE tb_user (
     user_id VARCHAR(10) PRIMARY KEY,
     username VARCHAR(50),
     email VARCHAR(100),
+    email_verified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    email_verification_token_hash VARCHAR(64),
+    email_verification_expires_at TIMESTAMP,
+    email_verification_sent_at TIMESTAMP,
     password VARCHAR(255),
     user_role user_role_enum
 );

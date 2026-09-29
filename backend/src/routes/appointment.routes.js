@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
-const { queueAppointmentNotification } = require('../services/mail.service');
+const { queueAppointmentNotification, queueClinicRequestNotification } = require('../services/mail.service');
 
 const APPT_STATUS_PENDING = '\u0e23\u0e2d';
 const APPT_STATUS_CLINIC_PENDING = 'รอคลินิกยืนยัน';
@@ -119,7 +119,7 @@ const isWithinVetSchedule = async ({ vetId, apptDate, apptTime }) => {
         WHERE vet_id = $1
           AND work_date = $2
           AND start_time <= $3::time
-          AND end_time > $3::time
+          AND end_time >= ($3::time + INTERVAL '30 minutes')
         LIMIT 1
         `,
         [vetId, apptDate, apptTime]
@@ -143,7 +143,9 @@ const getAppointmentNotificationData = async (appointmentId) => {
             v.vet_name,
             p.pet_name,
             o.owner_name,
-            COALESCE(o.owner_email, u.email) AS owner_email,
+            o.owner_tel,
+            CASE WHEN u.user_id IS NULL OR u.email_verified_at IS NOT NULL
+              THEN COALESCE(o.owner_email, u.email) ELSE NULL END AS owner_email,
             c.clinic_name,
             c.tel AS clinic_tel,
             c.address AS clinic_address
@@ -408,7 +410,7 @@ router.post('/', auth, async (req, res) => {
 
             if (!withinSchedule) {
                 return res.status(409).json({
-                    message: 'เวลานัดหมายอยู่นอกตารางเวรของสัตวแพทย์ที่เลือก'
+                    message: 'ช่วงเวลานัด 30 นาทีต้องอยู่ภายในตารางเวรของสัตวแพทย์ที่เลือก'
                 });
             }
 
@@ -561,7 +563,19 @@ router.post('/request', auth, async (req, res) => {
             [apptId, pet_id, preferredVetId || null, date, time, reason, APPT_STATUS_CLINIC_PENDING]
         );
         await client.query('COMMIT');
-        res.status(201).json({ message: 'ส่งคำขอนัดหมายแล้ว รอคลินิกยืนยัน', appointment: result.rows[0] });
+        let clinicEmailNotification;
+        try {
+            const notificationAppointment = await getAppointmentNotificationData(apptId);
+            clinicEmailNotification = queueClinicRequestNotification({ appointment: notificationAppointment });
+        } catch (notificationError) {
+            console.error('Queue clinic appointment request email failed:', notificationError.message);
+            clinicEmailNotification = { sent: false, queued: false, skipped: true, reason: 'notification-unavailable' };
+        }
+        res.status(201).json({
+            message: 'ส่งคำขอนัดหมายแล้ว รอคลินิกยืนยัน',
+            appointment: result.rows[0],
+            clinic_email_notification: clinicEmailNotification
+        });
     } catch (err) {
         await client.query('ROLLBACK').catch(() => {});
         console.error('Create Owner Appointment Request Error:', err);
@@ -799,7 +813,9 @@ router.put('/:id', auth, async (req, res) => {
             });
         }
 
-        if (isActiveStatus(nextStatus)) {
+        // Existing late appointments may be edited without changing their slot;
+        // only new or changed active slots must meet the current shift rule.
+        if (isActiveStatus(nextStatus) && (slotChanged || !isActiveStatus(currentStatus))) {
             const withinSchedule = await isWithinVetSchedule({
                 vetId: vet_id,
                 apptDate: normalizedDate,
@@ -808,7 +824,7 @@ router.put('/:id', auth, async (req, res) => {
 
             if (!withinSchedule) {
                 return res.status(409).json({
-                    message: 'เวลานัดหมายอยู่นอกตารางเวรของสัตวแพทย์ที่เลือก'
+                    message: 'ช่วงเวลานัด 30 นาทีต้องอยู่ภายในตารางเวรของสัตวแพทย์ที่เลือก'
                 });
             }
 

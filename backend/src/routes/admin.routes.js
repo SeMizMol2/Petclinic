@@ -3,6 +3,11 @@ const router = express.Router();
 const pool = require('../database/db');
 const auth = require('./auth.middleware');
 const bcrypt = require('bcryptjs');
+const { randomBytes } = require('node:crypto');
+const { protectedRecordMessage, lockPet, petHasHistory, lockOwnerAndCheckHistory } = require('../services/deletion-guard');
+const { usernameValidationMessage, lockUsernameWrites, usernameExists } = require('../services/username-guard');
+const { petBirthdateError } = require('../services/pet-birthdate');
+const { passwordValidationMessage } = require('../services/password-policy');
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
@@ -82,7 +87,7 @@ router.post('/users', auth, async (req, res) => {
   const client = await pool.connect();
   let transactionStarted = false;
   try {
-    const { owner_name, email, tel } = req.body;
+    const { owner_name, email, tel, password } = req.body;
     const normalizedEmail = normalizeEmail(email);
 
     if (normalizedEmail && !emailPattern.test(normalizedEmail)) {
@@ -93,18 +98,26 @@ router.post('/users', auth, async (req, res) => {
       return res.status(403).json({ message: 'ไม่มีสิทธิ์ทำรายการ' });
     }
 
-    const time = Date.now();
-    const userId = 'U' + time;
-    const ownerId = 'O' + time;
-    const mockUsername = `guest_${time}`;
-    const mockPassword = await bcrypt.hash('123456', 10);
+    const userId = makeId('U', 10);
+    const ownerId = makeId('O', 20);
+    const mockUsername = `guest_${userId.toLowerCase()}`;
+    const initialPassword = password == null || password === '' ? randomBytes(18).toString('base64url') : password;
+    const passwordError = passwordValidationMessage(initialPassword);
+    if (passwordError) return res.status(400).json({ message: passwordError });
+    const hashedPassword = await bcrypt.hash(initialPassword, 10);
 
     await client.query('BEGIN');
     transactionStarted = true;
+    await lockUsernameWrites(client);
+    if (await usernameExists(client, mockUsername)) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
+      return res.status(400).json({ message: 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว กรุณาลองใหม่' });
+    }
     await client.query(
       `INSERT INTO tb_user (user_id, username, email, password, user_role)
        VALUES ($1, $2, $3, $4, $5)`,
-      [userId, mockUsername, normalizedEmail || null, mockPassword, 'user']
+      [userId, mockUsername, normalizedEmail || null, hashedPassword, 'user']
     );
 
     await client.query(
@@ -115,7 +128,7 @@ router.post('/users', auth, async (req, res) => {
     await client.query('COMMIT');
     transactionStarted = false;
 
-    res.json({ message: 'เพิ่มสมาชิกสำเร็จ', username: mockUsername });
+    res.json({ message: 'เพิ่มสมาชิกสำเร็จ', username: mockUsername, initial_password: initialPassword });
   } catch (err) {
     if (transactionStarted) await client.query('ROLLBACK');
     console.error(err);
@@ -129,23 +142,39 @@ router.post('/users', auth, async (req, res) => {
 });
 
 router.delete('/users/:id', auth, async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const client = await pool.connect();
   try {
     const { id } = req.params;
-
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'ไม่มีสิทธิ์ทำรายการ' });
+    await client.query('BEGIN');
+    const user = await client.query('SELECT user_id FROM tb_user WHERE user_id = $1 FOR UPDATE', [id]);
+    if (!user.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'ไม่พบบัญชีผู้ใช้' });
     }
-
-    await pool.query('DELETE FROM tb_user WHERE user_id = $1', [id]);
-
+    const owners = await client.query('SELECT owner_id FROM tb_owner WHERE user_id = $1 ORDER BY owner_id', [id]);
+    for (const owner of owners.rows) {
+      const check = await lockOwnerAndCheckHistory(client, owner.owner_id);
+      if (check.protected) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ message: protectedRecordMessage });
+      }
+    }
+    await client.query('DELETE FROM tb_user WHERE user_id = $1', [id]);
+    await client.query('COMMIT');
     res.json({ message: 'ลบผู้ใช้งานสำเร็จ' });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ message: 'ลบไม่สำเร็จ (อาจมีข้อมูลสัตว์เลี้ยงค้างอยู่)' });
+  } finally {
+    client.release();
   }
 });
 
 router.put('/users/:id', auth, async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  let client;
   try {
     const { id } = req.params;
     const { username, owner_name, email, tel } = req.body;
@@ -155,31 +184,53 @@ router.put('/users/:id', auth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid email format' });
     }
 
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'ไม่มีสิทธิ์ทำรายการ' });
+    if (username != null && typeof username !== 'string') {
+      return res.status(400).json({ message: 'ชื่อผู้ใช้ต้องเป็นข้อความ' });
+    }
+    const loginName = username?.trim() || '';
+    if (loginName) {
+      const usernameError = usernameValidationMessage(loginName);
+      if (usernameError) return res.status(400).json({ message: usernameError });
     }
 
-    if (username) {
-      await pool.query(
+    client = await pool.connect();
+    await client.query('BEGIN');
+    await lockUsernameWrites(client);
+    if (loginName && await usernameExists(client, loginName, id)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว' });
+    }
+    const existingUser = await client.query('SELECT user_id FROM tb_user WHERE user_id = $1 FOR UPDATE', [id]);
+    if (!existingUser.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'ไม่พบบัญชีผู้ใช้' });
+    }
+
+    if (loginName) {
+      await client.query(
         'UPDATE tb_user SET username = $1, email = $2 WHERE user_id = $3',
-        [username, normalizedEmail || null, id]
+        [loginName, normalizedEmail || null, id]
       );
     } else {
-      await pool.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [normalizedEmail || null, id]);
+      await client.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [normalizedEmail || null, id]);
     }
 
-    await pool.query(
+    await client.query(
       'UPDATE tb_owner SET owner_name = $1, owner_email = $2, owner_tel = $3 WHERE user_id = $4',
       [owner_name, normalizedEmail || null, tel, id]
     );
 
+    await client.query('COMMIT');
     res.json({ message: 'แก้ไขข้อมูลสำเร็จ' });
   } catch (err) {
-    console.error(err);
+    if (client) await client.query('ROLLBACK').catch(() => {});
     if (err.code === '23505') {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
     }
+    console.error(err);
     res.status(500).json({ message: 'แก้ไขไม่สำเร็จ' });
+  } finally {
+    if (client) client.release();
   }
 });
 
@@ -212,10 +263,9 @@ router.get('/owners', auth, async (req, res) => {
 });
 
 router.post('/owners', auth, async (req, res) => {
-  const client = await pool.connect();
+  if (!requireAdmin(req, res)) return;
+  let client;
   try {
-    if (!requireAdmin(req, res)) return;
-
     const { owner_name, owner_email, owner_tel, username, password } = req.body;
     const normalizedOwnerEmail = normalizeEmail(owner_email);
 
@@ -226,14 +276,29 @@ router.post('/owners', auth, async (req, res) => {
     if (!owner_name) {
       return res.status(400).json({ message: 'กรุณากรอกชื่อเจ้าของสัตว์' });
     }
+    if (username != null && typeof username !== 'string') {
+      return res.status(400).json({ message: 'ชื่อผู้ใช้ต้องเป็นข้อความ' });
+    }
 
     const userId = makeId('U', 10);
     const ownerId = makeId('O', 20);
-    const loginName = username || `guest_${userId.toLowerCase()}`;
-    const rawPassword = password || '123456';
-    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const loginName = username?.trim() || `guest_${userId.toLowerCase()}`;
+    const usernameError = usernameValidationMessage(loginName);
+    if (usernameError) {
+      return res.status(400).json({ message: usernameError });
+    }
+    const initialPassword = password == null || password === '' ? randomBytes(18).toString('base64url') : password;
+    const passwordError = passwordValidationMessage(initialPassword);
+    if (passwordError) return res.status(400).json({ message: passwordError });
+    const hashedPassword = await bcrypt.hash(initialPassword, 10);
 
+    client = await pool.connect();
     await client.query('BEGIN');
+    await lockUsernameWrites(client);
+    if (await usernameExists(client, loginName)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว' });
+    }
     await client.query(
       `INSERT INTO tb_user (user_id, username, email, password, user_role)
        VALUES ($1, $2, $3, $4, $5)`,
@@ -250,24 +315,24 @@ router.post('/owners', auth, async (req, res) => {
       message: 'เพิ่มเจ้าของสัตว์สำเร็จ',
       owner_id: ownerId,
       username: loginName,
-      default_password: rawPassword
+      initial_password: initialPassword
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     if (err.code === '23505') {
       return res.status(400).json({ message: 'Email already exists' });
     }
     res.status(500).json({ message: 'เพิ่มเจ้าของสัตว์ไม่สำเร็จ' });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
 
 router.put('/owners/:id', auth, async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  let client;
   try {
-    if (!requireAdmin(req, res)) return;
-
     const { id } = req.params;
     const { owner_name, owner_email, owner_tel, username } = req.body;
     const normalizedOwnerEmail = normalizeEmail(owner_email);
@@ -279,56 +344,114 @@ router.put('/owners/:id', auth, async (req, res) => {
     if (!owner_name) {
       return res.status(400).json({ message: 'กรุณากรอกชื่อเจ้าของสัตว์' });
     }
-
-    const result = await pool.query(
-      `UPDATE tb_owner
-       SET owner_name = $1,
-           owner_email = $2,
-           owner_tel = $3
-       WHERE owner_id = $4
-       RETURNING user_id`,
-      [owner_name, normalizedOwnerEmail || null, owner_tel || null, id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'ไม่พบเจ้าของสัตว์' });
+    if (username != null && typeof username !== 'string') {
+      return res.status(400).json({ message: 'ชื่อผู้ใช้ต้องเป็นข้อความ' });
+    }
+    const loginName = username?.trim() || '';
+    if (loginName) {
+      const usernameError = usernameValidationMessage(loginName);
+      if (usernameError) return res.status(400).json({ message: usernameError });
     }
 
-    if (username && result.rows[0].user_id) {
-      await pool.query(
-        'UPDATE tb_user SET username = $1, email = $2 WHERE user_id = $3',
-        [username, normalizedOwnerEmail || null, result.rows[0].user_id]
-      );
-    } else if (result.rows[0].user_id) {
-      await pool.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [normalizedOwnerEmail || null, result.rows[0].user_id]);
-    }
-
-    res.json({ message: 'แก้ไขเจ้าของสัตว์สำเร็จ' });
-  } catch (err) {
-    console.error(err);
-    if (err.code === '23505') {
-      return res.status(400).json({ message: 'Email already exists' });
-    }
-    res.status(500).json({ message: 'แก้ไขเจ้าของสัตว์ไม่สำเร็จ' });
-  }
-});
-
-router.delete('/owners/:id', auth, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    if (!requireAdmin(req, res)) return;
-
-    const { id } = req.params;
+    client = await pool.connect();
     await client.query('BEGIN');
-
-    const owner = await client.query('SELECT user_id FROM tb_owner WHERE owner_id = $1', [id]);
-    if (owner.rows.length === 0) {
+    await lockUsernameWrites(client);
+    const identity = await client.query('SELECT user_id FROM tb_owner WHERE owner_id = $1', [id]);
+    if (!identity.rowCount) {
       await client.query('ROLLBACK');
       return res.status(404).json({ message: 'ไม่พบเจ้าของสัตว์' });
     }
 
-    if (owner.rows[0].user_id) {
-      await client.query('DELETE FROM tb_user WHERE user_id = $1', [owner.rows[0].user_id]);
+    const userId = identity.rows[0].user_id;
+    if (loginName && userId && await usernameExists(client, loginName, userId)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว' });
+    }
+    if (userId) {
+      const user = await client.query('SELECT user_id FROM tb_user WHERE user_id = $1 FOR UPDATE', [userId]);
+      if (!user.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ message: 'ไม่พบบัญชีผู้ใช้ที่เชื่อมกับเจ้าของสัตว์' });
+      }
+    }
+
+    const result = await client.query(
+      `UPDATE tb_owner
+       SET owner_name = $1,
+           owner_email = $2,
+           owner_tel = $3
+       WHERE owner_id = $4`,
+      [owner_name, normalizedOwnerEmail || null, owner_tel || null, id]
+    );
+
+    if (!result.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'ไม่พบเจ้าของสัตว์' });
+    }
+
+    if (loginName && userId) {
+      await client.query(
+        'UPDATE tb_user SET username = $1, email = $2 WHERE user_id = $3',
+        [loginName, normalizedOwnerEmail || null, userId]
+      );
+    } else if (userId) {
+      await client.query('UPDATE tb_user SET email = $1 WHERE user_id = $2', [normalizedOwnerEmail || null, userId]);
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: 'แก้ไขเจ้าของสัตว์สำเร็จ' });
+  } catch (err) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
+    }
+    console.error(err);
+    res.status(500).json({ message: 'แก้ไขเจ้าของสัตว์ไม่สำเร็จ' });
+  } finally {
+    if (client) client.release();
+  }
+});
+
+router.delete('/owners/:id', auth, async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    await client.query('BEGIN');
+    // Match the lock order used when an admin deletes a user account.
+    const identity = await client.query('SELECT user_id FROM tb_owner WHERE owner_id = $1', [id]);
+    if (!identity.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'ไม่พบเจ้าของสัตว์' });
+    }
+    if (identity.rows[0].user_id) {
+      await client.query('SELECT user_id FROM tb_user WHERE user_id = $1 FOR UPDATE', [identity.rows[0].user_id]);
+    }
+    const owner = await lockOwnerAndCheckHistory(client, id);
+    if (!owner.found) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'ไม่พบเจ้าของสัตว์' });
+    }
+    if (owner.protected) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: protectedRecordMessage });
+    }
+    if (owner.userId) {
+      const linkedOwners = await client.query(
+        'SELECT owner_id FROM tb_owner WHERE user_id = $1 AND owner_id <> $2 ORDER BY owner_id',
+        [owner.userId, id]
+      );
+      for (const linkedOwner of linkedOwners.rows) {
+        const check = await lockOwnerAndCheckHistory(client, linkedOwner.owner_id);
+        if (check.protected) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ message: protectedRecordMessage });
+        }
+      }
+    }
+
+    if (owner.userId) {
+      await client.query('DELETE FROM tb_user WHERE user_id = $1', [owner.userId]);
     } else {
       await client.query('DELETE FROM tb_owner WHERE owner_id = $1', [id]);
     }
@@ -386,6 +509,9 @@ router.post('/pets', auth, async (req, res) => {
       return res.status(400).json({ message: 'กรุณากรอกข้อมูลสัตว์เลี้ยงให้ครบ' });
     }
 
+    const birthdateError = petBirthdateError(pet_birthdate);
+    if (birthdateError) return res.status(400).json({ message: birthdateError });
+
     const petId = makeId('P', 20);
     await pool.query(
       `INSERT INTO tb_pet (
@@ -437,6 +563,9 @@ router.put('/pets/:id', auth, async (req, res) => {
       return res.status(400).json({ message: 'กรุณากรอกข้อมูลสัตว์เลี้ยงให้ครบ' });
     }
 
+    const birthdateError = petBirthdateError(pet_birthdate);
+    if (birthdateError) return res.status(400).json({ message: birthdateError });
+
     const result = await pool.query(
       `UPDATE tb_pet SET
         owner_id = $1,
@@ -477,18 +606,27 @@ router.put('/pets/:id', auth, async (req, res) => {
 });
 
 router.delete('/pets/:id', auth, async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const client = await pool.connect();
   try {
-    if (!requireAdmin(req, res)) return;
-
-    const result = await pool.query('DELETE FROM tb_pet WHERE pet_id = $1', [req.params.id]);
-    if (result.rowCount === 0) {
+    await client.query('BEGIN');
+    if (!await lockPet(client, req.params.id)) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'ไม่พบสัตว์เลี้ยง' });
     }
-
+    if (await petHasHistory(client, req.params.id)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: protectedRecordMessage });
+    }
+    await client.query('DELETE FROM tb_pet WHERE pet_id = $1', [req.params.id]);
+    await client.query('COMMIT');
     res.json({ message: 'ลบสัตว์เลี้ยงสำเร็จ' });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ message: 'ลบสัตว์เลี้ยงไม่สำเร็จ' });
+  } finally {
+    client.release();
   }
 });
 
@@ -757,7 +895,7 @@ router.get('/vaccines', auth, async (req, res) => {
         v.vac_rec_id,
         v.vaccine_name,
         v.lot_number,
-        v.vac_date,
+        v.vac_date::text AS vac_date,
         v.service_id,
         svc.service_name,
         v.pet_id,

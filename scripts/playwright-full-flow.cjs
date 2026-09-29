@@ -241,8 +241,11 @@ const main = async () => {
       await page.goto(`${APP_URL}/register`, { waitUntil: 'networkidle' });
       await page.getByLabel('ชื่อผู้ใช้').fill(qa.username);
       await page.getByLabel('อีเมล').fill(qa.email);
-      await page.getByLabel('รหัสผ่าน').fill(qa.password);
+      await page.getByLabel('รหัสผ่าน', { exact: true }).fill(qa.password);
+      await page.getByLabel('ยืนยันรหัสผ่าน', { exact: true }).fill(qa.password);
       await page.getByRole('button', { name: 'ลงทะเบียน' }).click();
+      await page.getByRole('heading', { name: 'สมัครสมาชิกสำเร็จ' }).waitFor();
+      await page.getByRole('link', { name: 'เข้าสู่ระบบ', exact: true }).click();
       await page.waitForURL((url) => url.pathname === '/login');
     });
 
@@ -254,10 +257,9 @@ const main = async () => {
     await step('user updates own profile', async () => {
       await gotoAndExpect('/user/profile', 'ข้อมูลส่วนตัว');
       await page.getByRole('button', { name: 'แก้ไขข้อมูล' }).click();
-      const inputs = page.locator('.profile-details input');
-      await inputs.nth(0).fill(qa.ownerName);
-      await inputs.nth(1).fill(qa.email);
-      await inputs.nth(2).fill('0812345678');
+      await page.getByLabel('ชื่อ-นามสกุล', { exact: true }).fill(qa.ownerName);
+      await page.getByLabel('อีเมล', { exact: true }).fill(qa.email);
+      await page.getByLabel('เบอร์โทรศัพท์', { exact: true }).fill('0812345678');
       await page.getByRole('button', { name: 'บันทึกข้อมูล' }).click();
       await expectBodyText(qa.ownerName);
     });
@@ -294,7 +296,7 @@ const main = async () => {
     await step('user pages load before clinic activity', async () => {
       await gotoAndExpect('/user/pets', qa.petName);
       await gotoAndExpect('/user/appointments', 'การนัดหมายของฉัน');
-      await gotoAndExpect('/user/receipts', 'ประวัติการชำระเงิน');
+      await gotoAndExpect('/user/receipts', 'ค่าใช้จ่ายและการชำระเงิน');
     });
 
     let adminToken;
@@ -408,8 +410,10 @@ const main = async () => {
       const requestRow = page.locator('.request-row').filter({ hasText: 'ขอนัดตรวจอาการ E2E' });
       await capture('admin-appointment-queue.png');
       if (process.env.E2E_CAPTURE_UI === '1') {
+        await page.getByRole('button', { name: /^รายการทั้งหมด/ }).click();
         await page.locator('.table-panel').scrollIntoViewIfNeeded();
         await capture('admin-appointment-table.png', false);
+        await page.getByRole('button', { name: /^รอคลินิกยืนยัน/ }).click();
       }
       await requestRow.getByRole('button', { name: 'ยืนยันนัด' }).click();
       await requestRow.waitFor({ state: 'hidden' });
@@ -605,6 +609,10 @@ const main = async () => {
       await expectBodyText('สุขภาพปกติ');
       await gotoAndExpect('/user/receipts', qa.receiptId);
       await expectBodyText('ชำระแล้ว');
+      const paidReceipt = page.locator('.receipt-row').filter({ hasText: qa.receiptId });
+      await paidReceipt.getByRole('button', { name: /ดูรายละเอียด/ }).click();
+      await paidReceipt.getByRole('heading', { name: 'ใบเสร็จรับเงิน' }).waitFor({ state: 'visible' });
+      await paidReceipt.getByText(qa.serviceName, { exact: true }).waitFor({ state: 'visible' });
     });
 
     await step('user cannot open admin pages', async () => {

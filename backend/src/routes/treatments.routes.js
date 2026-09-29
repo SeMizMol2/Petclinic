@@ -15,7 +15,10 @@ const ensureAdmin = (req, res) => {
 
 const nextTreatmentId = async (dbClient) => {
     const result = await dbClient.query(
-        'SELECT treatment_id FROM tb_treatment ORDER BY treatment_id DESC LIMIT 1'
+        `SELECT treatment_id FROM tb_treatment
+         WHERE treatment_id ~ '^TR[0-9]+$'
+         ORDER BY SUBSTRING(treatment_id FROM 3)::bigint DESC
+         LIMIT 1`
     );
 
     let newId = 'TR001';
@@ -115,6 +118,23 @@ const normalizePrice = (value) => {
     return Number.isFinite(price) && price >= 0 ? price : 0;
 };
 
+const validateTreatmentServices = (services) => {
+    if (services == null) return null;
+    if (!Array.isArray(services)) return 'รายการบริการต้องเป็นรายการข้อมูล';
+    for (const item of services) {
+        if (!item || !item.service_id) return 'กรุณาเลือกบริการให้ครบ';
+        const quantity = Number(item.quantity);
+        const price = Number(item.price);
+        if (item.quantity == null || item.quantity === '' || !Number.isInteger(quantity) || quantity <= 0) {
+            return 'จำนวนบริการต้องเป็นจำนวนเต็มมากกว่า 0';
+        }
+        if (item.price == null || item.price === '' || !Number.isFinite(price) || price < 0) {
+            return 'ราคาบริการต้องเป็นตัวเลขตั้งแต่ 0 บาทขึ้นไป';
+        }
+    }
+    return null;
+};
+
 const calculateServicesTotal = (services) => (services || []).reduce(
     (total, item) => total + (normalizePrice(item.price) * normalizeQuantity(item.quantity)),
     0
@@ -152,6 +172,7 @@ const nextReceiptDetailId = async (dbClient) => {
 };
 
 const syncUnpaidReceipt = async (dbClient, receipt, treatmentId, petId, totalAmount) => {
+    await dbClient.query('SELECT pg_advisory_xact_lock(74018, 1)');
     const ownerResult = await dbClient.query(
         'SELECT owner_id FROM tb_pet WHERE pet_id = $1',
         [petId]
@@ -321,12 +342,16 @@ router.post('/', auth, async (req, res) => {
             return res.status(400).json({ message: '\u0e01\u0e23\u0e38\u0e13\u0e32\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e40\u0e25\u0e35\u0e49\u0e22\u0e07' });
         }
 
+        const servicesError = validateTreatmentServices(services);
+        if (servicesError) return res.status(400).json({ message: servicesError });
+
         const applicabilityError = await validateServiceApplicability(client, pet_id, services);
         if (applicabilityError) {
             return res.status(applicabilityError.status).json({ message: applicabilityError.message });
         }
 
         await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(74018, 2)');
         const newTrId = await nextTreatmentId(client);
         const calculatedTotal = calculateServicesTotal(services);
 
@@ -373,6 +398,9 @@ router.put('/:id', auth, async (req, res) => {
         if (!pet_id) {
             return res.status(400).json({ message: '\u0e01\u0e23\u0e38\u0e13\u0e32\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e31\u0e15\u0e27\u0e4c\u0e40\u0e25\u0e35\u0e49\u0e22\u0e07' });
         }
+
+        const servicesError = validateTreatmentServices(services);
+        if (servicesError) return res.status(400).json({ message: servicesError });
 
         await client.query('BEGIN');
 

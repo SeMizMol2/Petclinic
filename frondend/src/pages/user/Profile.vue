@@ -1,336 +1,278 @@
 <template>
-  <div class="profile-page">
-    <section class="hero-section">
-      <div>
-        <p class="eyebrow">Owner profile</p>
-        <h1>ข้อมูลส่วนตัว</h1>
-        <p class="hero-text">จัดการรูปโปรไฟล์ ข้อมูลติดต่อ และรายละเอียดเจ้าของสัตว์เลี้ยงได้จากหน้าจอนี้</p>
-      </div>
-      <button class="action-btn" @click="isEditing ? saveProfile() : (isEditing = true)">
-        {{ isEditing ? 'บันทึกข้อมูล' : 'แก้ไขข้อมูล' }}
-      </button>
-    </section>
-
-    <section class="profile-grid">
-      <div class="profile-summary">
-        <div class="avatar-panel" @click="triggerFileInput">
-          <img v-if="previewImage || user.profile_pic" :src="previewImage || resolveApiAssetUrl(user.profile_pic)" class="avatar-img" />
-          <div v-else class="avatar-text">{{ user.username?.charAt(0).toUpperCase() || 'U' }}</div>
-          <div class="avatar-overlay">
-            <AppIcon name="upload" :size="18" />
-            <span>อัปโหลดรูป</span>
-          </div>
-          <input ref="fileInput" type="file" accept="image/*" class="hidden-input" @change="onFileSelected" />
+  <section class="profile-panel" :aria-busy="loading">
+    <p v-if="loading" role="status">กำลังโหลดข้อมูลส่วนตัว…</p>
+    <div v-else-if="loadError" class="load-error" role="alert">
+      <p>{{ loadError }}</p><button type="button" class="secondary" @click="loadProfile">ลองอีกครั้ง</button>
+    </div>
+    <template v-else>
+      <header class="profile-identity">
+        <div class="avatar" aria-hidden="true">
+          <img v-if="avatarUrl && !imageFailed" :src="avatarUrl" alt="" @error="imageFailed = true" />
+          <span v-else>{{ (user.owner_name || user.username || 'U').charAt(0).toUpperCase() }}</span>
         </div>
-
-        <div class="summary-copy">
+        <div class="identity-copy">
+          <p class="section-kicker">เจ้าของสัตว์เลี้ยง</p>
           <h2>{{ user.owner_name || user.username || 'เจ้าของสัตว์เลี้ยง' }}</h2>
-          <p class="summary-inline"><AppIcon name="mail" :size="16" /> {{ user.email || 'ยังไม่ได้ระบุอีเมล' }}</p>
-          <span class="summary-tag"><AppIcon name="phone" :size="14" /> {{ user.tel || 'ยังไม่ได้ระบุเบอร์โทรศัพท์' }}</span>
+          <p class="username">@{{ user.username || 'ผู้ใช้งาน' }}</p>
+          <button type="button" class="photo-button" :disabled="uploading || saving" @click="fileInput?.click()">
+            <AppIcon name="upload" :size="16" />{{ uploading ? 'กำลังอัปโหลด…' : 'เปลี่ยนรูป' }}
+          </button>
+          <input ref="fileInput" class="hidden-input" type="file" accept="image/*" aria-label="เลือกรูปโปรไฟล์" @change="onFileSelected" />
         </div>
-      </div>
+        <button v-if="!isEditing" ref="editButton" type="button" class="secondary edit-button" :disabled="uploading || changingPassword" @click="beginEdit">แก้ไขข้อมูล</button>
+        <span v-else class="editing-note">กำลังแก้ไขข้อมูล</span>
+      </header>
+      <p class="photo-help">รูปบันทึกทันทีเมื่ออัปโหลดสำเร็จ · ขนาดไม่เกิน 5 MB</p>
+      <p v-if="photoError" class="message error" role="alert">{{ photoError }}</p>
+      <p v-if="photoSuccess" class="message success" role="status">{{ photoSuccess }}</p>
+      <p v-if="feedback" class="message success" role="status">{{ feedback }}</p>
 
-      <div class="profile-details">
-        <div class="detail-card">
-          <span class="detail-label">ชื่อ-นามสกุล</span>
-          <input v-if="isEditing" v-model="user.owner_name" class="detail-input" />
-          <div v-else class="detail-value">{{ user.owner_name || 'ไม่พบข้อมูล' }}</div>
-        </div>
+      <form @submit.prevent="saveProfile">
+        <section class="detail-section">
+          <h3>ข้อมูลเจ้าของ</h3>
+          <div class="field">
+            <label for="owner-name">ชื่อ-นามสกุล</label>
+            <input v-if="isEditing" id="owner-name" ref="nameInput" v-model="draft.owner_name" maxlength="100" autocomplete="name" :disabled="saving" />
+            <p v-else>{{ user.owner_name || 'ยังไม่ได้ระบุชื่อ' }}</p>
+          </div>
+        </section>
+        <section class="detail-section">
+          <h3>ข้อมูลติดต่อ</h3>
+          <div class="contact-grid">
+            <div class="field">
+              <label for="owner-email">อีเมล</label>
+              <input v-if="isEditing" id="owner-email" v-model="draft.email" type="email" maxlength="100" autocomplete="email" :disabled="saving" />
+              <p v-else>{{ user.email || 'ยังไม่ได้ระบุอีเมล' }}</p>
+              <p v-if="!isEditing && user.email && !user.email_verified_at" class="email-pending">อีเมลนี้ยังไม่ยืนยัน <button type="button" class="resend-inline" :disabled="resendingEmail" @click="resendVerification">{{ resendingEmail ? 'กำลังส่ง…' : 'ส่งลิงก์ใหม่' }}</button></p>
+            </div>
+            <div class="field">
+              <label for="owner-phone">เบอร์โทรศัพท์</label>
+              <input v-if="isEditing" id="owner-phone" v-model="draft.tel" type="tel" maxlength="15" autocomplete="tel" :disabled="saving" />
+              <p v-else>{{ user.tel || 'ยังไม่ได้ระบุเบอร์โทรศัพท์' }}</p>
+            </div>
+          </div>
+        </section>
+        <footer class="profile-footer">
+          <p>ข้อมูลนี้ใช้สำหรับให้คลินิกติดต่อและนัดหมาย</p>
+          <p v-if="saveError" class="message error" role="alert">{{ saveError }}</p>
+          <div v-if="isEditing" class="form-actions">
+            <button type="button" class="secondary" :disabled="saving || uploading" @click="cancelEdit">ยกเลิก</button>
+            <button type="submit" class="primary" :disabled="saving || uploading">{{ saving ? 'กำลังบันทึก…' : 'บันทึกข้อมูล' }}</button>
+          </div>
+        </footer>
+      </form>
 
-        <div class="detail-card">
-          <span class="detail-label">อีเมล</span>
-          <input v-if="isEditing" v-model="user.email" class="detail-input" />
-          <div v-else class="detail-value">{{ user.email || 'ยังไม่ได้ระบุอีเมล' }}</div>
+      <section v-if="!isEditing" class="password-section" aria-labelledby="password-section-title">
+        <div class="password-heading">
+          <div>
+            <h3 id="password-section-title">ความปลอดภัยของบัญชี</h3>
+            <p>เปลี่ยนรหัสผ่านด้วยรหัสปัจจุบันของคุณ</p>
+          </div>
+          <button v-if="!changingPassword" type="button" class="secondary" @click="openPasswordForm">เปลี่ยนรหัสผ่าน</button>
         </div>
-
-        <div class="detail-card">
-          <span class="detail-label">เบอร์โทรศัพท์</span>
-          <input v-if="isEditing" v-model="user.tel" class="detail-input" />
-          <div v-else class="detail-value">{{ user.tel || 'ยังไม่ได้ระบุเบอร์โทรศัพท์' }}</div>
-        </div>
-
-        <div class="detail-card detail-note">
-          <span class="detail-label">หมายเหตุ</span>
-          <div class="detail-value muted">ข้อมูลนี้จะถูกใช้ประกอบการติดต่อ นัดหมาย และออกเอกสารของคลินิก</div>
-        </div>
-      </div>
-    </section>
-  </div>
+        <p v-if="passwordSuccess" class="message success" role="status">{{ passwordSuccess }}</p>
+        <form v-if="changingPassword" class="password-form" @submit.prevent="changePassword">
+          <div class="password-fields">
+            <div class="field">
+              <label for="current-password">รหัสผ่านปัจจุบัน</label>
+              <input id="current-password" ref="currentPasswordInput" v-model="passwordDraft.current" type="password" autocomplete="current-password" required :disabled="passwordSaving" />
+            </div>
+            <div class="field">
+              <label for="new-password">รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)</label>
+              <input id="new-password" v-model="passwordDraft.next" type="password" autocomplete="new-password" minlength="8" required :disabled="passwordSaving" />
+            </div>
+            <div class="field">
+              <label for="confirm-password">ยืนยันรหัสผ่านใหม่</label>
+              <input id="confirm-password" v-model="passwordDraft.confirm" type="password" autocomplete="new-password" minlength="8" required :disabled="passwordSaving" />
+            </div>
+          </div>
+          <p v-if="passwordError" class="message error" role="alert">{{ passwordError }}</p>
+          <div class="form-actions">
+            <button type="button" class="secondary" :disabled="passwordSaving" @click="cancelPasswordForm">ยกเลิก</button>
+            <button type="submit" class="primary" :disabled="passwordSaving">{{ passwordSaving ? 'กำลังเปลี่ยนรหัสผ่าน…' : 'บันทึกรหัสผ่านใหม่' }}</button>
+          </div>
+        </form>
+      </section>
+    </template>
+  </section>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import axios from 'axios'
-import { resolveApiAssetUrl } from '../../api'
+import { API_BASE_URL, resolveApiAssetUrl } from '../../api'
 import AppIcon from '../../components/AppIcon.vue'
 
 const user = ref({})
-const fileInput = ref(null)
-const previewImage = ref(null)
-const isEditing = ref(false)
-
+const draft = ref({ owner_name: '', email: '', tel: '' })
+const loading = ref(true), saving = ref(false), uploading = ref(false), isEditing = ref(false)
+const loadError = ref(''), saveError = ref(''), feedback = ref(''), photoError = ref(''), photoSuccess = ref('')
+const resendingEmail = ref(false)
+const changingPassword = ref(false), passwordSaving = ref(false), passwordError = ref(''), passwordSuccess = ref('')
+const passwordDraft = ref({ current: '', next: '', confirm: '' })
+const currentPasswordInput = ref(null)
+const fileInput = ref(null), nameInput = ref(null), editButton = ref(null)
+const previewImage = ref(''), imageFailed = ref(false)
+const avatarUrl = computed(() => previewImage.value || resolveApiAssetUrl(user.value.profile_pic))
+const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
+const persistSession = () => {
+  let previous = {}
+  try { previous = JSON.parse(localStorage.getItem('user') || '{}') } catch { /* Preserve a usable session even if cached data is invalid. */ }
+  localStorage.setItem('user', JSON.stringify({ ...previous, ...user.value }))
+  window.dispatchEvent(new Event('petclinic:profile-updated'))
+}
+const resetPreview = () => {
+  if (previewImage.value) URL.revokeObjectURL(previewImage.value)
+  previewImage.value = ''
+  imageFailed.value = false
+}
 const loadProfile = async () => {
-  const token = localStorage.getItem('token')
-  if (!token) return
-
+  loading.value = true
+  loadError.value = ''
   try {
-    const res = await axios.get('http://localhost:3000/api/user/me', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    user.value = {
-      ...res.data,
-      email: res.data.owner_email
-    }
-    localStorage.setItem('user', JSON.stringify(user.value))
-  } catch (err) {
-    console.error('โหลดข้อมูลผู้ใช้ไม่สำเร็จ:', err)
-    const userData = JSON.parse(localStorage.getItem('user'))
-    if (userData) user.value = userData
-  }
+    const { data } = await axios.get(`${API_BASE_URL}/api/user/me`, { headers: headers() })
+    user.value = { ...data, email: data.owner_email || '' }
+    persistSession()
+  } catch {
+    loadError.value = 'โหลดข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง'
+  } finally { loading.value = false }
 }
-
-onMounted(loadProfile)
-
-const triggerFileInput = () => fileInput.value?.click()
-
-const onFileSelected = async (event) => {
-  const file = event.target.files[0]
-  if (!file) return
-
-  previewImage.value = URL.createObjectURL(file)
-  const formData = new FormData()
-  formData.append('profileImage', file)
-
-  try {
-    const token = localStorage.getItem('token')
-    const res = await axios.post('http://localhost:3000/api/user/upload-profile', formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-
-    if (res.data.success) {
-      user.value.profile_pic = res.data.imageUrl
-      localStorage.setItem('user', JSON.stringify(user.value))
-      alert('อัปโหลดรูปสำเร็จ')
-    }
-  } catch (err) {
-    console.error(err)
-    alert('อัปโหลดรูปไม่สำเร็จ')
-  }
+const beginEdit = async () => {
+  draft.value = { owner_name: user.value.owner_name || '', email: user.value.email || '', tel: user.value.tel || '' }
+  saveError.value = ''; feedback.value = ''; isEditing.value = true
+  await nextTick(); nameInput.value?.focus()
 }
-
+const cancelEdit = async () => {
+  isEditing.value = false; saveError.value = ''
+  draft.value = { owner_name: '', email: '', tel: '' }
+  await nextTick(); editButton.value?.focus()
+}
 const saveProfile = async () => {
+  if (saving.value || uploading.value || !isEditing.value) return
+  saving.value = true; saveError.value = ''
+  const payload = { owner_name: draft.value.owner_name.trim(), owner_email: draft.value.email.trim().toLowerCase(), tel: draft.value.tel.trim() }
   try {
-    const token = localStorage.getItem('token')
-    await axios.put(
-      'http://localhost:3000/api/user/me',
-      {
-        owner_name: user.value.owner_name,
-        owner_email: user.value.email,
-        tel: user.value.tel
-      },
-      {
-        headers: { Authorization: `Bearer ${token}` }
-      }
-    )
-
-    localStorage.setItem('user', JSON.stringify(user.value))
-    isEditing.value = false
-    alert('บันทึกข้อมูลเรียบร้อย')
-  } catch (err) {
-    console.error(err)
-    alert(err.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ')
-  }
+    const { data } = await axios.put(`${API_BASE_URL}/api/user/me`, payload, { headers: headers() })
+    user.value = { ...user.value, ...payload, email: payload.owner_email, email_verified_at: data.email_verification_required ? null : user.value.email_verified_at }
+    persistSession(); isEditing.value = false
+    feedback.value = data.email_verification_required
+      ? (data.verification_email_sent ? 'บันทึกแล้ว กรุณายืนยันอีเมลใหม่ก่อนเข้าสู่ระบบครั้งถัดไป' : 'บันทึกแล้ว แต่ส่งลิงก์ยืนยันไม่สำเร็จ กดส่งลิงก์ใหม่ด้านล่าง')
+      : 'บันทึกข้อมูลเรียบร้อยแล้ว'
+    await nextTick(); editButton.value?.focus()
+  } catch (error) { saveError.value = error.response?.data?.message || 'บันทึกไม่สำเร็จ ข้อมูลที่แก้ไขยังอยู่ กรุณาลองอีกครั้ง' }
+  finally { saving.value = false }
 }
+const resendVerification = async () => {
+  if (resendingEmail.value) return
+  resendingEmail.value = true; saveError.value = ''; feedback.value = ''
+  try {
+    await axios.post(`${API_BASE_URL}/api/auth/resend-verification`, { email: user.value.email })
+    feedback.value = 'หากอีเมลยังรอยืนยัน ระบบส่งลิงก์ใหม่แล้ว กรุณาตรวจกล่องจดหมายและสแปม'
+  } catch (error) {
+    saveError.value = error.response?.data?.message || 'ส่งลิงก์ใหม่ไม่สำเร็จ กรุณาลองอีกครั้ง'
+  } finally { resendingEmail.value = false }
+}
+const openPasswordForm = async () => {
+  passwordError.value = ''; passwordSuccess.value = ''; changingPassword.value = true
+  await nextTick(); currentPasswordInput.value?.focus()
+}
+const cancelPasswordForm = () => {
+  if (passwordSaving.value) return
+  passwordDraft.value = { current: '', next: '', confirm: '' }
+  passwordError.value = ''; changingPassword.value = false
+}
+const changePassword = async () => {
+  if (passwordSaving.value) return
+  passwordError.value = ''
+  const { current, next, confirm } = passwordDraft.value
+  if (next !== confirm) { passwordError.value = 'รหัสผ่านใหม่กับช่องยืนยันไม่ตรงกัน'; return }
+  if (next === current) { passwordError.value = 'รหัสผ่านใหม่ต้องต่างจากรหัสผ่านปัจจุบัน'; return }
+  passwordSaving.value = true
+  try {
+    await axios.put(`${API_BASE_URL}/api/user/me/password`, { current_password: current, new_password: next }, { headers: headers() })
+    passwordDraft.value = { current: '', next: '', confirm: '' }
+    changingPassword.value = false
+    passwordSuccess.value = 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว ใช้รหัสใหม่ในการเข้าสู่ระบบครั้งถัดไป'
+  } catch (error) {
+    passwordError.value = error.response?.data?.message || 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาลองอีกครั้ง'
+  } finally { passwordSaving.value = false }
+}
+const onFileSelected = async (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file || uploading.value || saving.value) return
+  photoError.value = ''; photoSuccess.value = ''
+  if (!file.type.startsWith('image/')) { photoError.value = 'กรุณาเลือกไฟล์รูปภาพ'; return }
+  if (file.size > 5 * 1024 * 1024) { photoError.value = 'รูปภาพต้องมีขนาดไม่เกิน 5 MB'; return }
+  resetPreview(); previewImage.value = URL.createObjectURL(file); uploading.value = true
+  const form = new FormData(); form.append('profileImage', file)
+  try {
+    const { data } = await axios.post(`${API_BASE_URL}/api/user/upload-profile`, form, { headers: headers() })
+    if (!data.success || !data.imageUrl) throw new Error('Upload failed')
+    user.value.profile_pic = data.imageUrl; persistSession(); photoSuccess.value = 'บันทึกรูปโปรไฟล์เรียบร้อยแล้ว'
+  } catch (error) { photoError.value = error.response?.data?.message || 'อัปโหลดไม่สำเร็จ รูปเดิมยังอยู่ กรุณาลองอีกครั้ง' }
+  finally { resetPreview(); uploading.value = false }
+}
+onMounted(loadProfile)
+onUnmounted(resetPreview)
 </script>
 
 <style scoped>
-.profile-page {
-  display: grid;
-  gap: 20px;
-}
-
-.hero-section {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: start;
-  padding: 28px;
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  color: #0f766e;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.hero-section h1 {
-  margin: 0;
-  font-size: 30px;
-  color: #0f172a;
-}
-
-.hero-text {
-  margin: 8px 0 0;
-  max-width: 580px;
-  color: #64748b;
-  line-height: 1.65;
-}
-
-.profile-grid {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 20px;
-}
-
-.profile-summary {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.avatar-panel {
-  position: relative;
-  width: 132px;
-  height: 132px;
-  border-radius: 22px;
-  overflow: hidden;
-  cursor: pointer;
-  background: linear-gradient(135deg, #0f766e, #14b8a6);
-  margin-bottom: 18px;
-  box-shadow: 0 18px 32px rgba(15, 118, 110, 0.2);
-}
-
-.avatar-img,
-.avatar-text {
-  width: 100%;
-  height: 100%;
-}
-
-.avatar-img {
-  object-fit: cover;
-}
-
-.avatar-text {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-size: 52px;
-  font-weight: 800;
-}
-
-.avatar-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(17, 24, 39, 0.45);
-  color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.avatar-panel:hover .avatar-overlay {
-  opacity: 1;
-}
-
-.hidden-input {
-  display: none;
-}
-
-.summary-copy h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #0f172a;
-}
-
-.summary-inline {
-  margin: 10px 0 14px;
-  color: #64748b;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.summary-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 999px;
-  padding: 9px 13px;
-  background: #ecfdf5;
-  color: #0f766e;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.profile-details {
-  padding: 24px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.detail-card {
-  background: #f8fafc;
-  border-radius: 16px;
-  border: 1px solid #e8eef5;
-  padding: 18px;
-}
-
-.detail-note {
-  grid-column: 1 / -1;
-}
-
-.detail-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.detail-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: #0f172a;
-  line-height: 1.6;
-}
-
-.muted {
-  color: #475569;
-  font-weight: 500;
-}
-
-@media (max-width: 900px) {
-  .profile-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 720px) {
-  .hero-section {
-    flex-direction: column;
-  }
-
-  .profile-details {
-    grid-template-columns: 1fr;
-  }
+.profile-panel { max-width: 1040px; padding: 36px 40px; background: #fff; border: 1px solid var(--pc-border, #dae3e9); border-radius: 16px; color: #183343; }
+.profile-identity { display: flex; align-items: center; gap: 24px; }
+.avatar { width: 104px; height: 104px; border-radius: 50%; overflow: hidden; flex: none; background: #e4f3f0; color: #0f766e; display: grid; place-items: center; font-size: 38px; font-weight: 700; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.identity-copy { min-width: 0; flex: 1; }
+.section-kicker { margin: 0 0 5px; color: #526a78; font-size: 13px; }
+h2 { margin: 0; font-size: 26px; line-height: 1.4; overflow-wrap: anywhere; }
+.username { margin: 3px 0 10px; color: #526a78; font-size: 14px; overflow-wrap: anywhere; }
+button { font: inherit; cursor: pointer; min-height: 44px; border-radius: 8px; padding: 10px 18px; font-weight: 600; box-shadow: none; }
+.secondary { border: 1px solid #cbd9e1; background: #fff; color: #244658; }
+.secondary:hover { background: #f3f7f8; }
+.primary { border: 1px solid #0f766e; background: #0f766e; color: #fff; }
+.primary:hover { background: #095f59; }
+.photo-button { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; background: transparent; color: #0f766e; min-height: 32px; }
+.photo-button:hover { text-decoration: underline; }
+button:disabled { opacity: .55; cursor: wait; }
+button:focus-visible, input:focus-visible { outline: 3px solid #4caaa1; outline-offset: 3px; }
+.hidden-input { display: none; }
+.editing-note { color: #526a78; font-size: 13px; }
+.photo-help { margin: 18px 0 24px; color: #526a78; font-size: 12px; line-height: 1.7; }
+.detail-section { border-top: 1px solid #e1e8ed; padding: 26px 0 28px; }
+h3 { margin: 0 0 20px; font-size: 17px; }
+.contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.field { min-width: 0; }
+.field label { display: block; color: #526a78; font-size: 13px; margin-bottom: 8px; }
+.field p { margin: 0; font-size: 16px; line-height: 1.65; overflow-wrap: anywhere; }
+.field .email-pending { margin-top: 6px; color: #a43522; font-size: 13px; }
+.resend-inline { min-height: 32px; padding: 0 4px; border: 0; background: transparent; color: #0f766e; text-decoration: underline; }
+.field input { width: 100%; box-sizing: border-box; min-height: 46px; border: 1px solid #cbd9e1; background: #fff; border-radius: 8px; padding: 10px 12px; color: #183343; font: inherit; }
+.profile-footer { border-top: 1px solid #e1e8ed; padding-top: 20px; }
+.profile-footer > p { margin: 0; font-size: 13px; color: #526a78; line-height: 1.7; }
+.password-section { border-top: 1px solid #e1e8ed; padding-top: 26px; margin-top: 26px; }
+.password-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.password-heading h3 { margin-bottom: 4px; }
+.password-heading p { margin: 0; color: #526a78; font-size: 14px; line-height: 1.6; }
+.password-form { margin-top: 24px; }
+.password-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; }
+.password-fields .field:first-child { grid-column: 1 / -1; }
+.form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.message { padding: 12px 16px; margin: 12px 0; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+.success { background: #edf8f3; color: #176345; }
+.error, .profile-footer > .error { background: #fff2ef; color: #a43522; }
+@media (max-width: 600px) {
+  .profile-panel { padding: 24px 20px; border-radius: 12px; }
+  .profile-identity { flex-wrap: wrap; gap: 16px; }
+  .avatar { width: 76px; height: 76px; font-size: 30px; }
+  .identity-copy { flex: 1 1 calc(100% - 92px); }
+  h2 { font-size: 21px; }
+  .edit-button, .editing-note { margin-left: 92px; }
+  .contact-grid { grid-template-columns: 1fr; gap: 24px; }
+  .password-heading { align-items: stretch; flex-direction: column; }
+  .password-heading button { align-self: flex-start; }
+  .password-fields { grid-template-columns: 1fr; }
+  .detail-section { padding: 24px 0; }
+  .form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-actions button { padding-inline: 8px; }
 }
 </style>

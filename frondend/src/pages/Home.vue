@@ -6,7 +6,7 @@
           <AppIcon name="paw" :size="24" />
         </div>
         <div class="brand-copy">
-          <strong>โรงพยาบาลสัตว์เมืองเลย</strong>
+          <strong>{{ clinic.clinic_name || 'โรงพยาบาลสัตว์เมืองเลย' }}</strong>
           <span>ระบบจัดการข้อมูลการรักษาและบริการสัตว์เลี้ยง</span>
         </div>
       </div>
@@ -14,6 +14,7 @@
       <nav class="nav-links">
         <a href="#services">บริการ</a>
         <a href="#pet-care">ความรู้สัตว์เลี้ยง</a>
+        <a href="#contact">ติดต่อ</a>
       </nav>
 
       <div class="nav-account-actions">
@@ -25,15 +26,24 @@
     <main class="home-main">
       <section class="hero-section">
         <div class="hero-copy">
-          <p class="hero-label">บริการดูแลสัตว์เลี้ยงในจังหวัดเลย</p>
-          <h1>{{ clinic.clinic_name || 'โรงพยาบาลสัตว์เมืองเลย' }}</h1>
-          <h2>ตรวจรักษา วัคซีน ผ่าตัด และติดตามประวัติสัตว์เลี้ยง</h2>
+          <h1>โรงพยาบาลสัตว์เมืองเลย</h1>
           <p class="hero-description">
             ให้บริการดูแลสัตว์เลี้ยง พร้อมระบบสำหรับตรวจสอบข้อมูลสัตว์เลี้ยง นัดหมาย
             ประวัติการรักษา และใบเสร็จของเจ้าของสัตว์เลี้ยง
           </p>
-
-          <div class="hero-info-list">
+          <div class="hero-actions">
+            <router-link to="/login" class="primary-button">เข้าสู่ระบบเพื่อขอนัดหมาย</router-link>
+            <a href="#services" class="nav-secondary-button">ดูบริการของเรา</a>
+          </div>
+          <p class="appointment-note">เข้าสู่ระบบก่อนขอนัดหมาย และรอการยืนยันจากคลินิก</p>
+        </div>
+        <div class="hero-gallery">
+          <article class="hero-photo large">
+            <img src="/images/clinic-gallery/รูปภาพ1.png" :alt="`ภาพหน้า ${clinic.clinic_name || 'โรงพยาบาลสัตว์เมืองเลย'}`" fetchpriority="high" />
+          </article>
+        </div>
+      </section>
+          <section id="contact" class="hero-info-list" aria-label="ข้อมูลติดต่อโรงพยาบาล">
             <div class="hero-info-item">
               <span class="hero-info-icon"><AppIcon name="phone" :size="18" /></span>
               <div>
@@ -57,23 +67,12 @@
                 <strong>{{ clinic.address || 'กรุณาตรวจสอบข้อมูลกับทางโรงพยาบาล' }}</strong>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div class="hero-gallery">
-          <article class="hero-photo large">
-            <img
-              src="/images/clinic-gallery/รูปภาพ1.png"
-              alt="ภาพหน้าโรงพยาบาลสัตว์เมืองเลย"
-            />
-          </article>
-        </div>
-      </section>
+          </section>
 
       <section class="gallery-showcase">
         <div class="gallery-copy">
-          <p class="section-kicker">ภาพจากโรงพยาบาล</p>
-          <h2>เคสบริการจริงและเคสตัวอย่าง</h2>
+          <h2>ภาพจากโรงพยาบาล</h2>
+          <p>เคสบริการจริงและเคสตัวอย่าง</p>
         </div>
 
         <div
@@ -82,6 +81,7 @@
           aria-label="เคสบริการของโรงพยาบาลสัตว์เมืองเลย"
           @mouseenter="stopGalleryAutoSlide"
           @mouseleave="startGalleryAutoSlide"
+          @focusin="stopGalleryAutoSlide"
           @touchstart.passive="onGalleryTouchStart"
           @touchend.passive="onGalleryTouchEnd"
         >
@@ -109,7 +109,7 @@
             aria-label="ดูภาพก่อนหน้า"
             @click="previousGallery"
           >
-            ‹
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
           </button>
           <button
             type="button"
@@ -118,7 +118,7 @@
             aria-label="ดูภาพถัดไป"
             @click="nextGallery"
           >
-            ›
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
           </button>
 
           <div class="gallery-dots" aria-label="เลือกภาพ">
@@ -132,17 +132,17 @@
               @click="goToGallery(itemIndex)"
             />
           </div>
+          <button type="button" class="gallery-pause" :aria-pressed="galleryPaused" @click="toggleGalleryPause">{{ galleryPaused ? 'เล่นภาพอัตโนมัติ' : 'หยุดภาพอัตโนมัติ' }}</button>
         </div>
       </section>
 
       <section id="services" class="content-section">
         <div class="section-head">
           <div>
-            <p class="section-kicker">บริการของทางร้านและคลินิก</p>
-            <h2>บริการที่เปิดใช้งานในระบบ</h2>
+            <h2>บริการของเรา</h2>
           </div>
           <p class="section-description">
-            แสดงรายการบริการหลักพร้อมภาพประกอบและคำอธิบาย เพื่อให้เข้าใจภาพรวมการให้บริการได้ทันที
+            ดูรายละเอียดบริการและค่าบริการ ก่อนติดต่อหรือนัดหมายกับคลินิก
           </p>
         </div>
 
@@ -150,7 +150,6 @@
           <article v-for="service in serviceCards" :key="service.service_id" class="service-card">
             <div class="service-media">
               <img :src="service.image" :alt="service.service_name" loading="lazy" />
-              <span class="service-id">{{ service.service_id }}</span>
             </div>
 
             <div class="service-body">
@@ -172,7 +171,6 @@
       <section id="pet-care" class="knowledge-section">
         <div class="knowledge-heading">
           <div>
-            <p class="section-kicker">ความรู้สำหรับเจ้าของสัตว์</p>
             <h2>ดูแลให้ถูกวิธี สังเกตอาการได้เร็วขึ้น</h2>
           </div>
           <p>
@@ -245,6 +243,12 @@ const clinic = ref({})
 const services = ref([])
 const galleryPosition = ref(0)
 const galleryTransitionEnabled = ref(true)
+const galleryPaused = ref(false)
+function toggleGalleryPause() {
+  galleryPaused.value = !galleryPaused.value
+  if (galleryPaused.value) stopGalleryAutoSlide()
+  else startGalleryAutoSlide()
+}
 
 let galleryTimer = null
 let galleryTouchStartX = 0
@@ -328,7 +332,7 @@ function startGalleryAutoSlide() {
 
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-  if (clinicGallery.length > 1 && !reduceMotion) {
+  if (clinicGallery.length > 1 && !reduceMotion && !galleryPaused.value) {
     galleryTimer = window.setInterval(nextGallery, 5200)
   }
 }
@@ -821,7 +825,7 @@ onBeforeUnmount(stopGalleryAutoSlide)
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
   color: #0f172a;
-  font-family: Arial, sans-serif;
+  font-family: inherit;
   font-size: 2rem;
   line-height: 1;
   cursor: pointer;
@@ -859,7 +863,7 @@ onBeforeUnmount(stopGalleryAutoSlide)
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.55);
   cursor: pointer;
-  transition: width 0.2s ease, border-radius 0.2s ease, background 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .gallery-dots button.active {
@@ -1285,5 +1289,88 @@ onBeforeUnmount(stopGalleryAutoSlide)
   .gallery-slide-track {
     transition: none;
   }
+}
+</style>
+
+<style scoped>
+.home-page { background: #f7f8f6; color: #122f3e; }
+.top-nav, .home-main { width: min(1240px, calc(100% - 64px)); }
+.top-nav { padding: 22px 0; gap: 24px; border-bottom: 1px solid #dce5e7; }
+.brand { gap: 10px; min-width: 0; }
+.brand-mark { width: 40px; height: 40px; background: transparent; color: #122f3e; border-radius: 0; box-shadow: none; flex: none; }
+.brand-copy strong { font-size: 19px; color: #122f3e; }
+.brand-copy span { display: none; }
+.nav-links { gap: 22px; font-size: 14px; }
+.nav-secondary-button, .nav-solid-button, .primary-button { border-radius: 8px; box-shadow: none; font-size: 14px; min-height: 46px; }
+.nav-solid-button:hover, .primary-button:hover { transform: none; }
+.home-main { gap: 0; }
+.home-page .hero-section { padding: 38px 0 32px; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 40px; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.hero-copy { gap: 20px; }
+.hero-copy h1 { color: #122f3e; font-size: clamp(34px, 3.8vw, 54px); line-height: 1.3; max-width: none; }
+.hero-description { font-size: 16px; color: #526575; line-height: 1.85; }
+.hero-actions { flex-wrap: wrap; gap: 12px; }
+.appointment-note { margin: -6px 0 0; color: #526575; font-size: 12px; line-height: 1.7; }
+.hero-photo { min-height: 0; height: auto; aspect-ratio: 1.2; border-radius: 12px; margin: 0; }
+.hero-photo img { object-fit: cover; }
+.hero-info-list { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 14px 0; background: #fff; border: 0; border-top: 1px solid #dce5e7; border-bottom: 1px solid #dce5e7; scroll-margin-top: 24px; }
+.hero-info-item { padding: 8px 20px; align-items: start; }
+.hero-info-item:nth-child(2), .hero-info-item.address { padding: 8px 20px; grid-column: auto; border-top: 0; border-left: 1px solid #dce5e7; }
+.hero-info-icon { background: transparent; color: #122f3e; }
+.hero-info-item small { color: #526575; font-size: 12px; }
+.hero-info-item strong { font-size: 14px; font-weight: 600; }
+.home-page .content-section { order: 1; padding: 40px 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; scroll-margin-top: 24px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
+.section-head h2, .knowledge-heading h2 { font-size: 27px; color: #122f3e; }
+.section-description { font-size: 13px; max-width: 50ch; }
+.service-scroll { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; overflow: visible; }
+.home-page .service-card { min-width: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.service-media { border-radius: 10px; overflow: hidden; aspect-ratio: 1.8; }
+.service-media img { width: 100%; height: 100%; object-fit: cover; }
+.service-body { padding: 16px 0 0; }
+.service-card-top { flex-wrap: wrap; gap: 8px; }
+.service-card h3 { font-size: 18px; }
+.service-card p { font-size: 13px; margin-top: 8px; }
+.service-price { font-size: 14px; white-space: nowrap; }
+.home-page .gallery-showcase { order: 2; grid-template-columns: minmax(0, .7fr) minmax(0, 1fr); padding: 28px 0; border: 0; border-top: 1px solid #dce5e7; border-radius: 0; box-shadow: none; background: transparent; align-items: center; }
+.gallery-copy h2 { font-size: 28px; line-height: 1.4; max-width: none; }
+.gallery-copy p { margin: 0; color: #526575; line-height: 1.7; }
+.gallery-slider { aspect-ratio: 2; }
+.gallery-pause { position: absolute; z-index: 4; top: 12px; right: 12px; min-height: 36px; padding: 6px 12px; border: 0; border-radius: 8px; background: #fff; color: #122f3e; font: inherit; font-size: 12px; }
+.gallery-dots button { width: 24px; height: 24px; border: 6px solid transparent; background-clip: padding-box; }
+.gallery-dots button.active { width: 32px; }
+.home-page .knowledge-section { order: 3; padding: 36px 0 44px; border: 0; border-top: 1px solid #dce5e7; border-radius: 0; box-shadow: none; background: transparent; scroll-margin-top: 24px; }
+.home-page .knowledge-feature, .home-page .knowledge-brief { box-shadow: none; }
+a:focus-visible, button:focus-visible { outline: 3px solid #4caaa1; outline-offset: 4px; }
+@media (max-width: 900px) {
+  .top-nav { flex-wrap: wrap; gap: 14px; }
+  .nav-links { order: 3; width: 100%; justify-content: flex-start; }
+  .home-page .hero-section { gap: 24px; }
+  .hero-actions a { width: 100%; }
+  .service-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .top-nav, .home-main { width: calc(100% - 32px); }
+  .top-nav { padding: 16px 0; }
+  .brand-copy strong { font-size: 16px; }
+  .brand-mark { width: 30px; height: 30px; }
+  .nav-account-actions { width: 100%; justify-content: flex-start; }
+  .nav-links { gap: 22px; font-size: 13px; }
+  .home-page .hero-section { grid-template-columns: 1fr; padding: 28px 0 24px; }
+  .hero-copy h1 { font-size: 34px; }
+  .hero-description { font-size: 14px; }
+  .hero-actions { flex-direction: column; align-items: stretch; }
+  .hero-photo { aspect-ratio: 1.3; }
+  .hero-info-list { grid-template-columns: 1fr; padding: 0 14px; }
+  .hero-info-item, .hero-info-item:nth-child(2), .hero-info-item.address { padding: 16px 0; border-left: 0; }
+  .hero-info-item + .hero-info-item { border-top: 1px solid #dce5e7; }
+  .section-head { flex-direction: column; gap: 10px; }
+  .service-scroll { grid-template-columns: 1fr; gap: 24px; }
+  .service-card { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .service-media { aspect-ratio: 1; }
+  .service-body { padding: 0; }
+  .service-card h3 { font-size: 16px; }
+  .home-page .gallery-showcase { grid-template-columns: 1fr; gap: 16px; }
+  .gallery-copy h2, .section-head h2, .knowledge-heading h2 { font-size: 24px; }
+  .gallery-slider { aspect-ratio: 1.5; }
 }
 </style>

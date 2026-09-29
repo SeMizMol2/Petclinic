@@ -74,7 +74,7 @@ router.get('/', auth, requireAdmin, async (req, res) => {
     const { month, year } = req.query;
 
     let sql = `
-      SELECT e.exp_id, e.exp_title, e.exp_amount, e.exp_date,
+      SELECT e.exp_id, e.exp_title, e.exp_amount, e.exp_date::text AS exp_date,
              c.category_id, c.category_name, u.username AS created_by
       FROM tb_expense e
       LEFT JOIN tb_category c ON e.category_id = c.category_id

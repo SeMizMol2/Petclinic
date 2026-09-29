@@ -26,6 +26,9 @@ const formatDateKey = (value) => {
 };
 
 const formatDayNumber = (value) => {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return Number(value.slice(8, 10));
+  }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date.getDate();
@@ -85,7 +88,7 @@ router.get('/', auth, async (req, res) => {
 
     const expensesResult = await pool.query(
       `
-        SELECT e.exp_date, e.exp_title, e.exp_amount, c.category_name
+        SELECT e.exp_date::text AS exp_date, e.exp_title, e.exp_amount, c.category_name
         FROM tb_expense e
         LEFT JOIN tb_category c ON e.category_id = c.category_id
         WHERE EXTRACT(MONTH FROM e.exp_date) = $1

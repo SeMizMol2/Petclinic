@@ -2,7 +2,6 @@
   <div class="admin-page treatments-admin-page">
     <section class="page-header">
       <div>
-        <p class="eyebrow">Treatment records</p>
         <h1>บันทึกการรักษา</h1>
         <p class="subtitle">บันทึกอาการ วินิจฉัยโรค และจัดการรายการค่ารักษา</p>
       </div>
@@ -10,6 +9,14 @@
     </section>
 
     <section class="table-panel">
+      <div class="treatment-toolbar">
+        <label for="treatment-record-search">ค้นหาประวัติการรักษา</label>
+        <input id="treatment-record-search" v-model="recordSearch" type="search" placeholder="ค้นหาชื่อสัตว์ เจ้าของ หรือรหัสการรักษา" />
+        <nav class="payment-filters" aria-label="กรองสถานะการชำระเงิน">
+          <button v-for="filter in paymentFilters" :key="filter.value" type="button" :aria-pressed="paymentFilter === filter.value" @click="paymentFilter = filter.value">{{ filter.label }}</button>
+        </nav>
+        <p class="result-count" aria-live="polite">แสดง {{ visibleTreatments.length }} จาก {{ treatments.length }} รายการ</p>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -25,20 +32,20 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="t in treatments" :key="t.treatment_id">
-              <td>
+            <tr v-for="t in visibleTreatments" :key="t.treatment_id">
+              <td data-label="รหัสการรักษา">
                 <strong>{{ t.treatment_id }}</strong>
               </td>
-              <td>{{ formatDateTime(t.treatment_date) }}</td>
-              <td>
+              <td data-label="วันที่รักษา">{{ formatDateTime(t.treatment_date) }}</td>
+              <td data-label="สัตว์เลี้ยง">
                 {{ t.pet_name }}
                 <br />
                 <span class="muted">คุณ{{ t.owner_name }}</span>
               </td>
-              <td>{{ t.vet_name || t.doctor_name || '-' }}</td>
-              <td>{{ t.diagnosis || '-' }}</td>
-              <td class="right amount">{{ formatPrice(t.total_amount) }}</td>
-              <td>
+              <td data-label="สัตวแพทย์">{{ t.vet_name || t.doctor_name || '-' }}</td>
+              <td data-label="การวินิจฉัย">{{ t.diagnosis || '-' }}</td>
+              <td data-label="ยอดรวม" class="right amount">{{ formatPrice(t.total_amount) }}</td>
+              <td data-label="ใบเสร็จ / สถานะ">
                 <button
                   v-if="t.receipt_id"
                   class="receipt-link"
@@ -54,7 +61,7 @@
                   ออกใบเสร็จ
                 </button>
               </td>
-              <td class="center">
+              <td data-label="จัดการ" class="center">
                 <div class="row-actions">
                   <button class="ghost-btn mini-btn" @click="openEditModal(t.treatment_id)">แก้ไข</button>
                   <button class="followup-btn mini-btn" @click="openFollowUpModal(t)">นัดติดตาม</button>
@@ -62,8 +69,12 @@
                 </div>
               </td>
             </tr>
-            <tr v-if="treatments.length === 0">
-              <td colspan="8" class="state">ยังไม่มีประวัติการรักษา</td>
+            <tr v-if="visibleTreatments.length === 0">
+              <td colspan="8" class="state">
+                <strong>{{ treatments.length ? 'ไม่พบรายการที่ตรงกับการค้นหา' : 'ยังไม่มีประวัติการรักษา' }}</strong>
+                <p>{{ treatments.length ? 'ลองเปลี่ยนคำค้นหรือสถานะที่กรอง' : 'เริ่มบันทึกได้จากปุ่มเพิ่มการรักษาใหม่' }}</p>
+                <button v-if="treatments.length" type="button" class="ghost-btn mini-btn" @click="recordSearch = ''; paymentFilter = 'all'">ล้างตัวกรอง</button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -82,6 +93,7 @@
 
         <div class="form-layout">
           <div class="form-grid left-panel">
+            <h3 class="full-width form-section-title">ข้อมูลการรักษา</h3>
             <div class="pet-picker full-width" @focusout="onPetPickerFocusOut">
               <label for="treatment-pet-search">เลือกสัตว์เลี้ยง *</label>
               <div class="pet-search-wrap">
@@ -139,7 +151,6 @@
                     />
                     <span v-else class="clinical-avatar">{{ getPetInitial(selectedPetSummary.pet.pet_name) }}</span>
                     <div>
-                      <span class="clinical-kicker">ข้อมูลก่อนการรักษา</span>
                       <strong>{{ selectedPetSummary.pet.pet_name }}</strong>
                       <small>เจ้าของ คุณ{{ selectedPetSummary.owner.owner_name || '-' }}</small>
                     </div>
@@ -217,7 +228,7 @@
               <span>เมื่อแก้บริการ จำนวน หรือราคา ระบบจะอัปเดตยอดในใบเสร็จให้อัตโนมัติ</span>
             </div>
             <div class="service-add">
-              <select v-model="selectedServiceId" class="service-select" :disabled="isFinancialLocked || !form.pet_id">
+              <select v-model="selectedServiceId" class="service-select" aria-label="เลือกบริการ" :disabled="isFinancialLocked || !form.pet_id">
                 <option value="" disabled>{{ form.pet_id ? '-- เลือกบริการที่ใช้ได้ --' : '-- เลือกสัตว์เลี้ยงก่อน --' }}</option>
                 <option v-for="s in availableServicesList" :key="s.service_id" :value="s.service_id">
                   {{ s.service_name }} ({{ formatPrice(s.service_price) }} บาท)
@@ -239,11 +250,11 @@
                   <div class="item-name">{{ item.service_name }}</div>
                   <div class="item-price-row">
                     <span>ราคา</span>
-                    <input type="number" v-model.number="item.price" min="0" step="0.5" class="price-edit-input" :disabled="isFinancialLocked" />
+                    <input type="number" v-model.number="item.price" :aria-label="`ราคา ${item.service_name}`" min="0" step="0.5" class="price-edit-input" :disabled="isFinancialLocked" />
                     <span>บาท</span>
                   </div>
                 </div>
-                <input type="number" v-model.number="item.quantity" min="1" class="qty-input" :disabled="isFinancialLocked" />
+                <input type="number" v-model.number="item.quantity" :aria-label="`จำนวน ${item.service_name}`" min="1" class="qty-input" :disabled="isFinancialLocked" />
                 <div class="item-total">{{ formatPrice(item.price * item.quantity) }}</div>
                 <button @click="removeServiceItem(index)" class="danger-btn remove-btn" type="button" :disabled="isFinancialLocked">ลบ</button>
               </div>
@@ -443,6 +454,25 @@ import { resolveApiAssetUrl } from '../../api'
 
 const router = useRouter()
 const treatments = ref([])
+const recordSearch = ref('')
+const paymentFilter = ref('all')
+const paymentFilters = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'unpaid', label: 'ค้างชำระ' },
+  { value: 'paid', label: 'ชำระแล้ว' },
+  { value: 'no-document', label: 'ยังไม่ออกเอกสาร' }
+]
+const visibleTreatments = computed(() => {
+  const query = recordSearch.value.trim().toLocaleLowerCase('th-TH')
+  return treatments.value.filter(item => {
+    const matchesText = !query || [item.pet_name, item.owner_name, item.pet_id, item.treatment_id, item.receipt_id].some(value => String(value || '').toLocaleLowerCase('th-TH').includes(query))
+    const matchesStatus = paymentFilter.value === 'all'
+      || (paymentFilter.value === 'no-document' && !item.receipt_id)
+      || (paymentFilter.value === 'paid' && item.receipt_id && isReceiptPaid(item))
+      || (paymentFilter.value === 'unpaid' && item.receipt_id && !isReceiptPaid(item))
+    return matchesText && matchesStatus
+  })
+})
 const petsList = ref([])
 const servicesList = ref([])
 const vetsList = ref([])
@@ -1039,6 +1069,14 @@ const submitTreatment = async () => {
     return
   }
   if (form.value.services.length === 0 && !confirm('ยังไม่มีรายการค่ารักษา ต้องการบันทึกหรือไม่?')) return
+  const invalidService = form.value.services.find((item) =>
+    item.quantity === '' || item.quantity == null || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0 ||
+    item.price === '' || item.price == null || !Number.isFinite(Number(item.price)) || Number(item.price) < 0
+  )
+  if (invalidService) {
+    alert('กรุณาตรวจสอบจำนวนให้เป็นจำนวนเต็มมากกว่า 0 และราคาไม่ติดลบ')
+    return
+  }
 
   isSubmitting.value = true
   let treatmentSaved = false
@@ -1053,8 +1091,8 @@ const submitTreatment = async () => {
       services: form.value.services.map((item) => ({
         detail_id: item.detail_id || null,
         service_id: item.service_id,
-        quantity: Number(item.quantity || 1),
-        price: Number(item.price || 0)
+        quantity: Number(item.quantity),
+        price: Number(item.price)
       })),
       total_amount: totalAmount.value
     }
@@ -1856,5 +1894,61 @@ onMounted(fetchAllData)
   .recent-treatment-list article {
     grid-template-columns: 1fr;
   }
+}
+</style>
+
+<style scoped>
+.treatments-admin-page .page-header { padding: 0 0 4px; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.page-header h1 { font-size: 24px; }
+.treatments-admin-page .table-panel { padding: 22px; background: #fff; border: 1px solid #dbe4ea; border-radius: 12px; box-shadow: none; }
+.treatment-toolbar { margin-bottom: 18px; }
+.treatment-toolbar > label { display: block; margin-bottom: 8px; color: #526575; font-size: 13px; }
+.treatment-toolbar input { width: 100%; min-height: 46px; padding: 10px 14px; border: 1px solid #cbd9e1; border-radius: 8px; font: inherit; box-sizing: border-box; }
+.payment-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.payment-filters button { min-height: 42px; padding: 10px 16px; background: #f1f5f7; border: 1px solid transparent; border-radius: 8px; color: #405969; font: inherit; font-size: 13px; font-weight: 600; box-shadow: none; }
+.payment-filters button[aria-pressed="true"] { background: #0f766e; color: #fff; }
+.payment-filters button:hover { border-color: #0f766e; }
+.result-count { margin: 12px 0 0; font-size: 12px; color: #526575; }
+th, td { padding: 16px 10px; font-size: 13px; }
+td { overflow-wrap: anywhere; }
+.amount { color: #183343; font-variant-numeric: tabular-nums; }
+.receipt-link { font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.receipt-state { font-weight: 600; }
+.receipt-state.unpaid { background: #fff1ce; color: #875006; }
+.row-actions { justify-content: flex-start; gap: 6px; }
+.primary-btn, .ghost-btn, .followup-btn, .danger-btn, .close-btn { border-radius: 8px; box-shadow: none; }
+.treatments-admin-page .primary-btn { background: #0f766e; }
+.treatments-admin-page .primary-btn:hover { background: #095f59; transform: none; }
+button:focus-visible { outline: 3px solid #4caaa1; outline-offset: 3px; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+.state { text-align: center; padding: 30px 12px; color: #526575; }
+.state p { margin: 8px 0 16px; font-size: 13px; }
+.treatment-modal { max-height: calc(100dvh - 40px); overflow-y: auto; border-radius: 14px; }
+.form-layout { margin-top: 24px; align-items: start; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.form-section-title { margin: 0; font-size: 17px; color: #183343; }
+.service-panel { padding: 0 0 0 24px; border: 0; border-left: 1px solid #e1e8ed; border-radius: 0; background: #fff; }
+.service-label { font-size: 17px; color: #183343; margin-bottom: 18px; }
+.selected-items-box { background: #fff; border-radius: 0; }
+.clinical-context { background: #f5faf9; border: 0; border-radius: 10px; }
+.clinical-facts, .clinical-counts { font-size: 12px; }
+.allergy-notice.danger { border: 0; background: #fff0ed; color: #a43522; }
+.modal-actions { position: sticky; bottom: -24px; margin-top: 22px; padding: 18px 0; border-top: 1px solid #e1e8ed; background: #fff; z-index: 25; }
+input, select, textarea { border-radius: 8px; min-width: 0; box-sizing: border-box; }
+@media (max-width: 800px) {
+  .form-layout { grid-template-columns: 1fr; }
+  .service-panel { border-left: 0; border-top: 1px solid #e1e8ed; padding: 24px 0 0; }
+}
+@media (max-width: 720px) {
+  .treatments-admin-page .table-panel { padding: 16px; }
+  .table-wrap { overflow: visible; }
+  table, tbody { display: block; }
+  thead { display: none; }
+  tbody tr { display: block; padding: 16px 0; border-top: 1px solid #e1e8ed; }
+  tbody td { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; border: 0; padding: 7px 0; text-align: left; }
+  tbody td::before { content: attr(data-label); color: #526575; font-size: 12px; font-weight: 400; }
+  tbody td.state { display: block; }
+  tbody td.state::before { display: none; }
+  .modal-actions { bottom: -18px; flex-wrap: wrap; }
+  .modal-actions button { flex: 1 1 100%; min-height: 44px; white-space: normal; }
 }
 </style>

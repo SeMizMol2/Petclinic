@@ -16,6 +16,21 @@ axios.interceptors.request.use((config) => {
   return config
 })
 
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const authorization = error.config?.headers?.Authorization || error.config?.headers?.authorization
+    if (error.response?.status === 401 && authorization && localStorage.getItem('token')) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      if (router.currentRoute.value.path !== '/login') {
+        router.replace({ path: '/login', query: { reason: 'session-expired' } })
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 const app = createApp(App)
 
 app.use(router)

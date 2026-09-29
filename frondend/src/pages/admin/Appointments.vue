@@ -3,31 +3,44 @@
     <p v-if="reviewMessage" class="review-feedback" role="status">{{ reviewMessage }}</p>
     <section class="page-header">
       <div>
-        <p class="eyebrow">Appointment management</p>
         <h1>จัดการตารางนัดหมาย</h1>
         <p class="subtitle">
-          จัดการคิวนัดหมายของคลินิก สร้างนัดใหม่ แก้ไขเวลา และอัปเดตสถานะการนัดหมายจากหน้าเดียว
+          ตรวจคำขอ จัดคิว และดูตารางเวรสัตวแพทย์
         </p>
       </div>
       <button @click="openAddModal" class="primary-btn" type="button">เพิ่มการนัดหมาย</button>
     </section>
 
-    <section v-if="clinicRequests.length" class="request-queue" aria-labelledby="request-queue-title">
+    <nav class="view-tabs" aria-label="มุมมองการนัดหมาย">
+      <button type="button" :aria-pressed="activeView === 'requests'" @click="activeView = 'requests'">รอคลินิกยืนยัน <span>{{ clinicRequests.length }}</span></button>
+      <button type="button" :aria-pressed="activeView === 'today'" @click="activeView = 'today'">นัดวันนี้ <span>{{ todayAppointments.length }}</span></button>
+      <button type="button" :aria-pressed="activeView === 'all'" @click="activeView = 'all'">รายการทั้งหมด <span>{{ appointments.length }}</span></button>
+    </nav>
+    <div class="appointment-workspace">
+    <section v-if="activeView === 'requests'" class="request-queue" aria-labelledby="request-queue-title">
       <div class="request-queue-head">
         <h2 id="request-queue-title">คำขอนัดจากเจ้าของสัตว์เลี้ยง</h2>
         <span>{{ clinicRequests.length }} รายการรอตรวจสอบ</span>
       </div>
+      <p class="queue-help">เวลาที่เจ้าของขอ ยังไม่ใช่นัดที่ยืนยันแล้ว · ตรวจตารางเวรและคิวก่อนยืนยัน</p>
+      <p v-if="!clinicRequests.length" class="quiet-empty">ไม่มีคำขอรอคลินิกยืนยันแล้ว ดูคิวงานต่อได้ที่นัดวันนี้</p>
       <p v-if="reviewError" class="review-error" role="alert">{{ reviewError }}</p>
       <article v-for="request in clinicRequests" :key="request.appt_id" class="request-row">
-        <div>
-          <strong>{{ request.pet_name }} · คุณ{{ request.owner_name }}</strong>
-          <p>{{ formatFullDate(request.appt_date) }} เวลา {{ formatTime(request.appt_time) }} น. · {{ request.vet_name || 'ให้คลินิกจัดสัตวแพทย์' }}</p>
-          <small>เวลาที่เจ้าของขอ · ตรวจตารางเวรและคิวก่อนยืนยัน</small>
-          <small>{{ request.appt_reason }}</small>
+        <div class="request-date">
+          <span>{{ formatShortDate(request.appt_date) }}</span>
+          <strong>{{ formatTime(request.appt_time) }} น.</strong>
+          <button type="button" class="compare-button" @click="scheduleDate = formatInputDate(request.appt_date)">ดูเวรวันนี้</button>
+        </div>
+        <div class="request-copy">
+          <strong>{{ request.pet_name }}</strong>
+          <p>คุณ{{ request.owner_name || 'ไม่ระบุ' }}</p>
+          <p>{{ request.vet_name || 'ให้คลินิกจัดสัตวแพทย์' }}</p>
+          <small>{{ request.appt_reason || 'ไม่ได้ระบุเหตุผล' }}</small>
+          <span class="status-chip is-pending">รอคลินิกยืนยัน</span>
         </div>
         <div class="request-actions">
-          <button type="button" class="primary-btn mini-btn" :disabled="reviewingId === request.appt_id" @click="reviewRequest(request, 'approve')">ยืนยันนัด</button>
-          <button type="button" class="ghost-btn mini-btn" :disabled="reviewingId === request.appt_id" @click="rejectionId = rejectionId === request.appt_id ? '' : request.appt_id; rejectionReason = ''">ไม่รับคำขอ</button>
+          <button type="button" class="primary-btn mini-btn" :disabled="!!reviewingId" @click="reviewRequest(request, 'approve')">{{ reviewingId === request.appt_id ? 'กำลังบันทึก…' : 'ยืนยันนัด' }}</button>
+          <button type="button" class="ghost-btn mini-btn" :disabled="!!reviewingId" :aria-expanded="rejectionId === request.appt_id" @click="rejectionId = rejectionId === request.appt_id ? '' : request.appt_id; rejectionReason = ''">ไม่รับคำขอ</button>
         </div>
         <form v-if="rejectionId === request.appt_id" class="rejection-form" @submit.prevent="reviewRequest(request, 'reject')">
           <label>เหตุผลที่ไม่รับนัด <input v-model.trim="rejectionReason" maxlength="500" required placeholder="เช่น คลินิกไม่สามารถรับนัดช่วงเวลานี้ได้" /></label>
@@ -36,16 +49,18 @@
       </article>
     </section>
 
+    <aside class="schedule-column">
     <section class="shift-panel">
       <div class="shift-head">
         <div>
-          <p class="eyebrow">Veterinarian availability</p>
           <h2>ตารางเวรสัตวแพทย์</h2>
-          <p>บันทึกวันที่และช่วงเวลาที่สัตวแพทย์พร้อมให้บริการ ข้อมูลนี้จะแสดงในปฏิทินฝั่งเจ้าของสัตว์เลี้ยง</p>
+          <p>ช่วงเวลาที่สัตวแพทย์พร้อมให้บริการ</p>
         </div>
-        <span class="shift-count">{{ schedules.length }} ช่วงเวลา</span>
+        <span class="shift-count">{{ selectedSchedules.length }} ช่วงเวลา</span>
       </div>
-
+      <label class="schedule-date-picker">วันที่ดูตารางเวร <input v-model="scheduleDate" type="date" /></label>
+      <details class="schedule-manager">
+      <summary>จัดการตารางเวร</summary>
       <form class="shift-form" @submit.prevent="saveSchedule">
         <label>
           <span>สัตวแพทย์ *</span>
@@ -74,9 +89,9 @@
           {{ isSavingSchedule ? 'กำลังบันทึก...' : 'เพิ่มตารางเวร' }}
         </button>
       </form>
-
-      <div v-if="schedules.length > 0" class="shift-list">
-        <article v-for="shift in schedules" :key="shift.schedule_id" class="shift-item">
+      </details>
+      <div v-if="selectedSchedules.length > 0" class="shift-list">
+        <article v-for="shift in selectedSchedules" :key="shift.schedule_id" class="shift-item">
           <div class="shift-date">
             <span>{{ getShortMonth(shift.work_date) }}</span>
             <strong>{{ getDay(shift.work_date) }}</strong>
@@ -89,10 +104,21 @@
           <button type="button" class="danger-btn mini-btn" @click="deleteSchedule(shift.schedule_id)">ลบ</button>
         </article>
       </div>
-      <div v-else class="shift-empty">ยังไม่มีตารางเวรในช่วงวันที่กำลังแสดง</div>
+      <div v-else class="shift-empty">ไม่มีตารางเวรในวันที่เลือก ลองเลือกวันอื่นหรือเพิ่มตารางเวร</div>
     </section>
+    <section class="day-preview">
+      <h2>นัดที่ยืนยันแล้วในวันที่เลือก</h2>
+      <p class="queue-help">{{ formatFullDate(scheduleDate) }}</p>
+      <article v-for="apt in selectedConfirmed" :key="apt.appt_id" class="confirmed-row">
+        <strong>{{ formatTime(apt.appt_time) }} น.</strong>
+        <div><b>{{ apt.pet_name }}</b><small>{{ apt.vet_name || 'ยังไม่ระบุสัตวแพทย์' }}</small></div>
+      </article>
+      <p v-if="!selectedConfirmed.length" class="quiet-empty">ยังไม่มีนัดที่ยืนยันในวันนี้</p>
+    </section>
+    </aside>
 
-    <section class="toolbar">
+    <section v-if="activeView !== 'requests'" class="list-column">
+    <section v-if="activeView === 'all'" class="toolbar">
       <div class="filter-pills">
         <button
           v-for="filter in filters"
@@ -106,33 +132,8 @@
       </div>
     </section>
 
-    <section v-if="appointments.length > 0" class="alert-board">
-      <article class="alert-panel alert-panel-primary">
-        <span class="alert-kicker">overview</span>
-        <strong>{{ adminAlertTitle }}</strong>
-        <p>{{ adminAlertDescription }}</p>
-      </article>
-
-      <article class="alert-panel">
-        <span class="alert-kicker">today</span>
-        <strong>{{ todayAppointments.length }}</strong>
-        <p>คิวที่ต้องดูแลในวันนี้</p>
-      </article>
-
-      <article class="alert-panel">
-        <span class="alert-kicker">tomorrow</span>
-        <strong>{{ tomorrowAppointments.length }}</strong>
-        <p>คิวที่ควรวางแผนล่วงหน้า</p>
-      </article>
-
-      <article class="alert-panel" :class="{ 'alert-panel-danger': overdueAppointments.length > 0 }">
-        <span class="alert-kicker">overdue</span>
-        <strong>{{ overdueAppointments.length }}</strong>
-        <p>รายการที่ผ่านเวลานัดและยังไม่ได้ปิดงาน</p>
-      </article>
-    </section>
-
     <section class="table-panel">
+      <h2>{{ activeView === 'today' ? 'คิวนัดหมายวันนี้' : 'รายการนัดหมายทั้งหมด' }}</h2>
       <div class="table-wrap">
         <table>
           <thead>
@@ -150,7 +151,7 @@
               v-for="apt in filteredAppointments"
               :key="`${apt.appt_id}-${apt.appt_date}-${apt.appt_time}-${apt.appt_status}-${apt.cancel_reason || ''}`"
             >
-              <td>
+              <td data-label="วันและเวลา">
                 <div class="date-cell">
                   <div class="date-block">
                     <span class="month">{{ getShortMonth(apt.appt_date) }}</span>
@@ -162,11 +163,11 @@
                   </div>
                 </div>
               </td>
-              <td>
+              <td data-label="สัตวแพทย์">
                 <div class="primary-line">{{ apt.vet_name || 'ยังไม่ระบุ' }}</div>
                 <div class="secondary-line">{{ apt.vet_id || '-' }}</div>
               </td>
-              <td>
+              <td data-label="สัตว์เลี้ยง">
                 <div class="pet-cell">
                   <div class="pet-avatar" :style="{ backgroundColor: getPetColor(apt.pet_name) }">
                     {{ getInitial(apt.pet_name) }}
@@ -177,12 +178,12 @@
                   </div>
                 </div>
               </td>
-              <td>
+              <td data-label="เหตุผล / อาการ">
                 <div class="reason-chip" :title="apt.appt_reason || '-'">
                   {{ apt.appt_reason || 'ไม่ได้ระบุเหตุผลการนัดหมาย' }}
                 </div>
               </td>
-              <td>
+              <td data-label="สถานะ">
                 <div class="status-stack">
                   <span :class="['status-chip', getStatusClass(apt.appt_status)]">
                     {{ getStatusLabel(apt.appt_status) }}
@@ -193,7 +194,7 @@
                   </span>
                 </div>
               </td>
-              <td>
+              <td data-label="จัดการ">
                 <div class="row-actions">
                   <button
                     v-if="apt.appt_status === APPT_STATUS_CANCELED"
@@ -204,6 +205,7 @@
                     จัดนัดใหม่
                   </button>
                   <button v-else-if="apt.appt_status !== APPT_STATUS_CLINIC_PENDING" @click="openEditModal(apt)" class="ghost-btn mini-btn" type="button">แก้ไข</button>
+                  <button v-else type="button" class="ghost-btn mini-btn" @click="activeView = 'requests'">ตรวจคำขอ</button>
                   <button @click="deleteAppointment(apt.appt_id)" class="danger-btn mini-btn" type="button">ลบ</button>
                 </div>
               </td>
@@ -220,6 +222,8 @@
         </table>
       </div>
     </section>
+    </section>
+    </div>
 
     <div v-if="isModalOpen" class="modal-overlay" @click.self="closeModal">
       <div class="modal appointment-modal">
@@ -365,6 +369,10 @@ const petsList = ref([])
 const veterinarians = ref([])
 const schedules = ref([])
 const statusFilter = ref('all')
+const activeView = ref('requests')
+const scheduleDate = ref(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()))
+const selectedSchedules = computed(() => schedules.value.filter(shift => formatInputDate(shift.work_date) === scheduleDate.value))
+const selectedConfirmed = computed(() => appointments.value.filter(apt => apt.appt_status === APPT_STATUS_CONFIRMED && apt.appt_date === scheduleDate.value).sort((a, b) => a.appt_time.localeCompare(b.appt_time)))
 const reviewingId = ref('')
 const rejectionId = ref('')
 const rejectionReason = ref('')
@@ -477,6 +485,7 @@ const filters = computed(() => [
 const clinicRequests = computed(() => appointments.value.filter((item) => item.appt_status === APPT_STATUS_CLINIC_PENDING))
 
 const reviewRequest = async (request, action) => {
+  if (reviewingId.value) return
   if (action === 'approve' && !window.confirm(`ยืนยันนัดของ ${request.pet_name} วันที่ ${formatFullDate(request.appt_date)} เวลา ${formatTime(request.appt_time)} น. หรือไม่?`)) return
   reviewingId.value = request.appt_id
   reviewError.value = ''
@@ -556,6 +565,7 @@ const filteredPets = computed(() => {
 })
 
 const filteredAppointments = computed(() => {
+  if (activeView.value === 'today') return todayAppointments.value
   if (statusFilter.value === 'all') return appointments.value
   return appointments.value.filter((item) => item.appt_status === statusFilter.value)
 })
@@ -764,6 +774,7 @@ const saveSchedule = async () => {
   isSavingSchedule.value = true
   try {
     await axios.post('http://localhost:3000/api/appointments/vet-schedules', scheduleForm.value, authHeaders())
+    scheduleDate.value = scheduleForm.value.work_date
     scheduleForm.value = {
       vet_id: scheduleForm.value.vet_id,
       work_date: '',
@@ -901,6 +912,8 @@ const handleSubmit = async () => {
     }
 
     closeModal()
+    activeView.value = 'all'
+    statusFilter.value = 'all'
     await Promise.all([fetchAppointments(), fetchPetsList()])
   } catch (error) {
     console.error('Appointment submit error:', error)
@@ -1646,5 +1659,106 @@ textarea:focus {
   .shift-item .danger-btn {
     grid-column: 1 / -1;
   }
+}
+</style>
+
+<style scoped>
+/* Appointment desk: requests and veterinarian context stay side by side. */
+.appointments-admin-page { gap: 18px; }
+.appointments-admin-page .page-header { padding: 0 0 4px; background: transparent; border: 0; border-radius: 0; box-shadow: none; align-items: center; }
+.page-header h1 { font-size: 24px; }
+.subtitle { margin-top: 5px; font-size: 14px; color: #526575; }
+.view-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; background: #fff; border: 1px solid #dbe4ea; border-radius: 12px; }
+.view-tabs button { display: flex; align-items: center; gap: 8px; min-height: 58px; padding: 12px 18px; color: #526575; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; font: inherit; font-weight: 600; }
+.view-tabs button[aria-pressed="true"] { border-bottom-color: #0f766e; color: #0f766e; }
+.view-tabs span { min-width: 24px; border-radius: 50%; padding: 2px 6px; background: #edf2f5; font-size: 12px; }
+.appointment-workspace { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
+.request-queue, .list-column { grid-column: 1; grid-row: 1; min-width: 0; }
+.schedule-column { grid-column: 2; grid-row: 1; min-width: 0; display: grid; gap: 18px; }
+.request-queue, .shift-panel, .day-preview, .table-panel { padding: 22px; background: #fff; border: 1px solid #dbe4ea; border-radius: 12px; box-shadow: none; }
+.request-queue-head { gap: 8px; flex-wrap: wrap; }
+.request-queue-head h2, .shift-head h2, .day-preview h2, .table-panel h2 { font-size: 18px; margin: 0; color: #183343; }
+.request-queue-head span { font-size: 12px; color: #526575; }
+.queue-help, .quiet-empty { font-size: 13px; line-height: 1.7; color: #526575; }
+.quiet-empty { padding: 20px 0; }
+.request-row { display: grid; grid-template-columns: 115px minmax(0, 1fr) 106px; align-items: start; gap: 16px; padding: 22px 0; border-color: #e1e8ed; }
+.request-row:last-child { padding-bottom: 0; }
+.request-date { display: grid; gap: 5px; font-size: 13px; color: #526575; font-variant-numeric: tabular-nums; }
+.request-date strong { font-size: 17px; color: #183343; }
+.compare-button { padding: 5px 0; border: 0; background: transparent; color: #0f766e; text-align: left; font: inherit; font-size: 12px; box-shadow: none; }
+.compare-button:hover { text-decoration: underline; }
+.request-copy { min-width: 0; overflow-wrap: anywhere; }
+.request-copy > strong { font-size: 17px; color: #183343; }
+.request-copy p, .request-copy small { font-size: 13px; line-height: 1.6; color: #526575; }
+.request-copy small { display: block; }
+.request-copy .status-chip { margin-top: 10px; padding: 4px 10px; }
+.request-actions { display: grid; gap: 8px; }
+.rejection-form { grid-column: 1 / -1; margin-top: 0; padding-top: 14px; }
+.shift-head { gap: 8px; }
+.shift-head p:last-child { font-size: 12px; color: #526575; }
+.shift-count { padding: 5px 8px; font-weight: 600; }
+.schedule-date-picker { margin: 18px 0; font-size: 13px; color: #526575; }
+.schedule-manager summary { cursor: pointer; padding: 12px 0; color: #0f766e; font-size: 14px; font-weight: 600; border-top: 1px solid #e1e8ed; }
+.shift-form { grid-template-columns: 1fr 1fr; padding: 0 0 18px; border: 0; border-radius: 0; background: #fff; }
+.shift-form label:first-child, .shift-note-field, .shift-form > button { grid-column: 1 / -1; }
+.shift-form label:nth-child(2) { grid-column: 1 / -1; }
+.shift-list { grid-template-columns: 1fr; gap: 0; margin-top: 6px; }
+.shift-item { grid-template-columns: minmax(0, 1fr) auto; border: 0; border-top: 1px solid #e1e8ed; border-radius: 0; padding: 16px 0; }
+.shift-date { display: none; }
+.shift-detail { overflow-wrap: anywhere; }
+.shift-detail span, .shift-detail small { color: #526575; }
+.shift-empty { border: 0; padding: 18px 0 0; text-align: left; line-height: 1.7; color: #526575; font-size: 13px; }
+.confirmed-row { display: flex; align-items: start; gap: 18px; padding: 16px 0; border-top: 1px solid #e1e8ed; font-size: 13px; }
+.confirmed-row > strong { flex: none; font-variant-numeric: tabular-nums; }
+.confirmed-row div { min-width: 0; overflow-wrap: anywhere; }
+.confirmed-row small { display: block; margin-top: 5px; color: #526575; }
+.toolbar { padding: 0 0 14px; background: transparent; border: 0; box-shadow: none; border-radius: 0; }
+.filter-pills { gap: 6px; }
+.table-panel { padding: 20px 12px; }
+.table-panel h2 { margin: 0 8px 16px; }
+th, td { padding: 16px 9px; font-size: 13px; }
+th { color: #526575; }
+.date-block { display: none; }
+.date-cell, .pet-cell { gap: 8px; }
+.pet-avatar { width: 30px; height: 30px; border-radius: 8px; flex: none; }
+.row-actions { flex-wrap: wrap; gap: 6px; }
+.primary-btn, .ghost-btn, .danger-btn, .reschedule-btn, .close-btn, .pill-btn { border-radius: 8px; box-shadow: none; transition: background .15s ease; }
+.primary-btn { background: #0f766e; }
+.primary-btn:hover { background: #095f59; }
+.ghost-btn:hover, .pill-btn:hover { background: #f1f6f7; }
+button:hover { transform: none; }
+button:disabled { opacity: .55; cursor: wait; }
+button:focus-visible, summary:focus-visible { outline: 3px solid #4caaa1; outline-offset: 3px; }
+input, select, textarea { border-radius: 8px; box-sizing: border-box; min-width: 0; }
+.modal { max-height: calc(100dvh - 40px); overflow-y: auto; border-radius: 14px; box-shadow: none; }
+@media (max-width: 1250px) {
+  .appointment-workspace { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); }
+  .request-row { grid-template-columns: 100px minmax(0, 1fr); }
+  .request-actions { grid-column: 2; display: flex; flex-wrap: wrap; }
+}
+@media (max-width: 900px) {
+  .appointment-workspace { grid-template-columns: 1fr; }
+  .schedule-column { grid-column: 1; grid-row: 2; }
+}
+@media (max-width: 720px) {
+  .request-queue, .shift-panel, .day-preview { padding: 18px; }
+  .view-tabs { padding: 0 6px; }
+  .view-tabs button { font-size: 12px; padding: 10px 8px; min-height: 48px; }
+  .request-row { grid-template-columns: 1fr; gap: 12px; }
+  .request-date { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .request-actions { grid-column: 1; display: grid; grid-template-columns: 1fr 1fr; }
+  .request-queue-head, .rejection-form { flex-direction: column; align-items: stretch; }
+  .shift-item .danger-btn { grid-column: auto; width: auto; }
+  .shift-head { flex-direction: row; }
+  .table-wrap { overflow: visible; }
+  table, tbody { display: block; }
+  thead { display: none; }
+  tbody tr { display: block; padding: 14px 6px; border-top: 1px solid #e1e8ed; }
+  tbody td { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; border: 0; padding: 8px 0; overflow-wrap: anywhere; }
+  tbody td::before { content: attr(data-label); color: #526575; font-size: 12px; }
+  tbody td.state { display: block; }
+  tbody td.state::before { display: none; }
+  .date-cell, .pet-cell, .row-actions { flex-direction: row; }
+  .row-actions button { width: auto; }
 }
 </style>

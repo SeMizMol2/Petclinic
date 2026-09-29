@@ -163,7 +163,14 @@ const expenseCategories = computed(() => allCategories.value.filter((c) => c.typ
 const totalExpense = computed(() => expenses.value.reduce((sum, e) => sum + Number(e.exp_amount), 0))
 
 const formatPrice = (val) => Number(val || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const formatDate = (d) => new Date(d).toLocaleDateString('th-TH')
+const formatDate = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString('th-TH') : '-'
+const localToday = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
 const fetchExpenses = async () => {
@@ -189,13 +196,13 @@ const fetchCategories = async () => {
 
 const openAddModal = () => {
   modalMode.value = 'add'
-  form.value = { exp_title: '', exp_amount: '', exp_date: new Date().toISOString().slice(0, 10), category_id: '' }
+  form.value = { exp_title: '', exp_amount: '', exp_date: localToday(), category_id: '' }
   isModalOpen.value = true
 }
 
 const openEditModal = (exp) => {
   modalMode.value = 'edit'
-  form.value = { ...exp, exp_date: exp.exp_date?.slice(0, 10) }
+  form.value = { ...exp, exp_date: exp.exp_date }
   isModalOpen.value = true
 }
 

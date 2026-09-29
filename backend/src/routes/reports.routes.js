@@ -87,7 +87,7 @@ router.get('/', auth, async (req, res) => {
           e.exp_id,
           e.exp_title,
           e.exp_amount,
-          e.exp_date,
+          e.exp_date::text AS exp_date,
           c.category_name
         FROM tb_expense e
         LEFT JOIN tb_category c ON e.category_id = c.category_id

@@ -151,7 +151,7 @@
           </label>
           <label>
             วันเกิด
-            <input v-model="form.pet_birthdate" type="date" />
+            <input v-model="form.pet_birthdate" type="date" :max="todayInThailand" />
           </label>
           <label class="full">
             ประวัติแพ้ยา
@@ -173,6 +173,7 @@ import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { resolveApiAssetUrl } from '../../api'
 
+const todayInThailand = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
 const pets = ref([])
 const owners = ref([])
 const loading = ref(false)

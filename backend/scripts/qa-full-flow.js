@@ -1,6 +1,7 @@
 const path = require('path');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
+const { createHash } = require('node:crypto');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
@@ -21,6 +22,10 @@ const qa = {
   adminUsername: `qa_admin_${runId}`,
   adminPassword: 'QaAdmin123!',
   adminUserId: null,
+  credentialOwnerId: null,
+  credentialUserId: null,
+  credentialMemberId: null,
+  credentialMemberOwnerId: null,
   userId: null,
   ownerId: null,
   petId: null,
@@ -98,6 +103,7 @@ const cleanup = async () => {
     await client.query('BEGIN');
     if (qa.receiptId) {
       await client.query('DELETE FROM tb_receipt_detail WHERE receipt_id = $1', [qa.receiptId]);
+      await client.query('DELETE FROM tb_receipt_payment_event WHERE receipt_id = $1', [qa.receiptId]);
       await client.query('DELETE FROM tb_receipt WHERE receipt_id = $1', [qa.receiptId]);
     }
     if (qa.treatmentId) {
@@ -120,6 +126,10 @@ const cleanup = async () => {
     if (qa.expenseId) await client.query('DELETE FROM tb_expense WHERE exp_id = $1', [qa.expenseId]);
     if (qa.categoryId) await client.query('DELETE FROM tb_category WHERE category_id = $1', [qa.categoryId]);
     if (qa.petId) await client.query('DELETE FROM tb_pet WHERE pet_id = $1', [qa.petId]);
+    if (qa.credentialOwnerId) await client.query('DELETE FROM tb_owner WHERE owner_id = $1', [qa.credentialOwnerId]);
+    if (qa.credentialUserId) await client.query('DELETE FROM tb_user WHERE user_id = $1', [qa.credentialUserId]);
+    if (qa.credentialMemberOwnerId) await client.query('DELETE FROM tb_owner WHERE owner_id = $1', [qa.credentialMemberOwnerId]);
+    if (qa.credentialMemberId) await client.query('DELETE FROM tb_user WHERE user_id = $1', [qa.credentialMemberId]);
     if (qa.ownerId) await client.query('DELETE FROM tb_owner WHERE owner_id = $1', [qa.ownerId]);
     if (qa.userId) await client.query('DELETE FROM tb_user WHERE user_id = $1', [qa.userId]);
     if (qa.adminUserId) await client.query('DELETE FROM tb_user WHERE user_id = $1', [qa.adminUserId]);
@@ -133,7 +143,7 @@ const cleanup = async () => {
   }
 };
 
-const createSchedule = async (adminToken, vetId, dayOffset) => {
+const createSchedule = async (adminToken, vetId, dayOffset, startTime = '13:00', endTime = '15:00') => {
   for (let offset = dayOffset; offset < dayOffset + 20; offset += 1) {
     const workDate = isoDateAfter(offset);
     const result = await request('POST', '/appointments/vet-schedules', {
@@ -141,8 +151,8 @@ const createSchedule = async (adminToken, vetId, dayOffset) => {
       body: {
         vet_id: vetId,
         work_date: workDate,
-        start_time: '13:00',
-        end_time: '15:00',
+        start_time: startTime,
+        end_time: endTime,
         schedule_note: `QA ${runId}`
       }
     });
@@ -195,7 +205,7 @@ const main = async () => {
 
   await expectStatus(
     'register user and owner atomically',
-    200,
+    201,
     request('POST', '/auth/register', {
       body: { username: qa.username, email: qa.email, password: qa.password }
     })
@@ -211,6 +221,33 @@ const main = async () => {
   assert.equal(account.rows.length, 1);
   qa.userId = account.rows[0].user_id;
   qa.ownerId = account.rows[0].owner_id;
+
+  await expectStatus('new account cannot log in before email verification', 403,
+    request('POST', '/auth/login', { body: { username: qa.username, password: qa.password } }));
+  await expectStatus('resend does not reveal nonexistent email', 200,
+    request('POST', '/auth/resend-verification', { body: { email: `missing_${qa.email}` } }));
+  await expectStatus('invalid email verification token rejected', 400,
+    request('POST', '/auth/verify-email', { body: { token: 'a'.repeat(64) } }));
+  const expiredToken = 'c'.repeat(64);
+  await pool.query(
+    `UPDATE tb_user SET email_verification_token_hash = $1,
+       email_verification_expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+     WHERE user_id = $2`,
+    [createHash('sha256').update(expiredToken).digest('hex'), qa.userId]
+  );
+  await expectStatus('expired email verification token rejected', 400,
+    request('POST', '/auth/verify-email', { body: { token: expiredToken } }));
+  const verificationToken = 'b'.repeat(64);
+  await pool.query(
+    `UPDATE tb_user SET email_verification_token_hash = $1,
+       email_verification_expires_at = CURRENT_TIMESTAMP + INTERVAL '1 hour'
+     WHERE user_id = $2`,
+    [createHash('sha256').update(verificationToken).digest('hex'), qa.userId]
+  );
+  await expectStatus('verify email with valid single-use token', 200,
+    request('POST', '/auth/verify-email', { body: { token: verificationToken } }));
+  await expectStatus('email verification token cannot be reused', 400,
+    request('POST', '/auth/verify-email', { body: { token: verificationToken } }));
 
   const userLogin = await expectStatus(
     'user login',
@@ -236,6 +273,184 @@ const main = async () => {
   );
   const adminToken = adminLogin.token;
 
+  await expectStatus('admin rejects weak owner password', 400, request('POST', '/admin/owners', {
+    token: adminToken,
+    body: { owner_name: 'เจ้าของรหัสสั้น', username: `short_${runId}`, password: '123456' }
+  }));
+  const credentialOwner = await expectStatus('admin creates owner with unique random password', 201, request('POST', '/admin/owners', {
+    token: adminToken,
+    body: { owner_name: 'เจ้าของทดสอบรหัสผ่าน', username: `credential_${runId}`, owner_email: `credential_${qa.email}` }
+  }));
+  qa.credentialOwnerId = credentialOwner.owner_id;
+  const credentialRow = (await pool.query(
+    'SELECT u.user_id, u.password FROM tb_owner o JOIN tb_user u ON u.user_id = o.user_id WHERE o.owner_id = $1',
+    [qa.credentialOwnerId]
+  )).rows[0];
+  qa.credentialUserId = credentialRow.user_id;
+  assert.ok(credentialOwner.initial_password.length >= 8);
+  assert.equal(await bcrypt.compare('123456', credentialRow.password), false);
+  const credentialLogin = await expectStatus('new owner logs in with issued password', 200, request('POST', '/auth/login', {
+    body: { username: credentialOwner.username, password: credentialOwner.initial_password }
+  }));
+  await expectStatus('owner password change rejects incorrect current password', 400, request('PUT', '/user/me/password', {
+    token: credentialLogin.token, body: { current_password: 'wrong-password', new_password: 'NewPass123!' }
+  }));
+  await expectStatus('owner password change rejects short new password', 400, request('PUT', '/user/me/password', {
+    token: credentialLogin.token, body: { current_password: credentialOwner.initial_password, new_password: '123456' }
+  }));
+  await expectStatus('owner password change rejects reused password', 400, request('PUT', '/user/me/password', {
+    token: credentialLogin.token, body: { current_password: credentialOwner.initial_password, new_password: credentialOwner.initial_password }
+  }));
+  await expectStatus('owner changes password with correct current password', 200, request('PUT', '/user/me/password', {
+    token: credentialLogin.token, body: { current_password: credentialOwner.initial_password, new_password: 'NewPass123!' }
+  }));
+  await expectStatus('old owner password no longer logs in', 401, request('POST', '/auth/login', {
+    body: { username: credentialOwner.username, password: credentialOwner.initial_password }
+  }));
+  await expectStatus('new owner password logs in', 200, request('POST', '/auth/login', {
+    body: { username: credentialOwner.username, password: 'NewPass123!' }
+  }));
+
+  const credentialMember = await expectStatus('hidden admin member route also issues unique password', 200, request('POST', '/admin/users', {
+    token: adminToken, body: { owner_name: 'สมาชิกทดสอบรหัสผ่าน', email: `member_${qa.email}` }
+  }));
+  assert.ok(credentialMember.initial_password.length >= 8);
+  const memberRow = (await pool.query('SELECT u.user_id, o.owner_id FROM tb_user u JOIN tb_owner o ON o.user_id = u.user_id WHERE u.username = $1', [credentialMember.username])).rows[0];
+  qa.credentialMemberId = memberRow.user_id;
+  qa.credentialMemberOwnerId = memberRow.owner_id;
+  await expectStatus('member issued password logs in', 200, request('POST', '/auth/login', {
+    body: { username: credentialMember.username, password: credentialMember.initial_password }
+  }));
+
+  const ownerBeforeFailedEdit = (await pool.query(
+    `SELECT o.owner_name, o.owner_email, o.owner_tel, u.username, u.email
+     FROM tb_owner o JOIN tb_user u ON u.user_id = o.user_id
+     WHERE o.owner_id = $1`,
+    [qa.ownerId]
+  )).rows[0];
+  await expectStatus(
+    'duplicate owner email rejects entire edit',
+    400,
+    request('PUT', `/admin/owners/${qa.ownerId}`, {
+      token: adminToken,
+      body: {
+        owner_name: 'ไม่ควรถูกบันทึก',
+        owner_email: `admin_${qa.email}`,
+        owner_tel: '0999999999',
+        username: `${qa.username}_changed`
+      }
+    })
+  );
+  const ownerAfterFailedEdit = (await pool.query(
+    `SELECT o.owner_name, o.owner_email, o.owner_tel, u.username, u.email
+     FROM tb_owner o JOIN tb_user u ON u.user_id = o.user_id
+     WHERE o.owner_id = $1`,
+    [qa.ownerId]
+  )).rows[0];
+  assert.deepEqual(ownerAfterFailedEdit, ownerBeforeFailedEdit);
+  record('failed owner edit leaves both tables unchanged');
+
+  await expectStatus(
+    'owner edit updates both tables together',
+    200,
+    request('PUT', `/admin/owners/${qa.ownerId}`, {
+      token: adminToken,
+      body: {
+        owner_name: 'เจ้าของสัตว์ QA',
+        owner_email: qa.email,
+        owner_tel: '0811111111',
+        username: qa.username
+      }
+    })
+  );
+  const ownerAfterSuccessfulEdit = (await pool.query(
+    `SELECT o.owner_name, o.owner_email, o.owner_tel, u.username, u.email
+     FROM tb_owner o JOIN tb_user u ON u.user_id = o.user_id
+     WHERE o.owner_id = $1`,
+    [qa.ownerId]
+  )).rows[0];
+  assert.equal(ownerAfterSuccessfulEdit.owner_name, 'เจ้าของสัตว์ QA');
+  assert.equal(ownerAfterSuccessfulEdit.owner_tel, '0811111111');
+  assert.equal(ownerAfterSuccessfulEdit.owner_email, qa.email);
+  assert.equal(ownerAfterSuccessfulEdit.email, qa.email);
+  record('successful owner edit keeps both tables in sync');
+  if (process.env.QA_ONLY_OWNER_EDIT === '1') {
+    console.log(`FLOW_TEST_SUMMARY ${checks.length} checks passed`);
+    return;
+  }
+
+  const duplicateOwnerCountBefore = (await pool.query(
+    'SELECT COUNT(*)::int AS count FROM tb_user WHERE username = $1',
+    [qa.username]
+  )).rows[0].count;
+  await expectStatus(
+    'admin cannot add owner with an existing username',
+    400,
+    request('POST', '/admin/owners', {
+      token: adminToken,
+      body: { owner_name: 'ชื่อซ้ำ', owner_email: `duplicate_${qa.email}`, username: qa.username }
+    })
+  );
+  assert.equal((await pool.query(
+    'SELECT COUNT(*)::int AS count FROM tb_user WHERE username = $1',
+    [qa.username]
+  )).rows[0].count, duplicateOwnerCountBefore);
+  record('duplicate owner create leaves account count unchanged');
+
+  await expectStatus(
+    'admin cannot rename owner to an existing username',
+    400,
+    request('PUT', `/admin/owners/${qa.ownerId}`, {
+      token: adminToken,
+      body: { owner_name: 'ไม่ควรถูกบันทึก', owner_email: qa.email, owner_tel: '0999999999', username: qa.adminUsername }
+    })
+  );
+  const ownerAfterDuplicateUsername = (await pool.query(
+    'SELECT o.owner_name, o.owner_tel, u.username FROM tb_owner o JOIN tb_user u ON u.user_id = o.user_id WHERE o.owner_id = $1',
+    [qa.ownerId]
+  )).rows[0];
+  assert.equal(ownerAfterDuplicateUsername.owner_name, 'เจ้าของสัตว์ QA');
+  assert.equal(ownerAfterDuplicateUsername.username, qa.username);
+  record('duplicate owner edit leaves both tables unchanged');
+
+  await expectStatus(
+    'admin member edit cannot bypass username check',
+    400,
+    request('PUT', `/admin/users/${qa.userId}`, {
+      token: adminToken,
+      body: { username: qa.adminUsername, owner_name: 'ไม่ควรถูกบันทึก', email: qa.email, tel: '0999999999' }
+    })
+  );
+  const memberAfterDuplicateUsername = (await pool.query(
+    'SELECT username FROM tb_user WHERE user_id = $1', [qa.userId]
+  )).rows[0];
+  assert.equal(memberAfterDuplicateUsername.username, qa.username);
+  record('duplicate member edit leaves username unchanged');
+
+  await expectStatus(
+    'admin rejects invalid owner username format',
+    400,
+    request('POST', '/admin/owners', {
+      token: adminToken,
+      body: { owner_name: 'ชื่อผิดรูปแบบ', owner_email: `invalid_${qa.email}`, username: 'bad name' }
+    })
+  );
+
+  const raceUsername = `qa_race_${runId}`.slice(0, 50);
+  const raceResults = await Promise.all([1, 2].map((n) => request('POST', '/admin/owners', {
+    token: adminToken,
+    body: { owner_name: `แข่งเพิ่ม ${n}`, owner_email: `race${n}_${qa.email}`, username: raceUsername }
+  })));
+  assert.deepEqual(raceResults.map((item) => item.status).sort(), [201, 400]);
+  record('concurrent owner creation allows only one username');
+  const raceOwnerId = raceResults.find((item) => item.status === 201).data.owner_id;
+  await expectStatus('remove QA concurrent owner', 200, request('DELETE', `/admin/owners/${raceOwnerId}`, { token: adminToken }));
+
+  if (process.env.QA_ONLY_USERNAME === '1') {
+    console.log(`FLOW_TEST_SUMMARY ${checks.length} checks passed`);
+    return;
+  }
+
   await expectStatus('user profile', 200, request('GET', '/user/me', { token: userToken }));
   const invalidProfileImage = new FormData();
   invalidProfileImage.append('profileImage', new Blob(['not an image'], { type: 'text/plain' }), 'profile.txt');
@@ -252,6 +467,30 @@ const main = async () => {
       body: { owner_name: 'ผู้ใช้ทดสอบระบบ', owner_email: qa.email, tel: '0800000000' }
     })
   );
+  const changedEmail = `changed_${qa.email}`;
+  const changedProfile = await expectStatus('changing profile email requires verification', 200,
+    request('PUT', '/user/me', {
+      token: userToken,
+      body: { owner_name: 'ผู้ใช้ทดสอบระบบ', owner_email: changedEmail, tel: '0800000000' }
+    }));
+  assert.equal(changedProfile.email_verification_required, true);
+  await expectStatus('changed email blocks next login until verified', 403,
+    request('POST', '/auth/login', { body: { username: qa.username, password: qa.password } }));
+  const restoredProfile = await expectStatus('restoring profile email also requires verification', 200,
+    request('PUT', '/user/me', {
+      token: userToken,
+      body: { owner_name: 'ผู้ใช้ทดสอบระบบ', owner_email: qa.email, tel: '0800000000' }
+    }));
+  assert.equal(restoredProfile.email_verification_required, true);
+  const restoredToken = 'd'.repeat(64);
+  await pool.query(
+    `UPDATE tb_user SET email_verification_token_hash = $1,
+       email_verification_expires_at = CURRENT_TIMESTAMP + INTERVAL '1 hour'
+     WHERE user_id = $2`,
+    [createHash('sha256').update(restoredToken).digest('hex'), qa.userId]
+  );
+  await expectStatus('restored profile email can be verified', 200,
+    request('POST', '/auth/verify-email', { body: { token: restoredToken } }));
 
   const petForm = new FormData();
   petForm.append('pet_name', 'สัตว์เลี้ยงทดสอบ');
@@ -267,6 +506,15 @@ const main = async () => {
     request('POST', '/pets', { token: userToken, body: petForm })
   );
   qa.petId = createdPet.pet_id;
+
+  const futurePetForm = new FormData();
+  for (const [key, value] of petForm.entries()) futurePetForm.append(key, value);
+  futurePetForm.append('pet_birthdate', isoDateAfter(10));
+  await expectStatus('reject future pet birthdate', 400, request('POST', '/pets', { token: userToken, body: futurePetForm }));
+  await expectStatus('admin rejects future pet birthdate', 400, request('POST', '/admin/pets', {
+    token: adminToken,
+    body: { owner_id: qa.ownerId, pet_name: 'Future QA', pet_type: 'สุนัข', pet_gender: 'ผู้', sterile_status: 'ยังไม่ได้ทำหมัน', pet_birthdate: isoDateAfter(10) }
+  }));
 
   const editPetForm = new FormData();
   editPetForm.append('pet_name', 'สัตว์เลี้ยงทดสอบแก้ไข');
@@ -343,6 +591,67 @@ const main = async () => {
   );
   const savedSchedule = scheduleResponse.find((item) => qa.scheduleIds.includes(item.schedule_id));
   assert.equal(savedSchedule?.work_date, firstSlot.workDate, 'schedule date must match the date entered by staff');
+
+  const edgeShift = await createSchedule(adminToken, vetId, 60, '09:00', '17:00');
+  const edgeRequest = await expectStatus(
+    'owner can request an exact-minute time near shift end',
+    201,
+    request('POST', '/appointments/request', {
+      token: userToken,
+      body: { pet_id: qa.petId, vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:50', appt_reason: 'ตรวจท้ายเวร QA' }
+    })
+  );
+  qa.ownerRequestIds.push(edgeRequest.appointment.appt_id);
+  await expectStatus(
+    'clinic cannot approve a 16:50 request on a shift ending at 17:00',
+    409,
+    request('PATCH', `/appointments/requests/${edgeRequest.appointment.appt_id}/review`, {
+      token: adminToken, body: { action: 'approve' }
+    })
+  );
+  await expectStatus(
+    'clinic cannot create a 16:50 appointment on the same shift',
+    409,
+    request('POST', '/appointments', {
+      token: adminToken,
+      body: { pet_id: qa.petId, vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:50', appt_reason: 'นัดท้ายเวร QA' }
+    })
+  );
+  await expectStatus(
+    'clinic rejects a time one minute after the last valid start',
+    409,
+    request('POST', '/appointments', {
+      token: adminToken,
+      body: { pet_id: qa.petId, vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:31', appt_reason: 'นัดท้ายเวร QA' }
+    })
+  );
+  const edgeAppointment = await expectStatus(
+    'clinic accepts 16:30 as the last valid start',
+    201,
+    request('POST', '/appointments', {
+      token: adminToken,
+      body: { pet_id: qa.petId, vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:30', appt_reason: 'นัดท้ายเวร QA' }
+    })
+  );
+  qa.ownerRequestIds.push(edgeAppointment.appointment.appt_id);
+  await expectStatus(
+    'clinic cannot move an active appointment to 16:50',
+    409,
+    request('PUT', `/appointments/${edgeAppointment.appointment.appt_id}`, {
+      token: adminToken,
+      body: { vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:50', appt_reason: 'เลื่อนนัดท้ายเวร QA', appt_status: 'รอ' }
+    })
+  );
+  await expectStatus(
+    'remove QA shift-end appointment',
+    200,
+    request('DELETE', `/appointments/${edgeAppointment.appointment.appt_id}`, { token: adminToken })
+  );
+  if (process.env.QA_ONLY_SHIFT_END === '1') {
+    console.log(`FLOW_TEST_SUMMARY ${checks.length} checks passed`);
+    return;
+  }
+
   const appointment = await expectStatus(
     'admin creates pending appointment',
     201,
@@ -400,6 +709,14 @@ const main = async () => {
   assert.equal(ownerRequest.appointment.appt_date, firstSlot.workDate);
   assert.equal(ownerRequest.appointment.request_source, 'owner');
   assert.equal(ownerRequest.appointment.vet_id, null);
+  assert.equal(ownerRequest.clinic_email_notification?.skipped, true);
+  if (process.env.QA_ONLY_CLINIC_MAIL === '1') {
+    const savedRequest = await pool.query('SELECT appt_status FROM tb_appointment WHERE appt_id = $1', [ownerRequest.appointment.appt_id]);
+    assert.equal(savedRequest.rows[0]?.appt_status, 'รอคลินิกยืนยัน');
+    record('owner request remains saved when SMTP is disabled');
+    console.log(`FLOW_TEST_SUMMARY ${checks.length} checks passed`);
+    return;
+  }
 
   const slotsWhilePending = await expectStatus('pending request does not occupy slots', 200, request(
     'GET', `/appointments/available-slots?date=${firstSlot.workDate}`, { token: userToken }
@@ -500,6 +817,15 @@ const main = async () => {
     })
   );
 
+  await expectStatus('reject negative treatment price', 400, request('POST', '/treatments', {
+    token: adminToken,
+    body: { pet_id: qa.petId, vet_id: vetId, services: [{ service_id: qa.serviceId, quantity: 1, price: -1 }] }
+  }));
+  await expectStatus('reject zero treatment quantity', 400, request('POST', '/treatments', {
+    token: adminToken,
+    body: { pet_id: qa.petId, vet_id: vetId, services: [{ service_id: qa.serviceId, quantity: 0, price: 100 }] }
+  }));
+
   const treatment = await expectStatus(
     'create treatment with calculated service total',
     201,
@@ -593,6 +919,25 @@ const main = async () => {
       body: { payment_status: 'ชำระเสร็จสิ้น', pay_method: 'เงินสด' }
     })
   );
+  await expectStatus('invalid receipt status returns validation error', 400, request('PUT', `/receipts/${qa.receiptId}/status`, {
+    token: adminToken, body: { payment_status: 'invalid' }
+  }));
+  await expectStatus('ambiguous receipt status is rejected', 400, request('PUT', `/receipts/${qa.receiptId}/status`, {
+    token: adminToken, body: { payment_status: 'ไม่เสร็จ' }
+  }));
+  await expectStatus('reversal needs a reason', 400, request('PUT', `/receipts/${qa.receiptId}/status`, {
+    token: adminToken, body: { payment_status: 'ยังไม่ได้ชำระ' }
+  }));
+  await expectStatus('reverse paid receipt with reason', 200, request('PUT', `/receipts/${qa.receiptId}/status`, {
+    token: adminToken, body: { payment_status: 'ยังไม่ได้ชำระ', reason: 'รับชำระผิดใบเสร็จ' }
+  }));
+  const paymentEvents = await expectStatus('payment audit history', 200, request('GET', `/receipts/${qa.receiptId}/payment-events`, { token: adminToken }));
+  assert.equal(paymentEvents.data.length, 2);
+  assert.equal(paymentEvents.data[0].reason, 'รับชำระผิดใบเสร็จ');
+  assert.equal(paymentEvents.data[0].changed_by_username, qa.adminUsername);
+  await expectStatus('pay corrected receipt again', 200, request('PUT', `/receipts/${qa.receiptId}/status`, {
+    token: adminToken, body: { payment_status: 'ชำระเสร็จสิ้น', pay_method: 'เงินสด' }
+  }));
   await expectStatus(
     'missing receipt status update returns not found',
     404,
@@ -660,6 +1005,7 @@ const main = async () => {
   );
   qa.surgeryId = surgery.surg_id;
 
+  const vaccineDate = isoDateAfter(0);
   const vaccine = await expectStatus(
     'create vaccine record',
     201,
@@ -668,7 +1014,7 @@ const main = async () => {
       body: {
         vaccine_name: 'วัคซีนทดสอบ QA',
         lot_number: `LOT-${runId}`,
-        vac_date: isoDateAfter(0),
+        vac_date: vaccineDate,
         service_id: qa.serviceId,
         pet_id: qa.petId,
         vet_id: vetId
@@ -676,6 +1022,34 @@ const main = async () => {
     })
   );
   qa.vaccineId = vaccine.vac_rec_id;
+  const vaccineRows = await expectStatus(
+    'vaccine edit receives date input value',
+    200,
+    request('GET', '/admin/vaccines', { token: adminToken })
+  );
+  assert.equal(vaccineRows.find((item) => item.vac_rec_id === qa.vaccineId)?.vac_date, vaccineDate);
+
+  await expectStatus(
+    'vaccine edit keeps injection date',
+    200,
+    request('PUT', `/admin/vaccines/${qa.vaccineId}`, {
+      token: adminToken,
+      body: {
+        vaccine_name: 'วัคซีนทดสอบ QA',
+        lot_number: `LOT-${runId}`,
+        vac_date: vaccineDate,
+        service_id: qa.serviceId,
+        pet_id: qa.petId,
+        vet_id: vetId
+      }
+    })
+  );
+  const editedVaccineRows = await expectStatus(
+    'vaccine date remains unchanged after edit',
+    200,
+    request('GET', '/admin/vaccines', { token: adminToken })
+  );
+  assert.equal(editedVaccineRows.find((item) => item.vac_rec_id === qa.vaccineId)?.vac_date, vaccineDate);
 
   await expectStatus('user pet history', 200, request('GET', `/history/pet-history/${qa.petId}`, { token: userToken }));
   await expectStatus('user pet summary', 200, request('GET', `/history/pet-summary/${qa.petId}`, { token: userToken }));
@@ -746,6 +1120,7 @@ const main = async () => {
     })
   );
   qa.categoryId = category.category_id;
+  const expenseDate = isoDateAfter(0);
   const expense = await expectStatus(
     'create clinic expense',
     201,
@@ -754,12 +1129,56 @@ const main = async () => {
       body: {
         exp_title: `QA expense ${runId}`,
         exp_amount: 123,
-        exp_date: isoDateAfter(0),
+        exp_date: expenseDate,
         category_id: qa.categoryId
       }
     })
   );
   qa.expenseId = expense.exp_id;
+
+  const expenseMonth = Number(expenseDate.slice(5, 7));
+  const expenseYear = Number(expenseDate.slice(0, 4));
+  const expenseQuery = `month=${expenseMonth}&year=${expenseYear}`;
+  const listedExpenses = await expectStatus(
+    'expense date returned without timezone shift',
+    200,
+    request('GET', `/expenses?${expenseQuery}`, { token: adminToken })
+  );
+  assert.equal(listedExpenses.find((item) => item.exp_id === qa.expenseId)?.exp_date, expenseDate);
+
+  await expectStatus(
+    'expense edit keeps selected date',
+    200,
+    request('PUT', `/expenses/${qa.expenseId}`, {
+      token: adminToken,
+      body: {
+        exp_title: `QA expense ${runId}`,
+        exp_amount: 123,
+        exp_date: expenseDate,
+        category_id: qa.categoryId
+      }
+    })
+  );
+  const editedExpenses = await expectStatus(
+    'expense date remains unchanged after edit',
+    200,
+    request('GET', `/expenses?${expenseQuery}`, { token: adminToken })
+  );
+  assert.equal(editedExpenses.find((item) => item.exp_id === qa.expenseId)?.exp_date, expenseDate);
+
+  const dashboardExpenses = await expectStatus(
+    'dashboard expense date returned without timezone shift',
+    200,
+    request('GET', `/dashboard?${expenseQuery}`, { token: adminToken })
+  );
+  assert.equal(dashboardExpenses.details.expense.find((item) => item.exp_title === `QA expense ${runId}`)?.exp_date, expenseDate);
+
+  const reportExpenses = await expectStatus(
+    'report expense date returned without timezone shift',
+    200,
+    request('GET', `/reports?${expenseQuery}`, { token: adminToken })
+  );
+  assert.equal(reportExpenses.financialReport.expenses.find((item) => item.exp_id === qa.expenseId)?.exp_date, expenseDate);
 
   const smokeEndpoints = [
     '/admin/dashboard',
@@ -788,6 +1207,8 @@ const main = async () => {
 
   await expectStatus('public clinic information', 200, request('GET', '/clinic'));
   await expectStatus('public services', 200, request('GET', '/services/public'));
+  await pool.query("UPDATE tb_user SET user_role = 'user' WHERE user_id = $1", [qa.adminUserId]);
+  await expectStatus('demoted admin token cannot access admin data', 401, request('GET', '/admin/owners', { token: adminToken }));
   console.log(`FLOW_TEST_SUMMARY ${checks.length} checks passed`);
 };
 

@@ -4,7 +4,7 @@
       <div class="hero-copy">
         <div class="hero-title-line">
           <h1 id="pets-list-title">รายชื่อสัตว์เลี้ยง</h1>
-          <span v-if="!loading" class="pet-count">{{ pets.length }} ตัว</span>
+          <span v-if="!loading && !loadError" class="pet-count">{{ pets.length }} ตัว</span>
         </div>
         <p class="hero-text">ข้อมูลสำคัญและประวัติการรักษาของสัตว์เลี้ยงแต่ละตัว</p>
       </div>
@@ -12,6 +12,12 @@
     </section>
 
     <section v-if="loading" class="state-section">กำลังโหลดข้อมูลสัตว์เลี้ยง...</section>
+
+    <section v-else-if="loadError" class="state-section" role="alert">
+      <h2>โหลดข้อมูลสัตว์เลี้ยงไม่สำเร็จ</h2>
+      <p>{{ loadError }}</p>
+      <button type="button" class="primary-link" @click="loadPets">ลองอีกครั้ง</button>
+    </section>
 
     <section v-else-if="pets.length === 0" class="state-section empty-state">
       <h2>ยังไม่มีข้อมูลสัตว์เลี้ยง</h2>
@@ -194,7 +200,7 @@
               </label>
               <label>
                 <span>วันเกิด</span>
-                <input v-model="editPet.pet_birthdate" type="date" class="input-field" />
+                <input v-model="editPet.pet_birthdate" type="date" :max="todayInThailand" class="input-field" />
               </label>
             </div>
 
@@ -232,8 +238,10 @@ import axios from 'axios'
 import { resolveApiAssetUrl } from '../../api'
 import AppIcon from '../../components/AppIcon.vue'
 
+const todayInThailand = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
 const pets = ref([])
 const loading = ref(false)
+const loadError = ref('')
 const showEdit = ref(false)
 const editPet = ref({})
 const editImageFile = ref(null)
@@ -383,14 +391,16 @@ const loadHistoryForPet = async (petId) => {
 
 const loadPets = async () => {
   loading.value = true
+  loadError.value = ''
   try {
     const response = await axios.get('http://localhost:3000/api/pets', getHeaders())
     pets.value = Array.isArray(response.data) ? response.data : []
     await Promise.all(pets.value.map((pet) => loadHistoryForPet(pet.pet_id)))
   } catch (error) {
     console.error('loadPets error:', error)
-    pets.value = []
-    alert('ไม่สามารถโหลดข้อมูลสัตว์เลี้ยงได้')
+    if (error.response?.status !== 401) {
+      loadError.value = error.response?.data?.message || 'ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง ข้อมูลสัตว์เลี้ยงไม่ได้ถูกลบ'
+    }
   } finally {
     loading.value = false
   }

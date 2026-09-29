@@ -63,7 +63,7 @@
           </label>
           <label>
             <span>วันเกิด</span>
-            <input v-model="pet.pet_birthdate" type="date" class="input-field" />
+            <input v-model="pet.pet_birthdate" type="date" :max="todayInThailand" class="input-field" />
           </label>
           <label>
             <span>ประวัติแพ้ยา</span>
@@ -87,6 +87,7 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
+const todayInThailand = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
 const router = useRouter()
 const submitting = ref(false)
 const selectedImage = ref(null)

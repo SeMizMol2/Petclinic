@@ -2,33 +2,38 @@
 
 ## วิธีรันโปรเจค
 
-### 1. สร้างฐานข้อมูล PostgreSQL
+### 1. เตรียมฐานข้อมูล PostgreSQL
+ใช้ฐานข้อมูล Petclinic ที่มีตารางคลินิกและสัตวแพทย์ครบอยู่แล้ว (เช่น ฐานข้อมูลบนเครื่องที่จะนำเสนอ) ไฟล์ `enum.pgsql` และ `table.pgsql` เพียงสองไฟล์ยังไม่ใช่ตัวติดตั้งฐานข้อมูลใหม่แบบครบทุกตาราง จึงไม่ควรสร้างฐานข้อมูลใหม่จากสองไฟล์นี้อย่างเดียว
+
+สำหรับฐานข้อมูลเดิมที่ติดตั้งระบบนัดหมายแล้ว ให้รันไฟล์ต่อไปนี้กับฐานข้อมูลที่ `DB_NAME` ชี้อยู่ก่อนเปิด backend โดยไม่ต้องลบตารางหรือข้อมูลเดิม:
 ```bash
-createdb petclinic   # หรือชื่ออื่นตามที่ตั้งใน backend/.env (DB_NAME)
-psql -d petclinic -f database/enum.pgsql
-psql -d petclinic -f database/table.pgsql
+psql -d petclinic -f database/add_receipt_payment_events.pgsql
+psql -d petclinic -f database/add_email_verification.pgsql
 ```
-> ⚠️ ถ้าคุณเคยสร้างตารางจาก `table.pgsql` เวอร์ชันเก่าไว้แล้ว ให้ `DROP TABLE` ทั้งหมดก่อนรันใหม่
-> (โครงสร้างตารางมีการแก้ไข เพิ่มคอลัมน์ `profile_pic` ในตาราง `tb_owner`)
+เปลี่ยน `petclinic` เป็นชื่อฐานข้อมูลจริงของเครื่องนั้น ทั้งสองไฟล์รันซ้ำได้ โดย migration ยืนยันอีเมลจะไม่ปลดล็อกบัญชีที่ยังรอยืนยันเมื่อรันซ้ำ บัญชีที่มีอยู่ก่อนอัปเดตยังเข้าสู่ระบบได้ตามเดิม
 
 ### 2. ตั้งค่า Backend
-ไฟล์ `backend/.env` มีค่าคัดลอกมาจากของเดิมให้แล้ว ตรวจสอบให้ตรงกับเครื่องคุณ:
+คัดลอก `backend/.env.example` เป็น `backend/.env` บนเครื่องของตนเอง แล้วตั้งค่าให้ตรงกับฐานข้อมูลและอีเมลของเครื่องนั้น (ไฟล์ `.env` ไม่ขึ้น Git):
 ```
 DB_HOST=localhost
 DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=<รหัสผ่าน postgres ของคุณ>
 DB_NAME=<ชื่อฐานข้อมูลที่สร้างไว้>
-JWT_SECRET=petclinic_secret_key
+JWT_SECRET=<รหัสลับที่สุ่มเองและเก็บเป็นความลับ>
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=<email ที่ใช้ส่งแจ้งเตือน>
 SMTP_PASS=<app password หรือ smtp password>
 SMTP_SECURE=false
 MAIL_FROM=Pet Clinic <email ที่ใช้ส่งแจ้งเตือน>
+FRONTEND_BASE_URL=http://localhost:5173
+CLINIC_NOTIFICATION_EMAIL=<อีเมลคลินิกที่จะรับคำขอนัดใหม่>
 ```
 
-> ถ้ายังไม่ต้องการเปิดใช้งานอีเมลแจ้งเตือน สามารถเว้นค่า SMTP ไว้ได้ ระบบจะยังบันทึกนัดหมายได้ตามปกติ แต่จะข้ามการส่งอีเมล
+> ถ้าไม่ตั้ง `CLINIC_NOTIFICATION_EMAIL` ระบบจะส่งคำขอนัดใหม่ไปที่ `SMTP_USER` หากยังไม่ต้องการเปิดใช้งานอีเมลแจ้งเตือน สามารถเว้นค่า SMTP ไว้ได้ ระบบจะยังบันทึกนัดหมายได้ตามปกติ แต่จะข้ามการส่งอีเมล
+
+> การสมัครสมาชิกใหม่ต้องยืนยันอีเมลก่อนล็อกอิน จึงต้องตั้งค่า SMTP ให้ส่งได้จริง และตั้ง `FRONTEND_BASE_URL` เป็น URL ที่ผู้สมัครเปิดได้บนเครื่องของตน หาก SMTP ไม่พร้อม บัญชีจะถูกสร้างในสถานะรอยืนยันและผู้ใช้ต้องกดส่งลิงก์ใหม่เมื่อแก้การตั้งค่าแล้ว
 
 รันเซิร์ฟเวอร์ (ถ้ายังไม่มี `node_modules` ให้ `npm install` ก่อน):
 ```bash
@@ -46,9 +51,8 @@ npm run dev
 ```
 เว็บจะรันที่ `http://localhost:5173` (ตามที่ Vite แจ้ง)
 
-### Login แอดมิน (ฝังไว้ในโค้ด ไม่ได้เก็บใน DB)
-- username: `admin`
-- password: `admin1234`
+### Login แอดมิน
+ใช้ `ADMIN_USERNAME` และ `ADMIN_PASSWORD` ที่ตั้งไว้ใน `backend/.env` ของเครื่องนั้น
 
 ---
 
