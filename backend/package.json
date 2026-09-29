@@ -5,6 +5,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:flow": "node scripts/qa-full-flow.js",
+    "db:upgrade": "node scripts/upgrade-database.js",
     "db:migrate:owner-appointments": "node scripts/migrate-owner-appointments.js",
     "dev": "nodemon src/app.js"
   },
