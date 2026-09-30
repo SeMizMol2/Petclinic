@@ -267,14 +267,18 @@ router.post('/owners', auth, async (req, res) => {
   let client;
   try {
     const { owner_name, owner_email, owner_tel, username, password } = req.body;
+    const ownerNickname = typeof owner_name === 'string' ? owner_name.trim() : '';
     const normalizedOwnerEmail = normalizeEmail(owner_email);
 
     if (normalizedOwnerEmail && !emailPattern.test(normalizedOwnerEmail)) {
       return res.status(400).json({ message: 'Invalid email format' });
     }
 
-    if (!owner_name) {
-      return res.status(400).json({ message: 'กรุณากรอกชื่อเจ้าของสัตว์' });
+    if (!ownerNickname) {
+      return res.status(400).json({ message: 'กรุณากรอกชื่อเล่นของเจ้าของสัตว์' });
+    }
+    if (ownerNickname.length > 100) {
+      return res.status(400).json({ message: 'ชื่อเล่นต้องไม่เกิน 100 ตัวอักษร' });
     }
     if (username != null && typeof username !== 'string') {
       return res.status(400).json({ message: 'ชื่อผู้ใช้ต้องเป็นข้อความ' });
@@ -307,7 +311,7 @@ router.post('/owners', auth, async (req, res) => {
     await client.query(
       `INSERT INTO tb_owner (owner_id, user_id, owner_name, owner_email, owner_tel)
        VALUES ($1, $2, $3, $4, $5)`,
-      [ownerId, userId, owner_name, normalizedOwnerEmail || null, owner_tel || null]
+      [ownerId, userId, ownerNickname, normalizedOwnerEmail || null, owner_tel || null]
     );
     await client.query('COMMIT');
 
@@ -335,14 +339,18 @@ router.put('/owners/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
     const { owner_name, owner_email, owner_tel, username } = req.body;
+    const ownerNickname = typeof owner_name === 'string' ? owner_name.trim() : '';
     const normalizedOwnerEmail = normalizeEmail(owner_email);
 
     if (normalizedOwnerEmail && !emailPattern.test(normalizedOwnerEmail)) {
       return res.status(400).json({ message: 'Invalid email format' });
     }
 
-    if (!owner_name) {
-      return res.status(400).json({ message: 'กรุณากรอกชื่อเจ้าของสัตว์' });
+    if (!ownerNickname) {
+      return res.status(400).json({ message: 'กรุณากรอกชื่อเล่นของเจ้าของสัตว์' });
+    }
+    if (ownerNickname.length > 100) {
+      return res.status(400).json({ message: 'ชื่อเล่นต้องไม่เกิน 100 ตัวอักษร' });
     }
     if (username != null && typeof username !== 'string') {
       return res.status(400).json({ message: 'ชื่อผู้ใช้ต้องเป็นข้อความ' });
@@ -381,7 +389,7 @@ router.put('/owners/:id', auth, async (req, res) => {
            owner_email = $2,
            owner_tel = $3
        WHERE owner_id = $4`,
-      [owner_name, normalizedOwnerEmail || null, owner_tel || null, id]
+      [ownerNickname, normalizedOwnerEmail || null, owner_tel || null, id]
     );
 
     if (!result.rowCount) {

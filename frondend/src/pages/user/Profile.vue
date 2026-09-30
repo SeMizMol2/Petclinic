@@ -31,9 +31,9 @@
         <section class="detail-section">
           <h3>ข้อมูลเจ้าของ</h3>
           <div class="field">
-            <label for="owner-name">ชื่อ-นามสกุล</label>
-            <input v-if="isEditing" id="owner-name" ref="nameInput" v-model="draft.owner_name" maxlength="100" autocomplete="name" :disabled="saving" />
-            <p v-else>{{ user.owner_name || 'ยังไม่ได้ระบุชื่อ' }}</p>
+            <label for="owner-name">ชื่อเล่น</label>
+            <input v-if="isEditing" id="owner-name" ref="nameInput" v-model.trim="draft.owner_name" maxlength="100" autocomplete="nickname" required :disabled="saving" />
+            <p v-else>{{ user.owner_name || 'ยังไม่ได้ระบุชื่อเล่น' }}</p>
           </div>
         </section>
         <section class="detail-section">

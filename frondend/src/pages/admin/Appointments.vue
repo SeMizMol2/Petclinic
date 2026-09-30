@@ -248,15 +248,28 @@
               <span>ค้นหาสัตว์เลี้ยง *</span>
               <div class="search-box">
                 <input
+                  id="appointment-pet-search"
                   type="text"
                   v-model="searchPetQuery"
                   @focus="showPetDropdown = true"
                   @input="showPetDropdown = true"
                   @blur="handlePetInputBlur"
                   placeholder="พิมพ์ชื่อสัตว์เลี้ยง เจ้าของ หรือรหัส"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-controls="appointment-pet-options"
+                  :aria-expanded="showPetDropdown ? 'true' : 'false'"
+                  autocomplete="off"
                   required
                 />
                 <button v-if="form.pet_id" @click="clearPetSelection" type="button" class="inline-clear">ล้าง</button>
+                <ul v-if="showPetDropdown" id="appointment-pet-options" class="pet-dropdown" role="listbox" aria-label="ผลการค้นหาสัตว์เลี้ยง">
+                  <li v-if="filteredPets.length === 0" class="dropdown-empty">ไม่พบข้อมูลสัตว์เลี้ยง</li>
+                  <li v-for="pet in filteredPets" :key="pet.pet_id" @mousedown.prevent="selectPet(pet)" class="dropdown-item" role="option">
+                    <div class="primary-line">{{ pet.pet_name }}</div>
+                    <div class="secondary-line">รหัส: {{ pet.pet_id }} | เจ้าของ: {{ pet.owner_name || 'ไม่ระบุ' }}</div>
+                  </li>
+                </ul>
               </div>
               <p v-if="searchPetQuery && !form.pet_id" class="field-hint warning-text">
                 กรุณาเลือกสัตว์เลี้ยงจากรายการด้านล่างเพื่อยืนยันรายการนัดหมาย
@@ -264,13 +277,6 @@
               <p v-else-if="form.pet_id" class="field-hint success-text">
                 เลือกสัตว์เลี้ยงแล้ว รหัส {{ form.pet_id }}
               </p>
-              <ul v-if="showPetDropdown" class="pet-dropdown">
-                <li v-if="filteredPets.length === 0" class="dropdown-empty">ไม่พบข้อมูลสัตว์เลี้ยง</li>
-                <li v-for="pet in filteredPets" :key="pet.pet_id" @mousedown.prevent="selectPet(pet)" class="dropdown-item">
-                  <div class="primary-line">{{ pet.pet_name }}</div>
-                  <div class="secondary-line">รหัส: {{ pet.pet_id }} | เจ้าของ: {{ pet.owner_name || 'ไม่ระบุ' }}</div>
-                </li>
-              </ul>
             </label>
           </div>
 
@@ -1644,6 +1650,11 @@ label {
   gap: 8px;
 }
 
+.field-wrap {
+  position: relative;
+  min-width: 0;
+}
+
 label span {
   color: #334155;
   font-size: 14px;
@@ -1672,6 +1683,12 @@ textarea:focus {
 
 .search-box {
   position: relative;
+  min-width: 0;
+}
+
+.search-box input {
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .inline-clear {
@@ -1687,9 +1704,13 @@ textarea:focus {
 
 .pet-dropdown {
   position: absolute;
-  z-index: 8;
-  width: 100%;
-  margin: 8px 0 0;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  width: auto;
+  box-sizing: border-box;
+  margin: 0;
   padding: 8px;
   list-style: none;
   border-radius: 16px;
@@ -1698,6 +1719,8 @@ textarea:focus {
   box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
   max-height: 280px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .dropdown-item,
@@ -1712,6 +1735,10 @@ textarea:focus {
 
 .dropdown-item:hover {
   background: rgba(20, 184, 166, 0.08);
+}
+
+.dropdown-item:active {
+  background: rgba(20, 184, 166, 0.14);
 }
 
 .dropdown-empty {

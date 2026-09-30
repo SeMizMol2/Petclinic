@@ -46,7 +46,15 @@ router.put('/me', auth, async (req, res) => {
   let client;
   try {
     const { owner_name, owner_email, tel } = req.body;
+    const ownerNickname = typeof owner_name === 'string' ? owner_name.trim() : '';
     const normalizedEmail = normalizeEmail(owner_email);
+
+    if (!ownerNickname) {
+      return res.status(400).json({ message: 'กรุณากรอกชื่อเล่น' });
+    }
+    if (ownerNickname.length > 100) {
+      return res.status(400).json({ message: 'ชื่อเล่นต้องไม่เกิน 100 ตัวอักษร' });
+    }
 
     if (!normalizedEmail || normalizedEmail.length > 100 || !emailPattern.test(normalizedEmail)) {
       return res.status(400).json({ message: 'รูปแบบอีเมลไม่ถูกต้อง' });
@@ -92,7 +100,7 @@ router.put('/me', auth, async (req, res) => {
           owner_tel = $3
       WHERE user_id = $4
       `,
-      [owner_name || null, normalizedEmail || null, tel || null, req.user.user_id]
+      [ownerNickname, normalizedEmail || null, tel || null, req.user.user_id]
     );
 
     await client.query('COMMIT');

@@ -10,7 +10,7 @@
     </section>
 
     <section class="toolbar">
-      <input v-model="searchQuery" class="search-input" placeholder="ค้นหาชื่อ เบอร์โทร อีเมล หรือ username" />
+      <input v-model="searchQuery" class="search-input" placeholder="ค้นหาชื่อเล่น เบอร์โทร อีเมล หรือชื่อผู้ใช้" />
       <button class="ghost-btn" @click="fetchOwners">รีเฟรช</button>
     </section>
 
@@ -21,7 +21,7 @@
         <table>
           <thead>
             <tr>
-              <th>เจ้าของสัตว์</th>
+              <th>ชื่อเล่นเจ้าของ</th>
               <th>บัญชี</th>
               <th>ติดต่อ</th>
               <th class="center">จำนวนสัตว์</th>
@@ -30,7 +30,7 @@
           </thead>
           <tbody>
             <tr v-for="owner in filteredOwners" :key="owner.owner_id">
-              <td data-label="เจ้าของสัตว์">
+              <td data-label="ชื่อเล่นเจ้าของ">
                 <strong>{{ owner.owner_name }}</strong>
                 <span class="muted">{{ owner.owner_id }}</span>
               </td>
@@ -67,11 +67,11 @@
 
         <div class="form-grid">
           <label>
-            ชื่อ-นามสกุล
-            <input v-model="form.owner_name" required />
+            ชื่อเล่น
+            <input v-model.trim="form.owner_name" required maxlength="100" autocomplete="nickname" placeholder="ชื่อที่ใช้เรียกเจ้าของสัตว์" />
           </label>
           <label>
-            Username
+            ชื่อผู้ใช้
             <input v-model="form.username" :placeholder="modalMode === 'add' ? 'เว้นว่างเพื่อสร้างอัตโนมัติ' : ''" />
           </label>
           <label v-if="modalMode === 'add'">

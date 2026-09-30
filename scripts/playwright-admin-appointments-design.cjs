@@ -25,6 +25,10 @@ const fs = require('node:fs');
     }
     let json = [];
     if (path.endsWith('/appointments')) json = records;
+    if (path.endsWith('/pets-list')) json = [
+      { pet_id: 'P1', pet_name: 'มีตังค์', owner_name: 'กัส' },
+      { pet_id: 'P2', pet_name: 'มุกดำ', owner_name: 'กัส' }
+    ];
     if (path.endsWith('/veterinarians-list')) json = [{ vet_id: 'V1', vet_name: 'ภัครินทร์ วงษ์ลา' }];
     if (path.endsWith('/vet-schedules')) json = [{ schedule_id: 'S1', vet_id: 'V1', vet_name: 'ภัครินทร์ วงษ์ลา', work_date: today, start_time: '09:00', end_time: '17:00' }];
     return route.fulfill({ headers, json });
@@ -54,6 +58,22 @@ const fs = require('node:fs');
     assert.equal(await page.locator('.table-panel tbody tr').count(), 1);
     await page.getByRole('button', { name: 'เพิ่มการนัดหมาย', exact: true }).click();
     await page.getByRole('heading', { name: 'เพิ่มการนัดหมายใหม่' }).waitFor();
+    const petSearch = page.locator('#appointment-pet-search');
+    await petSearch.fill('มี');
+    const petDropdown = page.locator('#appointment-pet-options');
+    await petDropdown.waitFor();
+    const searchBox = await petSearch.boundingBox();
+    const dropdownBox = await petDropdown.boundingBox();
+    const modalBox = await page.locator('.appointment-modal').boundingBox();
+    assert.ok(searchBox && dropdownBox && modalBox);
+    assert.ok(dropdownBox.x >= modalBox.x && dropdownBox.x + dropdownBox.width <= modalBox.x + modalBox.width);
+    assert.ok(Math.abs(dropdownBox.width - searchBox.width) <= 2);
+    assert.ok(dropdownBox.y >= searchBox.y + searchBox.height);
+    assert.equal(await petDropdown.getByRole('option').count(), 1);
+    fs.mkdirSync('tmp', { recursive: true });
+    await page.screenshot({ path: 'tmp/admin-appointment-pet-search-desktop.png' });
+    await petDropdown.getByRole('option').click();
+    assert.match(await petSearch.inputValue(), /มีตังค์/);
     await page.getByRole('button', { name: 'ปิด', exact: true }).click();
     await page.locator('.schedule-manager summary').click();
     assert.equal(await page.locator('.shift-form').isVisible(), true);
@@ -65,6 +85,15 @@ const fs = require('node:fs');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator('.table-panel').scrollIntoViewIfNeeded();
     await page.screenshot({ path: '.impeccable/review/admin-appointments-mobile.png' });
+    await page.getByRole('button', { name: 'เพิ่มการนัดหมาย', exact: true }).click();
+    await page.locator('#appointment-pet-search').fill('มี');
+    await page.locator('#appointment-pet-options').waitFor();
+    const mobileDropdownBox = await page.locator('#appointment-pet-options').boundingBox();
+    const mobileModalBox = await page.locator('.appointment-modal').boundingBox();
+    assert.ok(mobileDropdownBox && mobileModalBox);
+    assert.ok(mobileDropdownBox.x >= mobileModalBox.x && mobileDropdownBox.x + mobileDropdownBox.width <= mobileModalBox.x + mobileModalBox.width);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: 'tmp/admin-appointment-pet-search-mobile.png' });
     console.log('PASS: request review/rejection payloads, date comparison, tabs, status filter, add modal, schedule form, responsive 390/320');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });
