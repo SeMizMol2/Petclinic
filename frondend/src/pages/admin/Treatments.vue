@@ -372,7 +372,19 @@
 
           <label>
             <span>เวลานัดหมาย *</span>
-            <input v-model="followUpForm.appt_time" type="time" required />
+            <input
+              v-model.trim="followUpForm.appt_time"
+              type="text"
+              inputmode="numeric"
+              maxlength="5"
+              placeholder="HH:mm เช่น 13:27"
+              autocomplete="off"
+              :aria-invalid="!!followUpTimeError"
+              aria-describedby="followup-time-help followup-time-error"
+              @blur="normalizeFollowUpAppointmentTime"
+            />
+            <small id="followup-time-help">กรอกเวลาแบบ 24 ชั่วโมง</small>
+            <small v-if="followUpTimeError" id="followup-time-error" class="followup-time-error" role="alert">{{ followUpTimeError }}</small>
           </label>
 
           <div :class="['schedule-context', followUpScheduleStateClass]">
@@ -398,7 +410,7 @@
 
         <div class="modal-actions">
           <button @click="dismissFollowUpModal" class="ghost-btn" type="button">
-            {{ followUpTarget.fromPostSave ? 'ไม่ต้องติดตามผล' : 'ยกเลิก' }}
+            ไว้นัดภายหลัง
           </button>
           <button
             @click="createFollowUpAppointment"
@@ -496,7 +508,6 @@ const receiptIssueStatus = ref('ยังไม่ได้ชำระ')
 const isIssuingReceipt = ref(false)
 const followUpTarget = ref(null)
 const isCreatingFollowUp = ref(false)
-const pendingPostSaveFlow = ref(null)
 const followUpForm = ref({
   vet_id: '',
   appt_date: '',
@@ -723,9 +734,27 @@ const todayInputValue = () => {
 
 const normalizeScheduleDate = (value) => String(value || '').slice(0, 10)
 const normalizeScheduleTime = (value) => String(value || '').slice(0, 5)
+const followUpScheduleError = ref(false)
+const followUpTimeTouched = ref(false)
+const isValidFollowUpTime = computed(() => /^([01]\d|2[0-3]):[0-5]\d$/.test(followUpForm.value.appt_time || ''))
+const followUpTimeError = computed(() => {
+  if (!followUpTimeTouched.value) return ''
+  if (!isValidFollowUpTime.value) return 'กรอกเวลาแบบ 24 ชั่วโมง HH:mm เช่น 13:27'
+  if (followUpForm.value.appt_date && new Date(`${followUpForm.value.appt_date}T${followUpForm.value.appt_time}:00+07:00`).getTime() < Date.now()) {
+    return 'วันและเวลานี้ผ่านไปแล้ว กรุณาเลือกใหม่'
+  }
+  return ''
+})
+
+const normalizeFollowUpAppointmentTime = () => {
+  const entered = String(followUpForm.value.appt_time || '').trim()
+  if (/^\d{4}$/.test(entered)) followUpForm.value.appt_time = `${entered.slice(0, 2)}:${entered.slice(2)}`
+  followUpTimeTouched.value = true
+}
 
 const fetchFollowUpSchedules = async (date) => {
   if (!date) return
+  followUpScheduleError.value = false
   try {
     const response = await axios.get('http://localhost:3000/api/appointments/vet-schedules', {
       headers: headers(),
@@ -734,6 +763,7 @@ const fetchFollowUpSchedules = async (date) => {
     schedulesList.value = response.data || []
   } catch (error) {
     schedulesList.value = []
+    followUpScheduleError.value = true
     console.error('Load follow-up vet schedules failed:', error)
   }
 }
@@ -750,14 +780,15 @@ const followUpScheduleText = computed(() => {
   if (!followUpForm.value.vet_id || !followUpForm.value.appt_date) {
     return 'เลือกสัตวแพทย์และวันที่เพื่อดูช่วงเวลาที่เข้าเวร'
   }
+  if (followUpScheduleError.value) return 'โหลดตารางเวรไม่ได้ · ยังส่งนัดได้หากหมอพร้อม ระบบจะตรวจคิวชนตอนบันทึก'
   if (matchingFollowUpSchedules.value.length === 0) {
-    return 'ไม่พบตารางเวรของสัตวแพทย์ในวันที่เลือก'
+    return 'ยังไม่มีตารางเวรในวันที่เลือก · คลินิกยังส่งนัดได้หากหมอพร้อม'
   }
   const shiftText = matchingFollowUpSchedules.value
     .map((schedule) => `${normalizeScheduleTime(schedule.start_time)}-${normalizeScheduleTime(schedule.end_time)} น.`)
     .join(', ')
   if (followUpForm.value.appt_time && !isFollowUpTimeWithinSchedule.value) {
-    return `ช่วงเข้าเวร: ${shiftText} · เวลาที่เลือกอยู่นอกช่วงเข้าเวร`
+    return `ช่วงเข้าเวร: ${shiftText} · เวลาที่เลือกอยู่นอกเวร แต่ยังส่งนัดได้หากหมอพร้อม`
   }
   return `ช่วงเข้าเวร: ${shiftText}`
 })
@@ -768,7 +799,8 @@ const isFollowUpTimeWithinSchedule = computed(() => {
   return matchingFollowUpSchedules.value.some((schedule) => {
     const start = normalizeScheduleTime(schedule.start_time)
     const end = normalizeScheduleTime(schedule.end_time)
-    return selectedTime >= start && selectedTime < end
+    const toMinutes = (time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+    return selectedTime >= start && toMinutes(selectedTime) + 30 <= toMinutes(end)
   })
 })
 
@@ -783,21 +815,21 @@ const canCreateFollowUp = computed(() =>
     followUpTarget.value?.pet_id
     && followUpForm.value.vet_id
     && followUpForm.value.appt_date
-    && followUpForm.value.appt_time
+    && isValidFollowUpTime.value
     && followUpForm.value.appt_reason
-    && isFollowUpTimeWithinSchedule.value
+    && new Date(`${followUpForm.value.appt_date}T${followUpForm.value.appt_time}:00+07:00`).getTime() > Date.now()
   )
 )
 
-const openFollowUpModal = (treatment, fromPostSave = false) => {
+const openFollowUpModal = (treatment) => {
+  followUpTimeTouched.value = false
   const vet = vetsList.value.find((item) => item.vet_id === treatment.vet_id)
   followUpTarget.value = {
     treatment_id: treatment.treatment_id,
     pet_id: treatment.pet_id,
     pet_name: treatment.pet_name || selectedPet.value?.pet_name || '',
     vet_id: treatment.vet_id || '',
-    vet_name: treatment.vet_name || vet?.vet_name || '',
-    fromPostSave
+    vet_name: treatment.vet_name || vet?.vet_name || ''
   }
   followUpForm.value = {
     vet_id: treatment.vet_id || '',
@@ -807,34 +839,15 @@ const openFollowUpModal = (treatment, fromPostSave = false) => {
   }
 }
 
-const continuePostSaveFlow = async () => {
-  const nextStep = pendingPostSaveFlow.value
-  pendingPostSaveFlow.value = null
-  if (!nextStep) return
-
-  if (nextStep.specialtyFollowUps.length > 0) {
-    specialtyTreatmentId.value = nextStep.treatmentId
-    specialtyFollowUps.value = nextStep.specialtyFollowUps
-    return
-  }
-
-  if (nextStep.receiptId) {
-    await viewReceipt(nextStep.receiptId)
-  }
-}
-
-const dismissFollowUpModal = async () => {
+const dismissFollowUpModal = () => {
   if (isCreatingFollowUp.value) return
-  const shouldContinue = Boolean(followUpTarget.value?.fromPostSave)
   followUpTarget.value = null
-  if (shouldContinue) await continuePostSaveFlow()
 }
 
 const createFollowUpAppointment = async () => {
   if (!canCreateFollowUp.value || !followUpTarget.value) return
 
   isCreatingFollowUp.value = true
-  const shouldContinue = Boolean(followUpTarget.value.fromPostSave)
   try {
     const response = await axios.post(
       'http://localhost:3000/api/appointments',
@@ -855,7 +868,6 @@ const createFollowUpAppointment = async () => {
         : 'สร้างนัดติดตามสำเร็จ แต่ระบบอีเมลยังไม่พร้อมใช้งาน'
     )
     followUpTarget.value = null
-    if (shouldContinue) await continuePostSaveFlow()
   } catch (err) {
     alert(err.response?.data?.message || 'สร้างนัดติดตามผลไม่สำเร็จ')
   } finally {
@@ -1116,23 +1128,15 @@ const submitTreatment = async () => {
       )
     }
 
-    const treatmentContext = {
-      treatment_id: savedTreatmentId,
-      pet_id: form.value.pet_id,
-      pet_name: selectedPet.value?.pet_name || '',
-      vet_id: form.value.vet_id || '',
-      vet_name: vetsList.value.find((vet) => vet.vet_id === form.value.vet_id)?.vet_name || ''
-    }
-
     closeModal()
     await fetchAllData()
     if (!wasEditing) {
-      pendingPostSaveFlow.value = {
-        treatmentId: savedTreatmentId,
-        specialtyFollowUps: followUps,
-        receiptId: receipt?.receipt_id || ''
+      if (followUps.length > 0) {
+        specialtyTreatmentId.value = savedTreatmentId
+        specialtyFollowUps.value = followUps
+      } else if (receipt?.receipt_id) {
+        await viewReceipt(receipt.receipt_id)
       }
-      openFollowUpModal(treatmentContext, true)
     } else if (followUps.length > 0) {
       specialtyTreatmentId.value = savedTreatmentId
       specialtyFollowUps.value = followUps
@@ -1762,6 +1766,9 @@ onMounted(fetchAllData)
   font-weight: 700;
 }
 
+.followup-appointment-grid input[aria-invalid="true"] { border-color: #dc2626; }
+.followup-time-error { color: #b42318; }
+
 .schedule-context {
   display: grid;
   gap: 4px;
@@ -1783,6 +1790,14 @@ onMounted(fetchAllData)
   border-color: #fde68a;
   background: #fffbeb;
   color: #92400e;
+}
+
+.schedule-context a {
+  justify-self: start;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .followup-help {

@@ -22,7 +22,7 @@
         <h2 id="request-queue-title">คำขอนัดจากเจ้าของสัตว์เลี้ยง</h2>
         <span>{{ clinicRequests.length }} รายการรอตรวจสอบ</span>
       </div>
-      <p class="queue-help">เวลาที่เจ้าของขอ ยังไม่ใช่นัดที่ยืนยันแล้ว · ตรวจตารางเวรและคิวก่อนยืนยัน</p>
+      <p class="queue-help">เวลาที่เจ้าของขอ ยังไม่ใช่นัดที่ยืนยันแล้ว · ดูตารางเวรประกอบและตรวจคิวชนก่อนยืนยัน</p>
       <p v-if="!clinicRequests.length" class="quiet-empty">ไม่มีคำขอรอคลินิกยืนยันแล้ว ดูคิวงานต่อได้ที่นัดวันนี้</p>
       <p v-if="reviewError" class="review-error" role="alert">{{ reviewError }}</p>
       <article v-for="request in clinicRequests" :key="request.appt_id" class="request-row">
@@ -35,6 +35,13 @@
           <strong>{{ request.pet_name }}</strong>
           <p>คุณ{{ request.owner_name || 'ไม่ระบุ' }}</p>
           <p>{{ request.vet_name || 'ให้คลินิกจัดสัตวแพทย์' }}</p>
+          <label v-if="!request.vet_id" class="request-vet-picker">
+            <span>เลือกสัตวแพทย์ก่อนยืนยัน</span>
+            <select v-model="reviewVetIds[request.appt_id]" :disabled="!!reviewingId">
+              <option value="">เลือกสัตวแพทย์</option>
+              <option v-for="vet in veterinarians" :key="vet.vet_id" :value="vet.vet_id">{{ vet.vet_name }}</option>
+            </select>
+          </label>
           <small>{{ request.appt_reason || 'ไม่ได้ระบุเหตุผล' }}</small>
           <span class="status-chip is-pending">รอคลินิกยืนยัน</span>
         </div>
@@ -287,7 +294,7 @@
                 <option value="" disabled>เลือกสัตวแพทย์ที่ลงเวร</option>
                 <option v-for="vet in veterinarians" :key="vet.vet_id" :value="vet.vet_id">{{ vet.vet_name }}</option>
               </select>
-              <small v-if="form.appt_date && form.vet_id" class="field-hint">
+              <small v-if="form.appt_date && form.vet_id" class="field-hint" :class="{ 'warning-text': !matchingShifts.length && !isLoadingSchedules && !scheduleFetchError }">
                 {{ matchingShiftText }}
               </small>
             </label>
@@ -308,7 +315,7 @@
           </div>
 
           <div class="form-grid">
-            <label>
+            <label class="appointment-date-field">
               <span>วันที่นัดหมาย *</span>
               <input
                 v-model="form.appt_date"
@@ -317,11 +324,27 @@
                 required
               />
             </label>
-            <label>
+            <label class="appointment-time-field">
               <span>เวลานัดหมาย *</span>
-              <input v-model="form.appt_time" type="time" required />
+              <input
+                v-model.trim="form.appt_time"
+                type="text"
+                inputmode="numeric"
+                maxlength="5"
+                placeholder="HH:mm เช่น 13:27"
+                autocomplete="off"
+                :aria-invalid="!!visibleTimeError"
+                aria-describedby="appointment-time-help appointment-time-feedback"
+                @input="timeServerError = ''"
+                @blur="normalizeAppointmentTimeInput"
+              />
+              <small id="appointment-time-help" class="field-hint">กรอกแบบ 24 ชั่วโมง เช่น 09:00 หรือ 13:27 · นัดใช้เวลา 30 นาที</small>
+              <small v-if="visibleTimeError" id="appointment-time-feedback" class="field-hint field-error" role="alert">{{ visibleTimeError }}</small>
+              <small v-else-if="timeAvailabilityText" id="appointment-time-feedback" class="field-hint" :class="timeAvailabilityWarning ? 'warning-text' : 'success-text'" role="status">{{ timeAvailabilityText }}</small>
             </label>
           </div>
+
+          <p v-if="appointmentFormError" class="appointment-form-error" role="alert">{{ appointmentFormError }}</p>
 
           <div class="form-grid" v-if="modalMode === 'edit'">
             <label class="full-width">
@@ -354,7 +377,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 
 const APPT_STATUS_PENDING = 'รอ'
@@ -378,10 +401,18 @@ const rejectionId = ref('')
 const rejectionReason = ref('')
 const reviewError = ref('')
 const reviewMessage = ref('')
+const reviewVetIds = ref({})
 const isModalOpen = ref(false)
 const modalMode = ref('add')
 const form = ref({})
 const isSubmitting = ref(false)
+const appointmentFormError = ref('')
+const timeServerError = ref('')
+const timeTouched = ref(false)
+const originalAppointmentSlot = ref(null)
+const isLoadingSchedules = ref(false)
+const scheduleFetchError = ref('')
+let scheduleFetchSequence = 0
 const searchPetQuery = ref('')
 const showPetDropdown = ref(false)
 const isSavingSchedule = ref(false)
@@ -486,6 +517,10 @@ const clinicRequests = computed(() => appointments.value.filter((item) => item.a
 
 const reviewRequest = async (request, action) => {
   if (reviewingId.value) return
+  if (action === 'approve' && !request.vet_id && !reviewVetIds.value[request.appt_id]) {
+    reviewError.value = 'กรุณาเลือกสัตวแพทย์ให้คำขอนี้ก่อนยืนยัน'
+    return
+  }
   if (action === 'approve' && !window.confirm(`ยืนยันนัดของ ${request.pet_name} วันที่ ${formatFullDate(request.appt_date)} เวลา ${formatTime(request.appt_time)} น. หรือไม่?`)) return
   reviewingId.value = request.appt_id
   reviewError.value = ''
@@ -493,10 +528,12 @@ const reviewRequest = async (request, action) => {
   try {
     await axios.patch(`http://localhost:3000/api/appointments/requests/${request.appt_id}/review`, {
       action,
+      vet_id: action === 'approve' ? (request.vet_id || reviewVetIds.value[request.appt_id]) : undefined,
       reason: action === 'reject' ? rejectionReason.value : ''
     }, authHeaders())
     rejectionId.value = ''
     rejectionReason.value = ''
+    delete reviewVetIds.value[request.appt_id]
     await fetchAppointments()
     reviewMessage.value = action === 'approve' ? 'ยืนยันคำขอนัดหมายแล้ว' : 'ไม่รับคำขอนัดหมายแล้ว เจ้าของจะเห็นเหตุผลในรายการนัดหมาย'
   } catch (error) {
@@ -577,10 +614,63 @@ const matchingShifts = computed(() =>
   )
 )
 
+const toTimeMinutes = (value) => {
+  const match = String(value || '').match(/^([01]\d|2[0-3]):([0-5]\d)$/)
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null
+}
+
+const requiresSlotValidation = computed(() => {
+  if (modalMode.value !== 'edit') return true
+  if (![APPT_STATUS_PENDING, APPT_STATUS_CONFIRMED].includes(form.value.appt_status)) return false
+  const original = originalAppointmentSlot.value
+  if (!original) return true
+  return original.appt_date !== form.value.appt_date ||
+    original.appt_time !== form.value.appt_time ||
+    original.vet_id !== form.value.vet_id ||
+    ![APPT_STATUS_PENDING, APPT_STATUS_CONFIRMED].includes(original.appt_status)
+})
+
+const timeValidationError = computed(() => {
+  const time = String(form.value.appt_time || '')
+  if (!time) return 'กรุณากรอกเวลานัดหมาย'
+  if (toTimeMinutes(time) === null) return 'กรอกเวลาแบบ 24 ชั่วโมง HH:mm เช่น 13:27'
+  if (requiresSlotValidation.value && form.value.appt_date && new Date(`${form.value.appt_date}T${time}:00+07:00`).getTime() < Date.now()) {
+    return 'วันและเวลานี้ผ่านไปแล้ว กรุณาเลือกใหม่'
+  }
+  return ''
+})
+
+const visibleTimeError = computed(() => timeServerError.value || (timeTouched.value ? timeValidationError.value : ''))
+const timeAvailabilityWarning = computed(() => {
+  const start = toTimeMinutes(form.value.appt_time)
+  if (start === null || !form.value.appt_date || !form.value.vet_id) return false
+  if (isLoadingSchedules.value || scheduleFetchError.value) return true
+  return !matchingShifts.value.some((shift) => {
+    const shiftStart = toTimeMinutes(String(shift.start_time || '').slice(0, 5))
+    const shiftEnd = toTimeMinutes(String(shift.end_time || '').slice(0, 5))
+    return shiftStart !== null && shiftEnd !== null && start >= shiftStart && start + 30 <= shiftEnd
+  })
+})
+const timeAvailabilityText = computed(() => {
+  if (!timeTouched.value || timeValidationError.value) return ''
+  if (!form.value.appt_date || !form.value.vet_id) return ''
+  if (isLoadingSchedules.value) return 'กำลังตรวจตารางเวร · คุณยังบันทึกนัดได้'
+  if (scheduleFetchError.value) return 'โหลดตารางเวรไม่ได้ · คุณยังบันทึกนัดได้ ระบบจะตรวจคิวชนตอนบันทึก'
+  return timeAvailabilityWarning.value
+    ? `${form.value.appt_time} น. อยู่นอกตารางเวร · คลินิกบันทึกได้หากหมอพร้อม ระบบจะตรวจคิวชนอีกครั้ง`
+    : `${form.value.appt_time} น. อยู่ในช่วงเข้าเวร · ระบบจะตรวจคิวชนอีกครั้งตอนบันทึก`
+})
+
 const matchingShiftText = computed(() => {
-  if (matchingShifts.value.length === 0) return 'ยังไม่พบตารางเวรของสัตวแพทย์ในวันที่เลือก'
-  return `ช่วงเข้าเวร: ${matchingShifts.value
-    .map((shift) => `${formatTime(shift.start_time)}-${formatTime(shift.end_time)} น.`)
+  if (isLoadingSchedules.value) return 'กำลังตรวจตารางเวร…'
+  if (scheduleFetchError.value) return 'โหลดตารางเวรไม่ได้ · ยังสร้างนัดได้หากหมอพร้อม'
+  if (matchingShifts.value.length === 0) return 'ยังไม่มีตารางเวรในวันที่เลือก · คลินิกยังสร้างนัดได้หากหมอพร้อม'
+  return `ช่วงเข้าเวร (นัด 30 นาที): ${matchingShifts.value
+    .map((shift) => {
+      const end = toTimeMinutes(String(shift.end_time || '').slice(0, 5))
+      const lastStart = end === null ? '' : `${String(Math.floor((end - 30) / 60)).padStart(2, '0')}:${String((end - 30) % 60).padStart(2, '0')}`
+      return `${formatTime(shift.start_time)}–${formatTime(shift.end_time)} น.${lastStart ? ` (เริ่มได้ถึง ${lastStart} น.)` : ''}`
+    })
     .join(', ')}`
 })
 
@@ -755,20 +845,38 @@ const scheduleRange = () => {
   const end = new Date(today.getFullYear(), today.getMonth() + 4, 0)
   const toKey = (date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-  return { from: toKey(today), to: toKey(end) }
+  const selectedDate = form.value.appt_date || ''
+  return {
+    from: selectedDate && selectedDate < toKey(today) ? selectedDate : toKey(today),
+    to: selectedDate && selectedDate > toKey(end) ? selectedDate : toKey(end)
+  }
 }
 
 const fetchSchedules = async () => {
+  const requestSequence = ++scheduleFetchSequence
+  isLoadingSchedules.value = true
+  scheduleFetchError.value = ''
   try {
     const res = await axios.get('http://localhost:3000/api/appointments/vet-schedules', {
       ...authHeaders(),
       params: scheduleRange()
     })
-    schedules.value = res.data || []
+    if (requestSequence === scheduleFetchSequence) schedules.value = res.data || []
   } catch (err) {
     console.error('Fetch veterinarian schedules error:', err)
+    if (requestSequence === scheduleFetchSequence) scheduleFetchError.value = 'โหลดตารางเวรไม่สำเร็จ'
+  } finally {
+    if (requestSequence === scheduleFetchSequence) isLoadingSchedules.value = false
   }
 }
+
+watch(() => form.value.appt_date, (date, previousDate) => {
+  if (date === previousDate || !isModalOpen.value || !date) return
+  timeServerError.value = ''
+  fetchSchedules()
+})
+
+watch(() => form.value.vet_id, () => { timeServerError.value = '' })
 
 const saveSchedule = async () => {
   isSavingSchedule.value = true
@@ -804,6 +912,10 @@ const deleteSchedule = async (scheduleId) => {
 
 const openAddModal = () => {
   modalMode.value = 'add'
+  originalAppointmentSlot.value = null
+  appointmentFormError.value = ''
+  timeServerError.value = ''
+  timeTouched.value = false
   form.value = {
     pet_id: '',
     vet_id: '',
@@ -820,7 +932,16 @@ const openAddModal = () => {
 
 const openEditModal = (appointment) => {
   modalMode.value = 'edit'
+  appointmentFormError.value = ''
+  timeServerError.value = ''
+  timeTouched.value = false
   const normalizedAppointment = normalizeAppointmentRecord(appointment)
+  originalAppointmentSlot.value = {
+    vet_id: appointment.vet_id || '',
+    appt_date: normalizedAppointment.appt_date,
+    appt_time: normalizedAppointment.appt_time,
+    appt_status: normalizedAppointment.appt_status
+  }
   form.value = {
     appt_id: appointment.appt_id,
     pet_id: appointment.pet_id,
@@ -837,6 +958,10 @@ const openEditModal = (appointment) => {
 
 const openRescheduleModal = (appointment) => {
   modalMode.value = 'reschedule'
+  originalAppointmentSlot.value = null
+  appointmentFormError.value = ''
+  timeServerError.value = ''
+  timeTouched.value = false
   const normalizedAppointment = normalizeAppointmentRecord(appointment)
   form.value = {
     appt_id: appointment.appt_id,
@@ -859,6 +984,14 @@ const closeModal = () => {
   showPetDropdown.value = false
 }
 
+const normalizeAppointmentTimeInput = () => {
+  const entered = String(form.value.appt_time || '').trim()
+  if (/^\d{4}$/.test(entered)) {
+    form.value.appt_time = `${entered.slice(0, 2)}:${entered.slice(2)}`
+  }
+  timeTouched.value = true
+}
+
 const showAppointmentFeedback = (response) => {
   const emailMessage = response?.data?.email_notification?.message
   const baseMessage = modalMode.value === 'add'
@@ -866,21 +999,24 @@ const showAppointmentFeedback = (response) => {
     : modalMode.value === 'reschedule'
       ? 'ส่งวันนัดหมายใหม่ให้ลูกค้าตอบรับแล้ว'
       : 'อัปเดตการนัดหมายสำเร็จ'
-  alert(emailMessage ? `${baseMessage}\n${emailMessage}` : baseMessage)
+  reviewMessage.value = emailMessage ? `${baseMessage}\n${emailMessage}` : baseMessage
 }
 
 const handleSubmit = async () => {
+  normalizeAppointmentTimeInput()
+  appointmentFormError.value = ''
+  timeServerError.value = ''
+  if (timeValidationError.value) return
+  if (modalMode.value === 'add' && !form.value.pet_id) {
+    appointmentFormError.value = 'กรุณาเลือกสัตว์เลี้ยงจากรายการก่อนบันทึกนัดหมาย'
+    return
+  }
   isSubmitting.value = true
   try {
     const token = localStorage.getItem('token')
     const headers = { Authorization: `Bearer ${token}` }
 
     if (modalMode.value === 'add') {
-      if (!form.value.pet_id) {
-        alert('กรุณาเลือกสัตว์เลี้ยงจากรายการก่อนบันทึกนัดหมาย')
-        return
-      }
-
       const response = await axios.post(
         'http://localhost:3000/api/appointments',
         {
@@ -917,7 +1053,12 @@ const handleSubmit = async () => {
     await Promise.all([fetchAppointments(), fetchPetsList()])
   } catch (error) {
     console.error('Appointment submit error:', error)
-    alert(error.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ')
+    const message = error.response?.data?.message || 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'
+    if (/ช่วงเวลานี้มีนัดหมาย|เวลาที่ผ่านมาแล้ว|วันและเวลา/.test(message)) {
+      timeServerError.value = message
+    } else {
+      appointmentFormError.value = message
+    }
   } finally {
     isSubmitting.value = false
   }
@@ -1583,6 +1724,36 @@ textarea:focus {
   font-weight: 600;
 }
 
+.appointment-time-field input {
+  font-variant-numeric: tabular-nums;
+}
+
+.appointment-date-field {
+  align-content: start;
+}
+
+.appointment-time-field input[aria-invalid="true"] {
+  border-color: #dc2626;
+}
+
+.field-error,
+.appointment-form-error {
+  color: #b42318;
+}
+
+.appointment-form-error {
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: #fff1f0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.review-feedback {
+  white-space: pre-line;
+}
+
 .warning-text {
   color: #b45309;
 }
@@ -1691,6 +1862,9 @@ textarea:focus {
 .request-copy > strong { font-size: 17px; color: #183343; }
 .request-copy p, .request-copy small { font-size: 13px; line-height: 1.6; color: #526575; }
 .request-copy small { display: block; }
+.request-vet-picker { display: grid; gap: 6px; max-width: 320px; margin-top: 12px; }
+.request-vet-picker span { font-size: 13px; color: #334155; }
+.request-vet-picker select { min-width: 0; padding: 9px 12px; font-size: 14px; }
 .request-copy .status-chip { margin-top: 10px; padding: 4px 10px; }
 .request-actions { display: grid; gap: 8px; }
 .rejection-form { grid-column: 1 / -1; margin-top: 0; padding-top: 14px; }

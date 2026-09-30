@@ -111,23 +111,6 @@ const findConflictingAppointment = async ({ apptDate, apptTime, vetId, excludeId
     return result.rows[0] || null;
 };
 
-const isWithinVetSchedule = async ({ vetId, apptDate, apptTime }) => {
-    const result = await pool.query(
-        `
-        SELECT schedule_id
-        FROM tb_vet_schedule
-        WHERE vet_id = $1
-          AND work_date = $2
-          AND start_time <= $3::time
-          AND end_time >= ($3::time + INTERVAL '30 minutes')
-        LIMIT 1
-        `,
-        [vetId, apptDate, apptTime]
-    );
-
-    return result.rows.length > 0;
-};
-
 const getAppointmentNotificationData = async (appointmentId) => {
     const result = await pool.query(
         `
@@ -402,18 +385,6 @@ router.post('/', auth, async (req, res) => {
         }
 
         if (normalizedStatus !== APPT_STATUS_CANCELED) {
-            const withinSchedule = await isWithinVetSchedule({
-                vetId: vet_id,
-                apptDate: normalizedDate,
-                apptTime: normalizedTime
-            });
-
-            if (!withinSchedule) {
-                return res.status(409).json({
-                    message: 'ช่วงเวลานัด 30 นาทีต้องอยู่ภายในตารางเวรของสัตวแพทย์ที่เลือก'
-                });
-            }
-
             const conflictingAppointment = await findConflictingAppointment({
                 apptDate: normalizedDate,
                 apptTime: normalizedTime,
@@ -611,29 +582,32 @@ router.patch('/requests/:id/review', auth, async (req, res) => {
                 await client.query('ROLLBACK');
                 return res.status(409).json({ message: 'เวลาที่ขอนัดผ่านไปแล้ว กรุณาไม่รับคำขอและแจ้งเจ้าของให้นัดใหม่' });
             }
-            await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`appointment:${appointment.appt_date}`]);
-            const shifts = await client.query(
-                `SELECT DISTINCT vet_id FROM tb_vet_schedule
-                 WHERE work_date = $1 AND start_time <= $2::time
-                   AND end_time >= ($2::time + INTERVAL '30 minutes')
-                   AND ($3::text = '' OR vet_id = $3)
-                 ORDER BY vet_id`,
-                [appointment.appt_date, appointment.appt_time, confirmedVetId || '']
-            );
-            confirmedVetId = null;
-            for (const shift of shifts.rows) {
-                const conflict = await findConflictingAppointment({
-                    apptDate: appointment.appt_date,
-                    apptTime: appointment.appt_time,
-                    vetId: shift.vet_id,
-                    excludeId: appointment.appt_id,
-                    db: client
-                });
-                if (!conflict) { confirmedVetId = shift.vet_id; break; }
+            const selectedVetId = String(req.body.vet_id || '').trim();
+            if (confirmedVetId && selectedVetId && selectedVetId !== confirmedVetId) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'เจ้าของเลือกสัตวแพทย์ไว้แล้ว กรุณายืนยันกับท่านเดิมหรือเสนอเวลาใหม่' });
             }
+            confirmedVetId = confirmedVetId || selectedVetId;
             if (!confirmedVetId) {
                 await client.query('ROLLBACK');
-                return res.status(409).json({ message: 'เวลานี้ไม่มีสัตวแพทย์ที่เลือกว่างหรืออยู่นอกตารางเวร กรุณาไม่รับคำขอและแจ้งเวลาใหม่' });
+                return res.status(400).json({ message: 'กรุณาเลือกสัตวแพทย์ก่อนยืนยันคำขอนัดหมาย' });
+            }
+            await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`appointment:${appointment.appt_date}`]);
+            const veterinarian = await client.query('SELECT vet_id FROM tb_veterinarian WHERE vet_id = $1 LIMIT 1', [confirmedVetId]);
+            if (!veterinarian.rowCount) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'ไม่พบสัตวแพทย์ที่เลือก กรุณาเลือกใหม่' });
+            }
+            const conflict = await findConflictingAppointment({
+                apptDate: appointment.appt_date,
+                apptTime: appointment.appt_time,
+                vetId: confirmedVetId,
+                excludeId: appointment.appt_id,
+                db: client
+            });
+            if (conflict) {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ message: 'สัตวแพทย์มีนัดหมายช่วงเวลานี้แล้ว กรุณาเสนอเวลาใหม่หรือไม่รับคำขอ' });
             }
         }
         await client.query(
@@ -814,20 +788,8 @@ router.put('/:id', auth, async (req, res) => {
         }
 
         // Existing late appointments may be edited without changing their slot;
-        // only new or changed active slots must meet the current shift rule.
+        // new or changed active slots still need a conflict check.
         if (isActiveStatus(nextStatus) && (slotChanged || !isActiveStatus(currentStatus))) {
-            const withinSchedule = await isWithinVetSchedule({
-                vetId: vet_id,
-                apptDate: normalizedDate,
-                apptTime: normalizedTime
-            });
-
-            if (!withinSchedule) {
-                return res.status(409).json({
-                    message: 'ช่วงเวลานัด 30 นาทีต้องอยู่ภายในตารางเวรของสัตวแพทย์ที่เลือก'
-                });
-            }
-
             const conflictingAppointment = await findConflictingAppointment({
                 apptDate: normalizedDate,
                 apptTime: normalizedTime,

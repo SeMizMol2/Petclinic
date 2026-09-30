@@ -17,7 +17,7 @@
       <div class="booking-intro">
         <div>
           <h2 id="booking-title">ตารางสัตวแพทย์</h2>
-          <p>ดูตารางเข้าเวร เลือกวันที่ แล้วกรอกเวลาที่ต้องการนัดได้เอง</p>
+          <p>วันที่มีเวรหมอแสดงเป็นสีเขียว แต่คุณเลือกวันอื่นและส่งเวลาที่ต้องการได้ คลินิกจะตรวจสอบก่อนยืนยันนัด</p>
         </div>
         <div class="month-switcher" aria-label="เปลี่ยนเดือน">
           <button type="button" aria-label="เดือนก่อนหน้า" :disabled="isCurrentMonth || scheduleLoading" @click="changeMonth(-1)">‹</button>
@@ -41,19 +41,27 @@
                 :disabled="!day.inMonth || day.key < toDateKey(new Date())"
                 :aria-label="calendarDayLabel(day)" :aria-pressed="selectedDate === day.key"
                 :aria-current="day.isToday ? 'date' : undefined"
-                :class="['calendar-day', { muted: !day.inMonth, selected: selectedDate === day.key, today: day.isToday, available: day.scheduleCount > 0 }]"
+                :class="['calendar-day', { muted: !day.inMonth, selected: selectedDate === day.key, today: day.isToday, available: day.scheduleCount > 0, 'has-my-appointment': day.appointmentCount > 0 }]"
                 @click="selectCalendarDay(day.key)">
-                <span>{{ day.day }}</span>
-                <small v-if="day.scheduleCount > 0">{{ day.scheduleCount }} หมอเข้าเวร</small>
+                <span class="calendar-day-number">{{ day.day }}</span>
+                <small v-if="day.appointmentCount > 0" class="calendar-my-appointment">{{ day.appointmentCount }} นัด</small>
+                <small v-if="day.scheduleCount > 0" class="calendar-shift-count">{{ day.scheduleCount }} เวร</small>
               </button>
             </div>
             <p v-if="!hasSelectableSchedules" class="calendar-empty">เดือนนี้ยังไม่มีตารางเข้าเวร คุณยังส่งคำขอวันและเวลาที่ต้องการให้คลินิกพิจารณาได้</p>
-            <div class="calendar-legend"><span><i aria-hidden="true"></i> วันที่มีหมอเข้าเวร</span><span>คลินิกตรวจสอบเวลาก่อนยืนยันนัด</span></div>
+            <div class="calendar-legend"><span><i class="legend-shift" aria-hidden="true"></i> มีหมอเข้าเวร</span><span><i class="legend-appointment" aria-hidden="true"></i> นัดของฉัน</span><span>วันอื่นก็ส่งคำขอได้</span></div>
           </template>
         </div>
 
         <aside class="day-schedule" aria-label="เวลาและสัตวแพทย์ที่เลือก">
           <div class="day-schedule-head"><span>วันและเวลาที่เลือก</span><strong>{{ selectedDate ? formatDateLabel(selectedDate) : 'เลือกวันที่จากปฏิทิน' }}</strong></div>
+          <div v-if="selectedDayAppointments.length > 0" class="selected-day-appointments">
+            <strong>นัดของฉันในวันนี้</strong>
+            <div v-for="item in selectedDayAppointments" :key="item.appt_id" class="selected-day-appointment">
+              <div><span>{{ formatTime(item.appt_time) }} น. · {{ item.pet_name || 'สัตว์เลี้ยง' }}</span><small>{{ statusLabel(item.appt_status) }}</small></div>
+              <button type="button" @click="revealAppointment(item)">ดูนัด</button>
+            </div>
+          </div>
           <div v-if="selectedSchedules.length > 0" class="vet-shift-list">
             <article v-for="shift in selectedSchedules" :key="shift.schedule_id" class="vet-shift">
               <div class="vet-avatar"><AppIcon name="stethoscope" :size="18" /></div>
@@ -62,10 +70,10 @@
           </div>
           <p v-else-if="!scheduleError" class="no-shift">{{ selectedDate ? 'ยังไม่มีตารางเข้าเวรในวันที่เลือก คลินิกจะตรวจสอบคำขอก่อนยืนยัน' : 'เลือกวันที่ต้องการจากปฏิทิน' }}</p>
           <label v-if="scheduleError" class="fallback-date"><span>เลือกวันที่ด้วยตนเอง</span><input v-model="bookingDate" type="date" :min="toDateKey(new Date())" /></label>
-          <label class="booking-vet"><span>สัตวแพทย์</span><select v-model="bookingVetId" :disabled="!bookingDate">
-            <option value="">ให้คลินิกจัดสัตวแพทย์</option>
+          <label class="booking-vet"><span>สัตวแพทย์ที่ต้องการ</span><select v-model="bookingVetId" :disabled="!bookingDate">
+            <option value="">ไม่ระบุ ให้คลินิกจัดสัตวแพทย์</option>
             <option v-for="vet in availableBookingVets" :key="vet.vet_id" :value="vet.vet_id">{{ vet.vet_name }}</option>
-          </select></label>
+          </select><small>ตารางเวรด้านบนใช้ดูประกอบ ไม่ได้เลือกหมอให้โดยอัตโนมัติ</small></label>
           <div class="booking-time">
             <span id="booking-time-label">เวลาที่ต้องการนัด <span aria-hidden="true">*</span></span>
             <div class="time-entry" role="group" aria-labelledby="booking-time-label" :class="{ 'has-error': bookingTimeError }">
@@ -512,6 +520,18 @@ const scheduleCountByDate = computed(() => {
   return Object.fromEntries(Object.entries(vetsByDate).map(([key, vets]) => [key, vets.size]))
 })
 
+const activeAppointmentsByDate = computed(() => {
+  const byDate = {}
+  appointments.value.filter(isCurrentAppointment).forEach((item) => {
+    const key = normalizeDateKey(item.appt_date)
+    if (!key) return
+    if (!byDate[key]) byDate[key] = []
+    byDate[key].push(item)
+  })
+  Object.values(byDate).forEach((items) => items.sort((a, b) => String(a.appt_time || '').localeCompare(String(b.appt_time || ''))))
+  return byDate
+})
+
 const hasSelectableSchedules = computed(() => {
   const today = toDateKey(new Date())
   return Object.keys(scheduleCountByDate.value).some((dateKey) => dateKey >= today)
@@ -533,27 +553,27 @@ const calendarDays = computed(() => {
       day: date.getDate(),
       inMonth: date.getMonth() === currentMonth.value.getMonth(),
       isToday: key === today,
-      scheduleCount: scheduleCountByDate.value[key] || 0
+      scheduleCount: scheduleCountByDate.value[key] || 0,
+      appointmentCount: activeAppointmentsByDate.value[key]?.length || 0
     }
   })
 })
 
 const calendarDayLabel = (day) => {
+  const ownAppointments = day.appointmentCount > 0 ? `มีนัดของคุณ ${day.appointmentCount} รายการ ` : ''
   const availability = day.scheduleCount > 0
-    ? `มีสัตวแพทย์เข้าเวร ${day.scheduleCount} คน เลือกเพื่อขอนัด`
-    : 'ยังไม่มีตารางเข้าเวร เลือกเพื่อส่งคำขอให้คลินิกพิจารณา'
-  return `${formatDateLabel(day.key)} ${availability}${day.isToday ? ' วันนี้' : ''}`
+    ? `มีสัตวแพทย์เข้าเวร ${day.scheduleCount} คน`
+    : 'ยังไม่มีตารางเข้าเวร'
+  return `${formatDateLabel(day.key)} ${ownAppointments}${availability} เลือกเพื่อดูรายละเอียดหรือส่งคำขอ${day.isToday ? ' วันนี้' : ''}`
 }
+
+const selectedDayAppointments = computed(() => activeAppointmentsByDate.value[selectedDate.value] || [])
 
 const selectedSchedules = computed(() =>
   schedules.value.filter((shift) => String(shift.work_date || '').slice(0, 10) === selectedDate.value)
 )
 
-const availableBookingVets = computed(() => {
-  if (scheduleError.value) return bookingVets.value
-  const scheduledVetIds = new Set(selectedSchedules.value.map((shift) => String(shift.vet_id)))
-  return bookingVets.value.filter((vet) => scheduledVetIds.has(String(vet.vet_id)))
-})
+const availableBookingVets = computed(() => bookingVets.value)
 
 const bookingTime = computed(() => {
   if (!/^\d{2}$/.test(bookingHour.value) || !/^\d{2}$/.test(bookingMinute.value)) return ''
@@ -571,12 +591,13 @@ const bookingTimeError = computed(() => {
 })
 
 const bookingTimeWarning = computed(() => {
-  if (!bookingTime.value || bookingTimeError.value || scheduleError.value || !selectedSchedules.value.length) return ''
+  if (!bookingTime.value || bookingTimeError.value) return ''
+  if (scheduleError.value) return 'ยังตรวจตารางเวรไม่ได้ คลินิกจะตรวจสอบก่อนยืนยันนัด'
   const shifts = bookingVetId.value
     ? selectedSchedules.value.filter((shift) => String(shift.vet_id) === String(bookingVetId.value))
     : selectedSchedules.value
   const inShift = shifts.some((shift) => bookingTime.value >= String(shift.start_time).slice(0, 5) && bookingTime.value < String(shift.end_time).slice(0, 5))
-  return inShift ? '' : 'เวลานี้อยู่นอกตารางเข้าเวร คลินิกอาจเสนอเวลาใหม่ก่อนยืนยันนัด'
+  return inShift ? '' : 'ยังไม่พบเวรในเวลาที่ขอ คลินิกจะตรวจสอบกับสัตวแพทย์ก่อนยืนยันนัด'
 })
 
 const resetBookingTime = () => {
@@ -1934,26 +1955,44 @@ button:disabled {
 .calendar-shell { min-width: 0; border: 0; border-radius: 0; background: transparent; overflow: visible; }
 .weekday-row { padding: 0 4px 11px; background: transparent; }
 .calendar-grid { gap: 6px; padding: 0; }
-.calendar-day { min-height: 68px; padding: 8px; border: 1px solid transparent; border-radius: 10px; }
+.calendar-day { min-height: 76px; padding: 8px; border: 1px solid transparent; border-radius: 10px; }
 .calendar-day:disabled { opacity: 1; cursor: default; }
 .calendar-day:disabled:not(.available) { color: #a6b3c1; }
 .calendar-day.available { background: #eef8f5; border-color: #d7eee7; }
 .calendar-day.available:hover:not(:disabled) { border-color: #0f766e; }
 .calendar-day.available:disabled { opacity: .46; }
+.calendar-day.has-my-appointment:not(.selected) { border-color: #d89c38; }
+.calendar-day.has-my-appointment:not(.selected):hover:not(:disabled) { border-color: #a6630a; }
 .calendar-day.selected { background: #0f766e; border-color: #0f766e; color: #fff; }
 .calendar-day.selected span,
 .calendar-day.selected small { color: #fff; }
-.calendar-day small { margin-top: 8px; font-size: 10px; line-height: 1.3; }
+.calendar-day small { margin-top: 5px; font-size: 10px; line-height: 1.3; }
+.calendar-day .calendar-my-appointment { width: fit-content; max-width: 100%; padding: 2px 4px; border-radius: 4px; background: #fff1d7; color: #72400a; white-space: nowrap; }
+.calendar-day .calendar-shift-count { color: #0b685f; }
+.calendar-day.selected .calendar-my-appointment { background: #fff1d7; color: #72400a; }
+.calendar-day.selected .calendar-shift-count { color: #fff; }
 .calendar-empty { margin: 12px 0 0; padding: 10px 0; color: #526277; font-size: 13px; line-height: 1.5; }
-.calendar-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; padding-top: 13px; color: #526277; font-size: 12px; }
-.calendar-legend span:first-child { display: inline-flex; align-items: center; gap: 7px; }
-.calendar-legend i { width: 7px; height: 7px; border-radius: 50%; background: #0f766e; }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-top: 13px; color: #526277; font-size: 12px; }
+.calendar-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.calendar-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.calendar-legend .legend-shift { background: #0f766e; }
+.calendar-legend .legend-appointment { background: #b36b0e; }
+.calendar-legend span:last-child { margin-left: auto; }
 .schedule-inline-error { padding: 20px; border: 1px solid #fecaca; border-radius: 12px; background: #fff7f7; color: #991b1b; }
 .schedule-inline-error p { margin: 5px 0 0; line-height: 1.5; }
 .schedule-inline-error .retry-btn { margin-top: 10px; }
 .day-schedule { min-width: 0; padding: 18px; border: 0; border-radius: 13px; background: #eef8f5; }
 .day-schedule-head span { color: #0b685f; }
 .day-schedule-head strong { margin-top: 5px; font-size: 1.1rem; line-height: 1.4; }
+.selected-day-appointments { margin-top: 14px; padding: 12px; border-radius: 10px; background: #fff; }
+.selected-day-appointments > strong { color: #0f172a; font-size: 13px; }
+.selected-day-appointment { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
+.selected-day-appointment + .selected-day-appointment { padding-top: 10px; border-top: 1px solid #e5edf5; }
+.selected-day-appointment > div { display: grid; gap: 2px; min-width: 0; }
+.selected-day-appointment span { color: #0f172a; font-size: 13px; font-weight: 700; }
+.selected-day-appointment small { color: #77500d; font-size: 11px; }
+.selected-day-appointment button { flex: 0 0 auto; min-height: 36px; padding: 6px 10px; border: 1px solid #cbd8e3; border-radius: 8px; background: #fff; color: #0b685f; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.selected-day-appointment button:hover { border-color: #0f766e; background: #f1f9f7; }
 .vet-shift-list { gap: 0; margin-top: 14px; border-top: 1px solid #d4e6e2; }
 .vet-shift { grid-template-columns: 34px 1fr; gap: 9px; padding: 11px 0; border: 0; border-bottom: 1px solid #d4e6e2; border-radius: 0; background: transparent; }
 .vet-avatar { width: 34px; height: 34px; border-radius: 9px; background: #fff; }
@@ -1971,6 +2010,7 @@ button:disabled {
   border: 1px solid #cbd8e3; border-radius: 10px;
   background: #fff; color: #0f172a; font: inherit;
 }
+.booking-vet > small { color: #526277; font-size: 11px; font-weight: 400; line-height: 1.45; }
 .time-entry { display: flex; align-items: end; gap: 9px; margin-top: 2px; }
 .time-part { display: grid; gap: 5px; width: 82px; min-width: 0; }
 .time-part > span { color: #526277; font-size: 11px; font-weight: 600; }
@@ -2054,8 +2094,8 @@ button:disabled {
   .booking-intro h2 { font-size: 1.28rem; }
   .month-switcher { width: 100%; grid-template-columns: 42px 1fr 42px; }
   .calendar-grid { gap: 3px; }
-  .calendar-day { min-height: 48px; padding: 5px; border-radius: 8px; }
-  .calendar-day small { margin-top: 4px; font-size: 9px; }
+  .calendar-day { min-height: 62px; padding: 5px; border-radius: 8px; }
+  .calendar-day small { margin-top: 3px; font-size: 9px; }
   .calendar-legend { font-size: 11px; }
   .day-schedule { padding: 15px; }
   .request-fields { grid-template-columns: 1fr; }

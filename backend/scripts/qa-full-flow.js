@@ -603,14 +603,14 @@ const main = async () => {
   );
   qa.ownerRequestIds.push(edgeRequest.appointment.appt_id);
   await expectStatus(
-    'clinic cannot approve a 16:50 request on a shift ending at 17:00',
-    409,
+    'clinic may approve an out-of-shift request after checking the doctor',
+    200,
     request('PATCH', `/appointments/requests/${edgeRequest.appointment.appt_id}/review`, {
       token: adminToken, body: { action: 'approve' }
     })
   );
   await expectStatus(
-    'clinic cannot create a 16:50 appointment on the same shift',
+    'clinic cannot double-book an approved out-of-shift appointment',
     409,
     request('POST', '/appointments', {
       token: adminToken,
@@ -618,28 +618,33 @@ const main = async () => {
     })
   );
   await expectStatus(
-    'clinic rejects a time one minute after the last valid start',
+    'clinic rejects a time overlapping that appointment',
     409,
     request('POST', '/appointments', {
       token: adminToken,
       body: { pet_id: qa.petId, vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:31', appt_reason: 'นัดท้ายเวร QA' }
     })
   );
+  await expectStatus(
+    'remove approved QA request before checking free out-of-shift booking',
+    200,
+    request('DELETE', `/appointments/${edgeRequest.appointment.appt_id}`, { token: adminToken })
+  );
   const edgeAppointment = await expectStatus(
-    'clinic accepts 16:30 as the last valid start',
+    'clinic creates an out-of-shift appointment',
     201,
     request('POST', '/appointments', {
       token: adminToken,
-      body: { pet_id: qa.petId, vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:30', appt_reason: 'นัดท้ายเวร QA' }
+      body: { pet_id: qa.petId, vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:50', appt_reason: 'นัดท้ายเวร QA' }
     })
   );
   qa.ownerRequestIds.push(edgeAppointment.appointment.appt_id);
   await expectStatus(
-    'clinic cannot move an active appointment to 16:50',
-    409,
+    'clinic moves an active appointment outside the shift',
+    200,
     request('PUT', `/appointments/${edgeAppointment.appointment.appt_id}`, {
       token: adminToken,
-      body: { vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:50', appt_reason: 'เลื่อนนัดท้ายเวร QA', appt_status: 'รอ' }
+      body: { vet_id: vetId, appt_date: edgeShift.workDate, appt_time: '16:31', appt_reason: 'เลื่อนนัดท้ายเวร QA', appt_status: 'รอ' }
     })
   );
   await expectStatus(
@@ -752,8 +757,11 @@ const main = async () => {
   await expectStatus('clinic cannot bypass request review with generic status change', 409, request('PUT', `/appointments/${ownerRequest.appointment.appt_id}/status`, {
     token: adminToken, body: { appt_status: 'ยืนยัน' }
   }));
-  await expectStatus('clinic approves owner appointment request', 200, request('PATCH', `/appointments/requests/${ownerRequest.appointment.appt_id}/review`, {
+  await expectStatus('clinic must choose a doctor for an any-doctor request', 400, request('PATCH', `/appointments/requests/${ownerRequest.appointment.appt_id}/review`, {
     token: adminToken, body: { action: 'approve' }
+  }));
+  await expectStatus('clinic approves owner appointment request', 200, request('PATCH', `/appointments/requests/${ownerRequest.appointment.appt_id}/review`, {
+    token: adminToken, body: { action: 'approve', vet_id: vetId }
   }));
   await expectStatus('clinic cannot approve overlapping request', 409, request('PATCH', `/appointments/requests/${competingRequest.appointment.appt_id}/review`, {
     token: adminToken, body: { action: 'approve' }

@@ -72,9 +72,10 @@
       <section class="gallery-showcase">
         <div class="gallery-copy">
           <h2>ภาพจากโรงพยาบาล</h2>
-          <p>เคสบริการจริงและเคสตัวอย่าง</p>
+          <p>เคสบริการจริง</p>
         </div>
 
+        <figure class="gallery-media">
         <div
           class="gallery-slider"
           aria-roledescription="carousel"
@@ -97,7 +98,7 @@
               class="gallery-slide"
               :aria-hidden="galleryPosition !== itemIndex"
             >
-              <img :src="item.src" :alt="item.title" loading="lazy" />
+              <img :src="item.src" :alt="item.alt || item.title" :style="item.objectPosition ? { objectPosition: item.objectPosition } : undefined" loading="lazy" />
               <div class="gallery-slide-title">{{ item.title }}</div>
             </article>
           </div>
@@ -134,6 +135,11 @@
           </div>
           <button type="button" class="gallery-pause" :aria-pressed="galleryPaused" @click="toggleGalleryPause">{{ galleryPaused ? 'เล่นภาพอัตโนมัติ' : 'หยุดภาพอัตโนมัติ' }}</button>
         </div>
+        <figcaption class="gallery-caption">
+          <strong v-if="activeGallerySlide.captionTitle">{{ activeGallerySlide.captionTitle }}</strong>
+          <p>{{ activeGallerySlide.description }}</p>
+        </figcaption>
+        </figure>
       </section>
 
       <section id="services" class="content-section">
@@ -257,32 +263,52 @@ const clinicGallery = [
   {
     id: 'cg-01',
     src: '/images/clinic-gallery/clinic-01.png',
-    title: 'เคสบริการจริง'
+    title: 'เคสบริการจริง',
+    alt: 'ภาพเอกซเรย์และแมวสวมปลอกคอกันเลีย',
+    description: 'ภาพเอกซเรย์และการดูแลแมวหลังเข้ารับบริการ'
   },
   {
     id: 'cg-02',
     src: '/images/clinic-gallery/clinic-02.png',
-    title: 'เคสบริการจริง'
+    title: 'เคสบริการจริง',
+    alt: 'สุนัขอยู่ในพื้นที่ดูแลสัตว์ของโรงพยาบาล',
+    description: 'บรรยากาศการดูแลสัตว์ภายในโรงพยาบาล'
   },
   {
     id: 'cg-03',
     src: '/images/clinic-gallery/clinic-03.png',
-    title: 'เคสตัวอย่าง'
+    title: 'เคสบริการจริง',
+    alt: 'กล่องเซรุ่มต้านพิษงูวางอยู่หน้าโค',
+    description: 'เวชภัณฑ์สำหรับดูแลสัตว์ที่โรงพยาบาล'
   },
   {
     id: 'cg-04',
     src: '/images/clinic-gallery/clinic-04.png',
-    title: 'เคสบริการจริง'
+    title: 'เคสบริการจริง',
+    alt: 'ภาพขั้นตอนการรักษาสัตว์และภาพเอกซเรย์',
+    description: 'ภาพจากขั้นตอนการตรวจและรักษา'
   },
   {
     id: 'cg-05',
     src: '/images/clinic-gallery/clinic-05.png',
-    title: 'เคสตัวอย่าง'
+    title: 'เคสบริการจริง',
+    alt: 'ภาพเอกซเรย์กระดูกขาของสัตว์',
+    description: 'ภาพเอกซเรย์ประกอบการตรวจ'
+  },
+  {
+    id: 'cg-06',
+    src: '/images/clinic-gallery/clinic-06-urinary-emergency.png',
+    title: 'เคสบริการจริง',
+    alt: 'แมวสีเทานอนอยู่บนโต๊ะตรวจที่โรงพยาบาลสัตว์',
+    objectPosition: 'center 62%',
+    captionTitle: 'แมวปัสสาวะไม่ออก: ภาวะฉุกเฉิน',
+    description: 'สังเกตอาการเบ่งปัสสาวะนาน เข้ากระบะบ่อย แต่ปัสสาวะออกน้อยหรือไม่ออกเลย บางรายท้องส่วนล่างอาจตึงจากกระเพาะปัสสาวะขยาย ภาวะอุดตันอาจทำให้ไตทำงานผิดปกติ ควรพามาพบสัตวแพทย์ทันที กรณีฉุกเฉินติดต่อโรงพยาบาลได้ตลอด 24 ชั่วโมง'
   }
 ]
 
 const gallerySlides = computed(() => [...clinicGallery, clinicGallery[0]])
 const currentGalleryIndex = computed(() => galleryPosition.value % clinicGallery.length)
+const activeGallerySlide = computed(() => clinicGallery[currentGalleryIndex.value])
 
 const imageLibrary = {
   treatment: 'https://images.unsplash.com/photo-1628009368231-7bb7cfcb0def?auto=format&fit=crop&w=1200&q=80',
@@ -333,7 +359,7 @@ function startGalleryAutoSlide() {
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
   if (clinicGallery.length > 1 && !reduceMotion && !galleryPaused.value) {
-    galleryTimer = window.setInterval(nextGallery, 5200)
+    galleryTimer = window.setInterval(nextGallery, 10000)
   }
 }
 
@@ -757,6 +783,13 @@ onBeforeUnmount(stopGalleryAutoSlide)
   text-wrap: balance;
 }
 
+.gallery-media {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+}
+
 .gallery-slider {
   position: relative;
   min-width: 0;
@@ -811,6 +844,25 @@ onBeforeUnmount(stopGalleryAutoSlide)
   font-size: clamp(1.1rem, 2vw, 1.45rem);
   font-weight: 800;
   line-height: 1.3;
+}
+
+.gallery-caption {
+  display: grid;
+  gap: 3px;
+  min-height: 78px;
+  color: #122f3e;
+}
+
+.gallery-caption strong {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.gallery-caption p {
+  margin: 0;
+  color: #455c69;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .gallery-control {
